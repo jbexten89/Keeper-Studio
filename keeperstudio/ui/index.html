@@ -2116,20 +2116,28 @@ const Crop = {
     renderAll(); this.ensurePlan();
   },
   active() { return S.byId.get(S.active) || null; },
-  ensurePlan(p = this.active()) {
+  seq: 0,
+  ensurePlan(p = this.active(), prefetch = false) {
     if (!p || S.module !== 'crop') return;
     if (this.plans.has(p.path) || this.inflight.has(p.path)) return;
     const manual = this.manual.get(p.path) || null;
-    const pr = api('/api/crop/plan', { path: p.path, manual }).then(plan => {
+    const focus = !prefetch && p === this.active();
+    const pr = api('/api/crop/plan', { path: p.path, manual, seq: ++this.seq, focus }).then(plan => {
+      if (plan.stale) return;  // skipped: you had already moved on
       this.plans.set(p.path, plan);
       this.status.set(p.path, { status: plan.status, label: plan.label, reason: plan.reason, src: 'check' });
       DB.put('cropstatus', p.path, this.status.get(p.path)).catch(() => {});
     }).catch(e => { this.plans.set(p.path, { error: e.message }); })
-      .finally(() => { this.inflight.delete(p.path); if (S.module === 'crop') { renderView(); renderRight(); renderLeft(); schedule(R_CELLS); } });
+      .finally(() => {
+        this.inflight.delete(p.path);
+        if (S.module !== 'crop') return;
+        if (!this.plans.has(p.path) && this.active() === p) return this.ensurePlan(p);  // was skipped but is back on screen
+        renderView(); renderRight(); renderLeft(); schedule(R_CELLS);
+      });
     this.inflight.set(p.path, pr);
     renderView();
     const i = S.viewIndex.get(p.id);  // warm up the neighbours so stepping through is instant
-    if (i != null) setTimeout(() => { const n = S.view[i + 1]; if (n && S.module === 'crop' && !this.plans.has(n.path) && !this.inflight.has(n.path) && this.inflight.size < 2) this.ensurePlan(n); }, 50);
+    if (i != null) setTimeout(() => { const n = S.view[i + 1]; if (n && S.module === 'crop' && !this.plans.has(n.path) && !this.inflight.has(n.path) && this.inflight.size < 2) this.ensurePlan(n, true); }, 400);
   },
   render() { renderView(); renderLeft(); renderRight(); },
 
@@ -2335,7 +2343,7 @@ const Crop = {
     const batch = [];
     const fin = await pollJob(id, s => {
       this.jobState = s;
-      for (const it of s.items) { const v = { status: it.status, label: it.label, reason: it.reason, src: 'check' }; this.status.set(it.path, v); batch.push([it.path, v]); }
+      for (const it of s.items) { const v = { status: it.status, label: it.label, reason: it.reason, src: 'check' }; this.status.set(it.path, v); batch.push([it.path, v]); if (it.plan) this.plans.set(it.path, it.plan); }
       if (S.module === 'crop') { renderLeft(); schedule(R_CELLS); }
     });
     DB.putMany('cropstatus', batch).catch(() => {});

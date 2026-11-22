@@ -281,6 +281,59 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
 pipeline.process_image = _process_image  # run_job looks it up at call time
 
 
+# ---- remembered framing checks ---------------------------------------------
+# A check is saved in the catalog under a key made from everything that can
+# change its answer: the photo (path, size, date), config.yaml, the framing
+# settings and any hand placement. Same inputs -> instant answer, even after a
+# restart; change any of them and that photo is checked afresh.
+plan_store = None  # set by the server: a Catalog
+_PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
+                  "landscape", "fit_to_frame", "disabled_sizes")
+_focus_lock = threading.Lock()
+_latest_focus = 0
+
+
+def _plan_key(path: str, settings: dict, manual: dict | None) -> str | None:
+    import hashlib
+    try:
+        st = os.stat(path)
+        cfg_m = os.stat(paths.config_path()).st_mtime
+    except OSError:
+        return None
+    sig = json.dumps([path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual],
+                     sort_keys=True, default=str)
+    return hashlib.sha1(sig.encode("utf-8")).hexdigest()
+
+
+def plan_cached(path: str, settings: dict, manual: dict | None = None, seq: int = 0, focus: bool = False) -> dict:
+    """plan(), remembered; and stale requests skipped while the user steps fast.
+
+    The window numbers its requests. A newer request for the photo on screen
+    makes any older request still waiting for the engine pointless, so it is
+    answered {"stale": true} instead of tying the engine up for seconds.
+    """
+    global _latest_focus
+    key = _plan_key(path, settings, manual)
+    if key and plan_store is not None:
+        hit = plan_store.get("plans", key)
+        if hit:
+            return hit
+    if seq:
+        with _focus_lock:
+            if focus and seq > _latest_focus:
+                _latest_focus = seq
+    with _engine_lock:
+        if seq and seq < _latest_focus and not (focus and seq == _latest_focus):
+            return {"path": path, "stale": True}
+        result = plan(path, settings, manual)
+    if key and plan_store is not None:
+        try:
+            plan_store.put("plans", key, result)
+        except Exception:
+            pass
+    return result
+
+
 def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
     """Where every size would be cut, without writing anything."""
     if Path(path).suffix.lower() not in {".jpg", ".jpeg"}:
@@ -397,8 +450,8 @@ def start_analyze(photo_paths: list[str], settings: dict, manual: dict) -> jobs.
                 break
             job.update(current=Path(p).name)
             try:
-                r = plan(p, settings, manual.get(p))
-                job.add_item({"path": p, "status": r["status"], "label": r["label"], "reason": r["reason"]})
+                r = plan_cached(p, settings, manual.get(p))
+                job.add_item({"path": p, "status": r["status"], "label": r["label"], "reason": r["reason"], "plan": r})
             except Exception as exc:
                 job.add_item({"path": p, "status": "review", "label": "error", "reason": f"{type(exc).__name__}: {exc}"})
             job.update(done=i)

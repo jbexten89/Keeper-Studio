@@ -212,7 +212,7 @@ def r_crop_settings(b):
 
 def r_crop_plan(b):
     settings = engine.merged_settings(catalog.get("settings", "crop"))
-    return engine.plan(b["path"], settings, b.get("manual"))
+    return engine.plan_cached(b["path"], settings, b.get("manual"), int(b.get("seq") or 0), bool(b.get("focus")))
 
 
 def r_crop_analyze(b):
@@ -300,6 +300,7 @@ ROUTES = {
 def serve(port: int = 0) -> ThreadingHTTPServer:
     global catalog
     catalog = Catalog(paths.catalog_path())
+    engine.plan_store = catalog
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, name="ks-server", daemon=True).start()
