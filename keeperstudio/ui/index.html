@@ -435,6 +435,9 @@ kbd{font-size:10px}
 .sheet-list{display:flex;flex-direction:column;gap:2px;max-height:50vh;overflow:auto}
 .sheet-list .row{background:none;border:0;color:var(--text);text-align:left;width:100%}
 .prompt-wrap{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:120;display:flex;align-items:center;justify-content:center}
+.filter-empty{position:absolute;inset:0;min-height:300px}
+.filter-empty>div{display:flex;flex-direction:column;align-items:center;gap:10px;line-height:1.5}
+.filter-empty .btn{margin-top:6px}
 </style>
 </head>
 <body>
@@ -753,6 +756,8 @@ function loadPhotos(res) {
   }
   for (const [x, n] of Object.entries(res.skipped || {})) { S.skipped += n; S.skippedExt.set(x.replace(/^\./, '') || 'no extension', n); }
   S.source = { type: 'all' }; S.mode = 'grid'; S.zoom = { mode: 'fit', cx: .5, cy: .5 };
+  // A new shoot starts unfiltered: a leftover filter (e.g. Crop: Needs review) would hide every photo.
+  S.filter = { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' }; if ($('#fText')) $('#fText').value = '';
   updateSkippedBanner();
   recomputeView();
   if (S.view.length) { S.active = S.view[0].id; S.selected = new Set([S.active]); S.anchor = S.active; }
@@ -1190,7 +1195,7 @@ function renderGrid() {
   }
   for (const [id, el] of cellEls) if (!want.has(id)) { el.remove(); cellEls.delete(id); }
   for (let i = urgent.length - 1; i >= 0; i--) Thumbs.request(urgent[i], true);
-  if (!S.view.length) inner.innerHTML = `<div class="msg">No photos match this filter.</div>`;
+  if (!S.view.length) inner.innerHTML = `<div class="msg filter-empty"><div><b>No photos match the current filter</b><br><span class="muted">${esc(filterSummary())}</span><br><button class="btn primary" data-clear-filter>Show all ${sourcePhotos().length} photos</button></div></div>`;
   else { const msg = inner.querySelector(':scope > .msg'); if (msg) msg.remove(); }
 }
 
@@ -1579,6 +1584,15 @@ function buildFilterBar() {
   $('#fSource').addEventListener('change', e => { setSource(e.target.value); e.target.blur(); });
   $('#fReset').addEventListener('click', () => { S.filter = { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' }; $('#fText').value = ''; afterFilter(); });
 }
+function filterSummary() {
+  const f = S.filter, parts = [];
+  if (f.flag !== 'any') parts.push('Flag: ' + $('#fFlag').selectedOptions[0].text);
+  if (f.rating) parts.push('Rating ≥ ' + f.rating + '★');
+  if (f.label !== 'any') parts.push('Label: ' + f.label);
+  if (f.crop && f.crop !== 'any') parts.push('Crop: ' + (STATUS_INFO[f.crop] || {}).label);
+  if (f.text) parts.push('Name contains “' + f.text + '”');
+  return parts.length ? 'Filtered by ' + parts.join(' · ') : 'This source is empty';
+}
 function afterFilter() {
   recomputeView();
   if (S.active == null && S.view.length && S.mode !== 'grid') S.active = S.view[0].id;
@@ -1896,6 +1910,7 @@ function bindEvents() {
       if (act === 'help') return toggleHelp();
     }
     const tg = e.target.closest('[data-toggle]'); if (tg) return togglePanel(tg.dataset.toggle);
+    if (e.target.closest('[data-clear-filter]')) { S.filter = { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' }; $('#fText').value = ''; return afterFilter(); }
     const rc = e.target.closest('[data-recent]'); if (rc) return loadFolder(rc.dataset.recent);
     const dm = e.target.closest('[data-dismiss]'); if (dm) { S.banners = S.banners.filter(b => b.id !== dm.dataset.dismiss); renderBanners(); }
   });
