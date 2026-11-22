@@ -2337,19 +2337,6 @@ const Crop = {
         const hole = c ? `M${c[0] - c[2]} ${c[1]}a${c[2]} ${c[2]} 0 1 0 ${2 * c[2]} 0a${c[2]} ${c[2]} 0 1 0 ${-2 * c[2]} 0Z` : `M${x} ${y}V${y + h}H${x + w}V${y}Z`;
         shapes += `<path d="${dimRect} ${hole}" fill="${c ? 'rgba(5,6,8,.9)' : 'rgba(5,6,8,.62)'}" fill-rule="evenodd"/>`;
       }
-      if (this.settings.vignette) {
-        // preview on the hovered/focused size, else the largest full-length size
-        const vb = focus || plan.boxes.find(b => b.name !== 'needed' && !this.circleFor(b) && !(b.name === (this.tightSize() || {}).name)) || plan.boxes[0];
-        if (vb && vb.name !== 'needed') {
-          const [x, y, w, h] = vb.box, amt = this.settings.vignette_amount ?? 0.2, start = 1.2 - 0.8 * (this.settings.vignette_size ?? 0.5);
-          let stops = '';
-          for (let i = 0; i <= 12; i++) {
-            const r = i / 12 * Math.SQRT2; let t = clamp((r - start) / (Math.SQRT2 - start), 0, 1); t = t * t * (3 - 2 * t);
-            stops += `<stop offset="${(r / Math.SQRT2).toFixed(3)}" stop-color="#000" stop-opacity="${(amt * t).toFixed(3)}"/>`;
-          }
-          shapes += `<defs><radialGradient id="vgPrev" cx=".5" cy=".5" r="${(Math.SQRT2 / 2).toFixed(4)}">${stops}</radialGradient></defs><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#vgPrev)"/>`;
-        }
-      }
       plan.boxes.forEach(b => {
         const [x, y, w, h] = b.box; const col = this.color(b.name); const hot = fname === b.name;
         if (fname && !hot) return;
@@ -2525,10 +2512,7 @@ const Crop = {
         ${switchHTML('landscape', s.landscape, 'Crop group shots', 'Landscape photos are cropped to the landscape sizes around the whole group')}
         <div class="pad"><button class="btn sm wide" data-crop="tunables">Fine-tune framing…</button></div>`)
       + sectionHTML('c-color', 'Color', `${switchHTML('enhance', s.enhance, 'Apply color preset', s.preschool ? 'Uses the preschool preset' : 'Uses the standard preset')}
-        <div class="pad ${s.enhance ? '' : 'disabled'}">${segHTML('enhanceWhen', s.enhance_when, [['before', 'Before cropping'], ['after', 'After cropping']])}</div>
-        ${switchHTML('vignette', s.vignette, 'Vignette', 'Darkens the edges of each print slightly, fitted to that print’s own edges')}
-        ${s.vignette ? `<div class="slider-row" title="How dark the corners get"><span>Amount</span><input type="range" min="0.05" max="0.6" step="0.01" value="${s.vignette_amount ?? 0.2}" data-range="vignette_amount"><b>${Math.round((s.vignette_amount ?? 0.2) * 100)}%</b></div>
-        <div class="slider-row" title="How far in from the edges it starts"><span>Size</span><input type="range" min="0" max="1" step="0.01" value="${s.vignette_size ?? 0.5}" data-range="vignette_size"><b>${Math.round((s.vignette_size ?? 0.5) * 100)}%</b></div>` : ''}`)
+        <div class="pad ${s.enhance ? '' : 'disabled'}">${segHTML('enhanceWhen', s.enhance_when, [['before', 'Before cropping'], ['after', 'After cropping']])}</div>`)
       + sectionHTML('c-out', 'Output', `<div class="pad"><div class="pathrow"><span class="path" title="${esc(this.outDir)}">${esc(this.outDir || 'Open a folder first')}</span></div>
         <div class="btn-row"><button class="btn sm" data-crop="out-change">Change…</button>${this.outCustom ? '<button class="btn sm" data-crop="out-default">Use default</button>' : '<span class="muted small">default</span>'}</div></div>
         ${switchHTML('orders', s.orders, `Also copy all sizes to “${esc(this.ordersName)}”`)}
@@ -2978,7 +2962,6 @@ function bindModuleEvents() {
     $(sel).addEventListener('input', e => {
       const r = e.target.closest('[data-range]'); if (!r) return;
       const b = r.parentElement.querySelector('b'); if (b) b.textContent = Math.round(+r.value * 1000) / 10 + '%';
-      if (/^vignette_/.test(r.dataset.range) && Crop.settings) { Crop.settings[r.dataset.range] = +r.value; Crop.center(); }  // live preview while dragging
     });
     $(sel).addEventListener('change', e => { const r = e.target.closest('[data-range]'); if (r) Crop.saveSettings({ [r.dataset.range]: +r.value }); });
   });

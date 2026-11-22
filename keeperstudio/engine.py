@@ -152,7 +152,6 @@ if not getattr(_orig_build, "_ks_wrapped", False):
 SETTINGS_FIELDS = (
     "preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
     "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes", "framing_style",
-    "vignette", "vignette_amount", "vignette_size",
 )
 FRAMING_STYLES = ("full", "knee_above", "knee_below")
 PHOTO_STYLES = ("full", "knee_above", "knee_below", "preschool")
@@ -190,7 +189,6 @@ def default_settings(cfg=None) -> dict:
         "fit_to_frame": bool(cfg.fit_to_frame),
         "disabled_sizes": [],
         "framing_style": "full",
-        "vignette": False, "vignette_amount": 0.2, "vignette_size": 0.5,
     }
 
 
@@ -524,56 +522,6 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
 
 
 pipeline.process_image = _process_image  # run_job looks it up at call time
-
-
-# ---- vignette ----------------------------------------------------------------
-# Applied to each print after cropping (and after the colour preset), shaped to
-# that print's own edges, so every size gets an even, centred falloff.
-def vignette_mask(w: int, h: int, amount: float, size: float):
-    """Per-pixel multiplier: 1 in the middle, 1-amount in the corners.
-
-    Distance is measured in the frame's own proportions: 1 at the middle of
-    each edge, ~1.41 in the corners. `size` sets how far in the darkening
-    starts (0 = only the corners, 1 = from near the centre).
-    """
-    import numpy as np
-    start = 1.2 - 0.8 * max(0.0, min(1.0, size))
-    xs = (np.arange(w, dtype=np.float32) + 0.5) / w * 2 - 1
-    ys = (np.arange(h, dtype=np.float32) + 0.5) / h * 2 - 1
-    r = np.sqrt(xs[None, :] ** 2 + ys[:, None] ** 2)
-    t = np.clip((r - start) / (2 ** 0.5 - start), 0, 1)
-    t = t * t * (3 - 2 * t)  # smoothstep
-    return 1 - max(0.0, min(0.8, amount)) * t
-
-
-def apply_vignette(im: Image.Image, amount: float, size: float) -> Image.Image:
-    import numpy as np
-    arr = np.asarray(im.convert("RGB"), np.float32)
-    m = vignette_mask(im.width, im.height, amount, size)
-    return Image.fromarray(np.clip(arr * m[:, :, None] + 0.5, 0, 255).astype(np.uint8), "RGB")
-
-
-def _install_vignette_hook():
-    import dataclasses as dc
-    from photocropper import imageio
-    if getattr(imageio.save_crop, "_ks_wrapped", False):
-        return
-    orig = imageio.save_crop
-
-    def save_crop(source, box, destination, *, post_lut=None, **kw):
-        v = getattr(_tl, "vignette", None)
-        if not v:
-            return orig(source, box, destination, post_lut=post_lut, **kw)
-        cropped = source.image.crop(box)
-        if post_lut is not None:
-            cropped = enhance.apply_lut(cropped, post_lut)
-        cropped = apply_vignette(cropped, v[0], v[1])
-        return orig(dc.replace(source, image=cropped), (0, 0, cropped.width, cropped.height), destination, **kw)
-    save_crop._ks_wrapped = True
-    imageio.save_crop = save_crop
-
-
-_install_vignette_hook()
 
 
 # ---- 3/4 length ----------------------------------------------------------------
@@ -933,8 +881,6 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
             cfg = run_config(s)
             _tl.group_manual = group
             _tl.framing_style = s.get("framing_style") or "full"
-            _tl.vignette = ((float(s.get("vignette_amount") or 0.2), float(s.get("vignette_size") or 0.5))
-                            if s.get("vignette") else None)
 
             def progress(done, total, result, offset=offset):
                 st_, label = _status(result, str(result.path) in manual)
@@ -958,7 +904,6 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
             finally:
                 _tl.group_manual = None
                 _tl.framing_style = "full"
-                _tl.vignette = None
             offset += len(batch)
             totals["ok"] += summary.count(pipeline.OK)
             totals["review"] += len(summary.review)
