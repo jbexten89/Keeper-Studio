@@ -519,6 +519,10 @@ kbd{font-size:10px}
 .mini-switch::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#C9CED6;transition:left .12s}
 .mini-switch.on{background:var(--accent)}
 .mini-switch.on::after{left:14px;background:#fff}
+.banner.info{background:var(--accent);color:#03111E}
+.banner.info button[data-dismiss]{color:#03111E}
+.banner .banner-act{margin-left:auto;background:#03111E;color:#fff;border-color:#03111E}
+.help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
 </style>
 </head>
 <body>
@@ -1149,7 +1153,7 @@ function starsHTML(r, interactive, cls = '') {
   return `<span class="stars ${r ? '' : 'zero'} ${cls}">${s}</span>`;
 }
 function renderBanners() {
-  $('#banners').innerHTML = S.banners.map(b => `<div class="banner amber" data-id="${b.id}"><span>${esc(b.text)}</span><button data-dismiss="${b.id}" title="Dismiss">✕</button></div>`).join('');
+  $('#banners').innerHTML = S.banners.map(b => `<div class="banner ${b.cls || 'amber'}" data-id="${b.id}"><span>${esc(b.text)}</span>${b.action ? `<button class="btn sm banner-act" data-banner-url="${esc(b.action.url)}">${esc(b.action.label)}</button>` : ''}<button data-dismiss="${b.id}" title="${b.id === 'update' ? 'Later' : 'Dismiss'}">✕</button></div>`).join('');
 }
 function renderTop() {
   if ($('#top')._built) return; $('#top')._built = true;
@@ -1946,7 +1950,7 @@ function toast(html, ms = 1500) {
 }
 function buildHelp() {
   const g = (title, rows) => `<div><h4>${title}</h4>${rows.map(([d, k]) => `<div class="hk"><span>${d}</span><span>${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</span></div>`).join('')}</div>`;
-  $('#help').innerHTML = `<div class="help-card"><h3>Keyboard Shortcuts</h3><div class="help-grid">
+  $('#help').innerHTML = `<div class="help-card"><h3>Keyboard Shortcuts <span class="help-ver">Keeper Studio ${esc((S.hello && S.hello.version) || '')}</span></h3><div class="help-grid">
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
@@ -2883,6 +2887,15 @@ const Cut = {
 };
 
 /* ---------- module UI events ---------- */
+// A newer release on GitHub? Shown once per launch as a blue banner; ✕ means "later".
+async function checkForUpdate() {
+  try {
+    const r = await api('/api/update-check', {});
+    if (!r.ok || !r.newer || S.banners.some(b => b.id === 'update')) return;
+    S.banners.push({ id: 'update', cls: 'info', text: `Keeper Studio ${r.latest} is available — you have ${r.current}. Download it, unzip it, and replace your Keeper Studio folder; your settings and framing are kept.`, action: { label: 'Download', url: r.page } });
+    renderBanners();
+  } catch {}
+}
 function setFilmH(v, save) {
   const h = clamp(Math.round(v), 84, 320); if (h === S.filmH && !save) return;
   const fs = $('#filmScroll'), ratio = fs && fs.scrollWidth ? fs.scrollLeft / fs.scrollWidth : 0;
@@ -2917,6 +2930,7 @@ function bindFilmSize() {
   g.addEventListener('dblclick', () => setFilmH(124, true));
 }
 function bindModuleEvents() {
+  $('#banners').addEventListener('click', e => { const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
   bindFilmSize();
   $('#top').addEventListener('click', e => { const b = e.target.closest('[data-module]'); if (b) setModule(b.dataset.module); });
   const onClick = async e => {
@@ -3016,6 +3030,8 @@ async function init() {
   window.reveal = reveal;
   if (location.search.includes('fallback')) S.banners.push({ id: 'fallback', text: 'Keeper Studio opened in your web browser because its own window couldn’t start. Everything works here, but folder pickers ask you to type or paste the path.' });
   try { const h = await api('/api/hello', {}); S.recent = h.recent || []; S.hello = h; } catch (e) { toast('Keeper Studio’s engine is not responding: ' + esc(e.message), 6000); }
+  { const hv = $('#help .help-ver'); if (hv && S.hello) hv.textContent = 'Keeper Studio ' + S.hello.version; }
+  setTimeout(checkForUpdate, 4000);
   await Promise.all([loadStore(), Crop.load(), Comp.load()]);
   renderAll();
 }

@@ -142,6 +142,43 @@ class Handler(BaseHTTPRequestHandler):
 
 # ------------------------------------------------------------------ routes --
 
+RELEASES_API = "https://api.github.com/repos/jbexten89/Keeper-Studio/releases/latest"
+RELEASES_PAGE = "https://github.com/jbexten89/Keeper-Studio/releases/latest"
+
+
+def _vtuple(v: str) -> tuple:
+    out = []
+    for part in v.lstrip("vV").split("."):
+        num = "".join(ch for ch in part if ch.isdigit())
+        out.append(int(num) if num else 0)
+    return tuple(out + [0] * (3 - len(out)))
+
+
+def r_update_check(b):
+    """Is a newer release published? Reads only the latest version number."""
+    import urllib.request
+    try:
+        req = urllib.request.Request(RELEASES_API, headers={"Accept": "application/vnd.github+json",
+                                                            "User-Agent": f"KeeperStudio/{__version__}"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        latest = str(data.get("tag_name") or "")
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "current": __version__}
+    newer = bool(latest) and _vtuple(latest) > _vtuple(__version__)
+    return {"ok": True, "current": __version__, "latest": latest.lstrip("vV"), "newer": newer,
+            "page": data.get("html_url") or RELEASES_PAGE, "notes": (data.get("body") or "")[:1500]}
+
+
+def r_open_url(b):
+    url = str(b.get("url") or "")
+    if not url.startswith("https://github.com/jbexten89/Keeper-Studio"):
+        raise ValueError("only the Keeper Studio releases page can be opened")
+    import webbrowser
+    webbrowser.open(url)
+    return {"ok": True}
+
+
 def r_hello(b):
     return {
         "version": __version__, "dialogs": dialogs is not None, "platform": sys.platform,
@@ -301,7 +338,7 @@ def r_cutout_existing(b):
 
 
 ROUTES = {
-    "/api/hello": r_hello,
+    "/api/hello": r_hello, "/api/update-check": r_update_check, "/api/open-url": r_open_url,
     "/api/db/entries": r_db_entries, "/api/db/get": r_db_get, "/api/db/put": r_db_put, "/api/db/del": r_db_del,
     "/api/dialog": r_dialog,
     "/api/library/open": r_open_folder, "/api/library/info": r_info,

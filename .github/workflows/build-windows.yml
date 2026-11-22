@@ -3,9 +3,16 @@ name: Build Windows app
 # Builds a stand-alone "Keeper Studio" folder (Keeper Studio.exe + its files)
 # so the app runs on a Windows PC with no Python installed. PyInstaller cannot
 # cross-compile, so this runs on a Windows machine at GitHub.
+#
+# Every push makes a test build (kept 30 days under Actions). Pushing a version
+# tag such as v1.0.0 also publishes a Release with the zipped app attached;
+# releases are kept until deleted.
 on:
   workflow_dispatch:
   push:
+
+permissions:
+  contents: write  # lets a tag build create its Release
 
 jobs:
   build:
@@ -23,6 +30,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install --upgrade pyinstaller
+
+      - name: Stamp the version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          (Get-Content keeperstudio/__init__.py) -replace '__version__ = ".*"', "__version__ = `"$v`"" | Set-Content keeperstudio/__init__.py
+          Get-Content keeperstudio/__init__.py | Write-Host
+        shell: pwsh
 
       - name: Build
         run: pyinstaller --noconfirm keeperstudio.spec
@@ -57,3 +72,18 @@ jobs:
           name: KeeperStudio-Windows
           path: dist/Keeper Studio/
           retention-days: 30
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $zip = "KeeperStudio-Windows-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "dist/Keeper Studio" -DestinationPath $zip
+          $notes = @"
+          **Download** $zip below, unzip it, and run **Keeper Studio.exe** inside the Keeper Studio folder.
+
+          Updating: replace your old Keeper Studio folder with the new one. Your settings, framing and catalog live in %LOCALAPPDATA%\KeeperStudio and are kept.
+          "@
+          gh release create "${{ github.ref_name }}" $zip --title "Keeper Studio ${{ github.ref_name }}" --notes $notes --generate-notes
+        shell: pwsh

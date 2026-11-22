@@ -9,6 +9,19 @@ and the web version of **Keeper** (jbexten89/Keeper) keep working exactly as
 before. Keeper Studio has its own copy of the engine and its own `config.yaml`,
 so changing framing here never changes PhotoCropper.
 
+
+## Download
+
+Get the newest version from **[Releases](https://github.com/jbexten89/Keeper-Studio/releases/latest)**:
+download `KeeperStudio-Windows-vX.Y.Z.zip`, unzip it, and run **Keeper Studio.exe**.
+To update, replace the old Keeper Studio folder with the new one; settings, framing
+and the catalog live in `%LOCALAPPDATA%\KeeperStudio` and are kept. The app shows a
+banner when a newer release is out.
+
+Releases are made by pushing a version tag (`git tag v1.1.0 && git push origin v1.1.0`);
+the build stamps that version into the app and attaches the zip. Ordinary pushes still
+make test builds under Actions, kept for 30 days.
+
 ## Install
 
 **Easiest (no Python needed):** open this repository's **Actions** tab → the
