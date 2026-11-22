@@ -2632,6 +2632,7 @@ async function init() {
   bindEvents(); bindModuleEvents();
   renderAll();
   window.reveal = reveal;
+  if (location.search.includes('fallback')) S.banners.push({ id: 'fallback', text: 'Keeper Studio opened in your web browser because its own window couldn’t start. Everything works here, but folder pickers ask you to type or paste the path.' });
   try { const h = await api('/api/hello', {}); S.recent = h.recent || []; S.hello = h; } catch (e) { toast('Keeper Studio’s engine is not responding: ' + esc(e.message), 6000); }
   await Promise.all([loadStore(), Crop.load(), Comp.load()]);
   renderAll();

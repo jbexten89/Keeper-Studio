@@ -15,6 +15,41 @@ from pathlib import Path
 from . import paths, server
 
 
+def _unblock_downloaded_files() -> None:
+    """Remove Windows' "downloaded from the internet" mark from the app's DLLs.
+
+    Windows tags every file extracted from a downloaded ZIP. The .NET loader
+    behind the app window (pythonnet) refuses tagged DLLs and the app dies with
+    "Failed to resolve Python.Runtime.Loader.Initialize". Deleting the tag (an
+    NTFS alternate data stream) is what right-click > Properties > Unblock does.
+    """
+    if os.name != "nt" or not getattr(sys, "frozen", False):
+        return
+    root = paths.bundle_dir()
+    for folder, _dirs, files in os.walk(root):
+        for name in files:
+            if name.lower().endswith((".dll", ".pyd", ".exe")):
+                try:
+                    os.remove(os.path.join(folder, name) + ":Zone.Identifier")
+                except OSError:
+                    pass
+
+
+def _open_in_browser(url: str, reason: str | None = None) -> int:
+    import webbrowser
+    if reason:
+        try:
+            (paths.data_dir() / "window-error.txt").write_text(reason, encoding="utf-8")
+        except OSError:
+            pass
+    webbrowser.open(url + ("?fallback=1" if reason else ""))
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        return 0
+
+
 def _selftest() -> int:
     """Load config and models and plan a crop on a blank frame; used by CI."""
     lines = []
@@ -35,6 +70,9 @@ def _selftest() -> int:
             raise FileNotFoundError(ui)
         import webview  # noqa: F401
         lines.append("pywebview: ok")
+        if os.name == "nt":
+            import clr  # noqa: F401  (loads pythonnet / .NET, which the window needs)
+            lines.append("pythonnet: ok")
         lines.append("sizes: " + ", ".join(s["name"] for s in engine.sizes(cfg)))
         lines.append("OK")
         code = 0
@@ -46,6 +84,7 @@ def _selftest() -> int:
 
 
 def main() -> int:
+    _unblock_downloaded_files()
     if "--selftest" in sys.argv:
         return _selftest()
 
@@ -57,22 +96,16 @@ def main() -> int:
     url = f"http://127.0.0.1:{httpd.server_address[1]}/"
 
     if "--browser" in sys.argv or os.environ.get("KS_BROWSER"):
-        import webbrowser
         print(f"Keeper Studio running at {url}")
-        webbrowser.open(url)
-        try:
-            while True:
-                time.sleep(3600)
-        except KeyboardInterrupt:
-            return 0
+        return _open_in_browser(url)
 
     try:
         import webview
-    except ImportError:
-        import webbrowser
-        webbrowser.open(url)
-        while True:
-            time.sleep(3600)
+        if os.name == "nt":
+            import clr  # noqa: F401  fail here, not halfway through opening the window
+    except Exception as exc:
+        import traceback
+        return _open_in_browser(url, traceback.format_exc())
 
     window = webview.create_window(
         "Keeper Studio", url, width=1560, height=980, min_size=(1100, 720),
@@ -118,6 +151,11 @@ def main() -> int:
             pass
 
     window.events.loaded += on_loaded
-    webview.start(private_mode=False, storage_path=str(paths.data_dir() / "webview"))
+    try:
+        webview.start(private_mode=False, storage_path=str(paths.data_dir() / "webview"))
+    except Exception:
+        import traceback
+        server.dialogs = None
+        return _open_in_browser(url, traceback.format_exc())
     httpd.shutdown()
     return 0
