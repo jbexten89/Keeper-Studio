@@ -1154,9 +1154,14 @@ function folderTree() {
   for (const p of S.photos) { const parts = p.folder.split('/'); for (let i = 1; i <= parts.length; i++) { const k = parts.slice(0, i).join('/'); counts.set(k, (counts.get(k) || 0) + 1); } }
   return [...counts.entries()].sort((a, b) => collator.compare(a[0], b[0]));
 }
+function keepScroll(sel, draw) {
+  // panels are redrawn often (every check, every click): keep where the user had scrolled to
+  const old = $(sel + ' .scroll'), y = old ? old.scrollTop : 0; draw();
+  const neu = $(sel + ' .scroll'); if (neu && y) neu.scrollTop = y;
+}
 function renderLeft() {
   if (!S.panels.left) return;
-  if (S.module !== 'library') { const m = Mods.get(S.module); return m && m.left(); }
+  if (S.module !== 'library') { const m = Mods.get(S.module); return m && keepScroll('#left', () => m.left()); }
   const cur = srcKey(S.source);
   const row = (key, label, count, extra = '', attrs = '') =>
     `<div class="row src ${key === cur ? 'on' : ''}" data-src="${esc(key)}" ${attrs}>${label}${extra}<span class="cnt">${count}</span></div>`;
@@ -1573,7 +1578,7 @@ function fmtExif(p) {
 function fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB'; }
 function renderRight() {
   if (!S.panels.right) return;
-  if (S.module !== 'library') { const m = Mods.get(S.module); return m && m.right(); }
+  if (S.module !== 'library') { const m = Mods.get(S.module); return m && keepScroll('#right', () => m.right()); }
   const p = S.byId.get(S.active); const R = $('#right');
   if (!p) {
     R.innerHTML = `<div class="scroll">${sectionHTML('hist', 'Histogram', '<div class="hist-wrap"><canvas id="hist" width="512" height="200"></canvas></div>')}<div class="hint">${S.photos.length ? 'Select a photo to see its details.' : 'Open a folder to get started.'}</div></div>`;
