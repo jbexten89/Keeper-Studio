@@ -470,6 +470,14 @@ kbd{font-size:10px}
 #left .sec .row{padding-top:3px;padding-bottom:3px}
 #left .sec .pad{padding-top:6px;padding-bottom:6px}
 #left .slider-row{gap:8px;padding-right:14px}#left .slider-row b{min-width:0}
+.rechecking{position:relative}
+.rechecking .status-card{opacity:.45;pointer-events:none}
+.recheck-badge{position:absolute;top:18px;right:22px;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.status-card.checking{min-height:96px}
+.size-row.master{border-bottom:1px solid var(--border);margin-bottom:3px;padding-bottom:6px}
+.size-row.master .sz-name{font-weight:600}
+.chk.some{background:#0C0D10;border-color:var(--accent)}
+.chk.some::after{content:'';position:absolute;left:3px;top:6px;width:7px;height:2px;background:var(--accent)}
 </style>
 </head>
 <body>
@@ -2447,8 +2455,12 @@ const Crop = {
         ${plan.missing && plan.missing.length ? `<div class="miss-note"><b>${plan.missing.map(prettySize).join(', ')} won’t be made</b> — its tight framing couldn’t be placed automatically on this photo (more than one face found, or it runs off the edge). Press <kbd>S</kbd> to place it by hand.</div>` : ''}
         <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${!plan.landscape && this.tightSize() && plan.status !== 'review' ? `<button class="btn sm" data-crop="square">Place ${prettySize(this.tightSize().name)} <kbd>S</kbd></button>` : ''}${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
         ${this.manual.has(p.path) ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div></div>`;
-    } else if (p && plan && plan.error) status = `<div class="status-card review"><div class="sc-head"><span class="st-dot review"></span><b>Couldn’t check this photo</b></div><pre>${esc(plan.error)}</pre></div>`;
-    else if (p) status = '<div class="status-card none"><div class="sc-head"><span class="spin-dot"></span><b>Checking framing…</b></div></div>';
+    } else if (p && plan && plan.error) status = `<div class="status-card review"><div class="sc-head"><span class="st-dot review"></span><b>${/switched off/.test(plan.error) ? 'No sizes switched on' : 'Couldn’t check this photo'}</b></div><div class="sc-label">${esc(plan.error.replace(/^\w+Error: /, ''))}</div></div>`;
+    else if (p && this._lastCard && this._lastCard.path === p.path) {
+      // re-checking the same photo (a size or setting changed): keep its card in place, dimmed
+      status = `<div class="rechecking">${this._lastCard.html}<span class="recheck-badge"><span class="spin-dot"></span>Checking…</span></div>`;
+    } else if (p) status = '<div class="status-card none checking"><div class="sc-head"><span class="spin-dot"></span><b>Checking framing…</b></div></div>';
+    if (p && plan) this._lastCard = { path: p.path, html: status };
     const sizeRow = z => {
       const d = dims[z.name]; const on = !off.has(z.name);
       return `<div class="size-row ${on ? '' : 'off'} ${this.hover === z.name ? 'hot' : ''}" data-size="${esc(z.name)}">
@@ -2458,10 +2470,12 @@ const Crop = {
         <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? (plan && plan.missing && plan.missing.includes(z.name) ? '<span class="warn">not made</span>' : '—') : 'off'}</span></div>`;
     };
     const portrait = this.sizes.filter(z => z.kind === 'portrait'), land = this.sizes.filter(z => z.kind === 'landscape');
+    const nOn = this.sizes.filter(z => !off.has(z.name)).length, allOn = nOn === this.sizes.length;
+    const master = `<div class="size-row master"><button class="chk ${allOn ? 'on' : nOn ? 'some' : ''}" data-sizeall="${allOn ? 'off' : 'on'}" title="${allOn ? 'Turn every size off' : 'Turn every size on'}"></button><span class="sz-name">All sizes</span><span class="sz-dim">${nOn} of ${this.sizes.length} on</span></div>`;
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
     const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>` : '<div class="hint">Select a photo to straighten it.</div>';
     const html = sectionHTML('c-status', 'Framing', status) + sectionHTML('c-straight', 'Straighten', straight)
-      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
+      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
       ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
   },
@@ -2754,6 +2768,8 @@ function bindModuleEvents() {
       return;
     }
     const ci = t.closest('[data-circle]'); if (ci) { Crop.toggleCircle(ci.dataset.circle); return; }
+    const sa = t.closest('[data-sizeall]');
+    if (sa) { Crop.saveSettings({ disabled_sizes: sa.dataset.sizeall === 'on' ? [] : Crop.sizes.map(z => z.name) }); return; }
     const st = t.closest('[data-sizetoggle]');
     if (st) { const off = new Set(Crop.settings.disabled_sizes || []); const n = st.dataset.sizetoggle; off.has(n) ? off.delete(n) : off.add(n); Crop.saveSettings({ disabled_sizes: [...off] }); return; }
     const cf = t.closest('[data-cropfilter]');
