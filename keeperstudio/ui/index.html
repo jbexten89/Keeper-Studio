@@ -996,7 +996,10 @@ function selectByClick(id, e, fromFilm) {
 function refreshSelection() {
   $('#app').classList.toggle('multi', S.photos.length > 0 && S.selected.size > 1 && S.mode !== 'grid');
   renderGrid(); renderFilm(); renderFilmBar(); renderRight(); syncToolbar();
-  if (S.mode !== 'grid') renderView();
+  // Crop / Composite / Cut-out draw their own view: a click in the filmstrip must redraw it
+  // even when Library was left in Grid view.
+  if (S.module !== 'library') renderLeft();
+  if (S.mode !== 'grid' || S.module !== 'library') renderView();
   if (S.fs) renderFs();
 }
 function selectAll() { S.selected = new Set(S.view.map(p => p.id)); if (S.active == null && S.view.length) S.active = S.view[0].id; refreshSelection(); }
