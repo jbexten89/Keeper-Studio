@@ -39,7 +39,10 @@ input[type=radio],input[type=checkbox]{accent-color:var(--accent);margin:0}
   grid-template-areas:"top top top top top" "et et et et et" "el left center right er" "eb eb eb eb eb" "film film film film film"}
 #top{grid-area:top;display:flex;align-items:center;gap:14px;padding:0 16px;overflow:hidden;background:var(--panel-2);border-bottom:1px solid var(--border)}
 #edgeTop{grid-area:et}#edgeLeft{grid-area:el}#edgeRight{grid-area:er}#edgeBottom{grid-area:eb}
-#left{grid-area:left}#right{grid-area:right}#center{grid-area:center}#film{grid-area:film;margin:0 12px}
+#left{grid-area:left}
+#leftGrip{grid-area:left;justify-self:end;width:8px;margin-right:-10px;z-index:6;cursor:ew-resize;border-radius:3px}
+#leftGrip:hover,#leftGrip.drag{background:rgba(46,155,255,.45)}
+#app.no-left #leftGrip{display:none}#right{grid-area:right}#center{grid-area:center}#film{grid-area:film;margin:0 12px}
 .edge{display:flex;align-items:center;justify-content:center}
 .edge button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:10px;line-height:1;padding:2px 8px;border-radius:3px}
 .edge button:hover{color:var(--accent)}
@@ -523,7 +526,7 @@ kbd{font-size:10px}
   <header id="top"></header>
   <div class="edge" id="edgeTop"><button data-toggle="top" title="Toggle top bar"></button></div>
   <div class="edge" id="edgeLeft"><button data-toggle="left" title="Toggle left panel (Tab)"></button></div>
-  <aside id="left" class="panel"></aside>
+  <aside id="left" class="panel"></aside><div id="leftGrip" class="side-grip" title="Drag to resize · double-click to reset"></div>
   <main id="center">
     <div id="banners"></div>
     <div id="filterbar"></div>
@@ -651,6 +654,7 @@ const S = {
   sort: prefs.sort || 'capture', sortDir: prefs.sortDir || 1,
   thumbSize: prefs.thumbSize || 190,
   filmH: Math.min(320, Math.max(84, prefs.filmH || 124)),
+  leftW: Math.min(520, Math.max(200, prefs.leftW || 240)),
   compare: { select: null, cand: null, side: 'select' },
   surveyIds: [],
   zoom: { mode: 'fit', cx: .5, cy: .5 },
@@ -663,7 +667,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
@@ -1110,7 +1114,7 @@ function exitFs() {
 /* ================= Panels ================= */
 function applyPanels() {
   const a = $('#app'), P = S.panels;
-  a.style.setProperty('--lw', P.left ? '240px' : '0px');
+  a.style.setProperty('--lw', P.left ? S.leftW + 'px' : '0px');
   a.style.setProperty('--rw', P.right ? '280px' : '0px');
   a.style.setProperty('--th', P.top ? '44px' : '0px');
   a.style.setProperty('--fh', P.film ? S.filmH + 'px' : '0px'); FW = Math.round(S.filmH - 32);
@@ -2887,7 +2891,21 @@ function setFilmH(v, save) {
   if (S.module !== 'library') renderView(); else if (S.mode !== 'grid') renderView();
   if (save) { savePrefs(); ensureVisible(); }
 }
+function setLeftW(v, save) {
+  const w = clamp(Math.round(v), 200, Math.min(520, innerWidth * 0.45)); if (w === S.leftW && !save) return;
+  S.leftW = w; applyPanels(); renderView(); renderFilm();
+  if (save) savePrefs();
+}
+function bindLeftSize() {
+  const g = $('#leftGrip'); if (!g) return; let d = null;
+  g.addEventListener('pointerdown', e => { e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('drag'); d = { x: e.clientX, w: S.leftW }; });
+  g.addEventListener('pointermove', e => { if (d) setLeftW(d.w + (e.clientX - d.x)); });
+  const end = () => { if (!d) return; d = null; g.classList.remove('drag'); setLeftW(S.leftW, true); };
+  g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+  g.addEventListener('dblclick', () => setLeftW(240, true));
+}
 function bindFilmSize() {
+  bindLeftSize();
   const r = $('#filmSize'); if (!r) return; r.value = S.filmH;
   r.addEventListener('input', () => setFilmH(+r.value));
   r.addEventListener('change', () => { setFilmH(+r.value, true); r.blur(); });
