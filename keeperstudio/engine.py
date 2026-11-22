@@ -79,6 +79,76 @@ def _install_rotation_hook():
 
 _install_rotation_hook()
 
+
+# ---- balls and logos are not faces -------------------------------------------
+# The face model sometimes reads a basketball, volleyball or a logo as a face,
+# and a photo with "two faces" is sent to review. A real face sits on a body,
+# so when more than one face is found, the pose model (asked for up to a few
+# people) decides: faces with nobody's head at them are dropped. If the pose
+# model finds no one at all, nothing is dropped and the engine decides as before.
+_body_pose = None
+_body_lock = threading.Lock()
+
+
+def _body_heads(rgb) -> list[tuple[float, float]] | None:
+    global _body_pose
+    import mediapipe as mp
+    import numpy as np
+    with _body_lock:
+        if _body_pose is None:
+            cfg = config()
+            if not cfg.pose_model_path:
+                return None
+            from mediapipe.tasks.python import BaseOptions, vision
+            _body_pose = vision.PoseLandmarker.create_from_options(vision.PoseLandmarkerOptions(
+                base_options=BaseOptions(model_asset_path=str(Path(cfg.pose_model_path).expanduser())),
+                running_mode=vision.RunningMode.IMAGE, num_poses=6))
+        res = _body_pose.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb)))
+    h, w = rgb.shape[:2]
+    heads = []
+    for lm in res.pose_landmarks or []:
+        pts = [lm[i] for i in (0, 2, 5) if getattr(lm[i], "visibility", 1.0) >= 0.3]  # nose, eyes
+        if pts:
+            heads.append((sum(p.x for p in pts) / len(pts) * w, sum(p.y for p in pts) / len(pts) * h))
+    return heads
+
+
+def real_faces(faces, rgb):
+    if len(faces) < 2:
+        return faces
+    try:
+        heads = _body_heads(rgb)
+    except Exception:
+        return faces
+    if not heads:
+        return faces
+    keep = []
+    for f in faces:
+        ex, ey = f.eye_mid
+        reach = max(f.chin[1] - ey, abs(f.eye_left[0] - f.eye_right[0])) * 1.2
+        if any(((hx - ex) ** 2 + (hy - ey) ** 2) ** 0.5 <= reach for hx, hy in heads):
+            keep.append(f)
+    return keep or faces
+
+
+class _BodyCheckedDetector:
+    def __init__(self, inner):
+        self._inner = inner
+
+    def detect(self, image_rgb):
+        return real_faces(list(self._inner.detect(image_rgb)), image_rgb)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+_orig_build = detectors.build
+if not getattr(_orig_build, "_ks_wrapped", False):
+    def _build(name, cfg):
+        return _BodyCheckedDetector(_orig_build(name, cfg))
+    _build._ks_wrapped = True
+    detectors.build = _build
+
 SETTINGS_FIELDS = (
     "preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
     "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes", "framing_style",
@@ -500,6 +570,7 @@ pipeline.apply_manual_crop = _apply_manual
 # settings and any hand placement. Same inputs -> instant answer, even after a
 # restart; change any of them and that photo is checked afresh.
 plan_store = None  # set by the server: a Catalog
+PLAN_VERSION = 2  # bump when the engine would answer differently, so saved checks are redone
 _PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
                   "landscape", "fit_to_frame", "disabled_sizes", "framing_style")
 _focus_lock = threading.Lock()
@@ -513,7 +584,7 @@ def _plan_key(path: str, settings: dict, manual: dict | None) -> str | None:
         cfg_m = os.stat(paths.config_path()).st_mtime
     except OSError:
         return None
-    sig = json.dumps([path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual, rotations.get(path, 0)],
+    sig = json.dumps([PLAN_VERSION, path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual, rotations.get(path, 0)],
                      sort_keys=True, default=str)
     return hashlib.sha1(sig.encode("utf-8")).hexdigest()
 
