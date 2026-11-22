@@ -449,6 +449,10 @@ kbd{font-size:10px}
 .straight input{flex:1}
 .straight b{font-weight:600;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
 .pad-x{padding:0 12px}
+.circle-tg{margin-left:8px;background:none;border:1px solid var(--border-2);border-radius:10px;color:var(--muted);font:inherit;font-size:11px;padding:0 7px;cursor:pointer}
+.circle-tg:hover{color:var(--text)}
+.circle-tg.on{border-color:#fff;color:#fff;background:rgba(255,255,255,.08)}
+.sz-name{display:flex;align-items:center;white-space:nowrap;min-width:0}
 </style>
 </head>
 <body>
@@ -2100,7 +2104,7 @@ const Crop = {
   settings: null, sizes: [], warnings: [], ordersName: 'Orders', configPath: '',
   plans: new Map(), inflight: new Map(), status: new Map(), manual: new Map(),
   outDir: '', outCustom: false, scope: 'all', job: null, jobState: null, result: null,
-  adjusting: null, hover: null, overlay: true, planError: null, rotations: new Map(), live: null,
+  adjusting: null, hover: null, focus: null, circle: false, overlay: true, planError: null, rotations: new Map(), live: null,
   async load() {
     try {
       const r = await api('/api/crop/settings', {});
@@ -2109,6 +2113,18 @@ const Crop = {
     try { for (const [k, v] of await DB.entries('manual')) this.manual.set(k, v); } catch {}
     try { for (const [k, v] of await DB.entries('cropstatus')) this.status.set(k, v); } catch {}
     try { for (const [k, v] of Object.entries((await api('/api/crop/rotations', {})).rotations)) this.rotations.set(k, v); } catch {}
+    try { this.circle = !!(await DB.get('kv', 'cropCircle')); } catch {}
+  },
+  CIRCLE_IN: 3,
+  squareInches(name) { const m = /^(\d+(?:_\d+)?)x\1$/.exec(name); return m ? parseFloat(m[1].replace('_', '.')) : null; },
+  circleFor(b) {  // [cx, cy, r] in photo pixels, or null
+    const inch = this.squareInches(b.name); if (!this.circle || !inch || inch <= this.CIRCLE_IN) return null;
+    const [x, y, w, h] = b.box; return [x + w / 2, y + h / 2, w * (this.CIRCLE_IN / inch) / 2];
+  },
+  toggleCircle(name) {
+    this.circle = !this.circle; DB.put('kv', 'cropCircle', this.circle).catch(() => {});
+    this.focus = this.circle ? name : (this.focus === name ? null : this.focus);
+    this.center(); renderRight();
   },
   color(name) { const i = this.sizes.findIndex(s => s.name === name); return name === 'needed' ? '#E5484D' : SIZE_COLORS[(i < 0 ? 0 : i) % SIZE_COLORS.length]; },
   async libraryLoaded() {
@@ -2187,16 +2203,20 @@ const Crop = {
     const svg = $('#cropSvg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     let shapes = '', labels = '';
     if (plan && plan.boxes && this.overlay && !this.adjusting) {
-      const focus = this.hover ? plan.boxes.find(b => b.name === this.hover) : null;
+      const fname = this.hover || this.focus;
+      const focus = fname ? plan.boxes.find(b => b.name === fname) : null;
       if (focus) {
-        const [x, y, w, h] = focus.box;
-        shapes += `<path d="M${-W} ${-H}H${2 * W}V${2 * H}H${-W}Z M${x} ${y}V${y + h}H${x + w}V${y}Z" fill="rgba(5,6,8,.62)" fill-rule="evenodd"/>`;
+        const [x, y, w, h] = focus.box; const c = this.circleFor(focus);
+        const hole = c ? `M${c[0] - c[2]} ${c[1]}a${c[2]} ${c[2]} 0 1 0 ${2 * c[2]} 0a${c[2]} ${c[2]} 0 1 0 ${-2 * c[2]} 0Z` : `M${x} ${y}V${y + h}H${x + w}V${y}Z`;
+        shapes += `<path d="M${-W} ${-H}H${2 * W}V${2 * H}H${-W}Z ${hole}" fill="${c ? 'rgba(5,6,8,.9)' : 'rgba(5,6,8,.62)'}" fill-rule="evenodd"/>`;
       }
       plan.boxes.forEach(b => {
-        const [x, y, w, h] = b.box; const col = this.color(b.name); const hot = this.hover === b.name;
-        if (this.hover && !hot) return;
+        const [x, y, w, h] = b.box; const col = this.color(b.name); const hot = fname === b.name;
+        if (fname && !hot) return;
         shapes += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${col}" stroke-width="${hot ? 2.5 : 1.6}" vector-effect="non-scaling-stroke" ${b.fits ? '' : 'stroke-dasharray="7 5"'}/>`;
-        if (this.hover || b.name === 'needed') labels += `<span class="box-tag" style="left:${x / W * 100}%;top:${y / H * 100}%;--c:${col}">${b.name === 'needed' ? 'Needed frame (off the photo)' : prettySize(b.name)}</span>`;
+        const c = this.circleFor(b);
+        if (c) shapes += `<circle cx="${c[0]}" cy="${c[1]}" r="${c[2]}" fill="none" stroke="#fff" stroke-width="1.6" stroke-dasharray="${hot ? '0' : '6 5'}" vector-effect="non-scaling-stroke"/>`;
+        if (fname || b.name === 'needed') labels += `<span class="box-tag" style="left:${x / W * 100}%;top:${y / H * 100}%;--c:${col}">${b.name === 'needed' ? 'Needed frame (off the photo)' : prettySize(b.name) + (c ? ` · ${this.CIRCLE_IN}″ circle` : '')}</span>`;
       });
     }
     svg.innerHTML = shapes; $('#cropLabels').innerHTML = labels;
@@ -2347,7 +2367,7 @@ const Crop = {
       return `<div class="size-row ${on ? '' : 'off'} ${this.hover === z.name ? 'hot' : ''}" data-size="${esc(z.name)}">
         <button class="chk ${on ? 'on' : ''}" data-sizetoggle="${esc(z.name)}" title="${on ? 'Turn off' : 'Turn on'} this size"></button>
         <span class="swatch-line" style="--c:${this.color(z.name)}"></span>
-        <span class="sz-name">${prettySize(z.name)}${z.own_framing ? ' <em>tight</em>' : ''}</span>
+        <span class="sz-name">${prettySize(z.name)}${z.own_framing ? ' <em>tight</em>' : ''}${this.squareInches(z.name) > this.CIRCLE_IN ? `<button class="circle-tg ${this.circle ? 'on' : ''}" data-circle="${esc(z.name)}" title="Show only what falls inside a ${this.CIRCLE_IN}″ circle centred in this ${prettySize(z.name)} print">◯ ${this.CIRCLE_IN}″</button>` : ''}</span>
         <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? '—' : 'off'}</span></div>`;
     };
     const portrait = this.sizes.filter(z => z.kind === 'portrait'), land = this.sizes.filter(z => z.kind === 'landscape');
@@ -2656,6 +2676,7 @@ function bindModuleEvents() {
       else if (name === 'cutView') { Cut.view = v; renderView(); }
       return;
     }
+    const ci = t.closest('[data-circle]'); if (ci) { Crop.toggleCircle(ci.dataset.circle); return; }
     const st = t.closest('[data-sizetoggle]');
     if (st) { const off = new Set(Crop.settings.disabled_sizes || []); const n = st.dataset.sizetoggle; off.has(n) ? off.delete(n) : off.add(n); Crop.saveSettings({ disabled_sizes: [...off] }); return; }
     const cf = t.closest('[data-cropfilter]');
