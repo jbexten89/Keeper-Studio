@@ -358,9 +358,9 @@ kbd{font-size:10px}
 .chk.on{background:var(--accent);border-color:var(--accent)}
 .chk.on::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #03111E;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .swatch-line{width:14px;height:10px;border:2px solid var(--c);border-radius:2px;flex:none}
-.sz-name{flex:1}
-.sz-name em{font-style:normal;font-size:10px;color:var(--muted);border:1px solid var(--border-2);border-radius:8px;padding:0 5px;margin-left:4px}
-.sz-dim{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.sz-name{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 0}
+.sz-name em{white-space:nowrap;font-style:normal;font-size:10px;color:var(--muted);border:1px solid var(--border-2);border-radius:8px;padding:0 5px;margin-left:4px}
+.sz-dim{flex:none;margin-left:8px;white-space:nowrap;color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 .sz-group{padding:8px 12px 2px;font-variant:all-small-caps;letter-spacing:.08em;color:var(--muted)}
 .row .st-dot{margin-right:2px}
 /* job cards */
@@ -449,7 +449,7 @@ kbd{font-size:10px}
 .straight input{flex:1}
 .straight b{font-weight:600;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
 .pad-x{padding:0 12px}
-.circle-tg{margin-left:8px;background:none;border:1px solid var(--border-2);border-radius:10px;color:var(--muted);font:inherit;font-size:11px;padding:0 7px;cursor:pointer}
+.circle-tg{margin-left:6px;white-space:nowrap;line-height:16px;background:none;border:1px solid var(--border-2);border-radius:10px;color:var(--muted);font:inherit;font-size:11px;padding:0 7px;cursor:pointer}
 .circle-tg:hover{color:var(--text)}
 .circle-tg.on{border-color:#fff;color:#fff;background:rgba(255,255,255,.08)}
 .sz-name{display:flex;align-items:center;white-space:nowrap;min-width:0}
