@@ -24,6 +24,60 @@ from . import jobs, paths
 
 _engine_lock = threading.RLock()
 
+# ---- straightening -----------------------------------------------------------
+# A per-photo angle (degrees, clockwise) set in Crop. The engine loads every
+# photo through photocropper.imageio.load; wrapping it rotates the pixels and
+# trims to the largest upright rectangle (no blank corners) before detection
+# and cropping, so face finding, framing and the written crops all see the
+# straightened photo. Photos with no angle are untouched.
+rotations: dict[str, float] = {}
+
+
+def straightened_size(w: float, h: float, deg: float) -> tuple[int, int]:
+    """Largest axis-aligned rectangle inside a w x h image rotated by deg."""
+    import math
+    a = math.radians(abs(deg))
+    if a < 1e-9:
+        return int(w), int(h)
+    sin_a, cos_a = math.sin(a), math.cos(a)
+    long_side, short_side = (w, h) if w >= h else (h, w)
+    if short_side <= 2 * sin_a * cos_a * long_side or abs(sin_a - cos_a) < 1e-10:
+        x = 0.5 * short_side
+        wr, hr = (x / sin_a, x / cos_a) if w >= h else (x / cos_a, x / sin_a)
+    else:
+        cos_2a = cos_a * cos_a - sin_a * sin_a
+        wr, hr = (w * cos_a - h * sin_a) / cos_2a, (h * cos_a - w * sin_a) / cos_2a
+    return max(1, int(wr)), max(1, int(hr))
+
+
+def straighten(img, deg: float):
+    if not deg:
+        return img
+    w, h = img.size
+    rw, rh = straightened_size(w, h, deg)
+    rot = img.rotate(-deg, resample=Image.BICUBIC, expand=False)
+    l, t = (w - rw) // 2, (h - rh) // 2
+    return rot.crop((l, t, l + rw, t + rh))
+
+
+def _install_rotation_hook():
+    from photocropper import imageio as _io
+    if getattr(_io.load, "_ks_wrapped", False):
+        return
+    orig = _io.load
+
+    def load(path):
+        src = orig(path)
+        deg = rotations.get(str(path))
+        if deg:
+            src.image = straighten(src.image, deg)
+        return src
+    load._ks_wrapped = True
+    _io.load = load
+
+
+_install_rotation_hook()
+
 SETTINGS_FIELDS = (
     "preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
     "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes",
@@ -218,7 +272,8 @@ def _oriented_size(path: str) -> tuple[int, int]:
         w, h = im.size
         if im.getexif().get(0x0112, 1) in (5, 6, 7, 8):
             w, h = h, w
-    return w, h
+    deg = rotations.get(str(path))
+    return straightened_size(w, h, deg) if deg else (w, h)
 
 
 def _status(result, manual) -> tuple[str, str]:
@@ -300,7 +355,7 @@ def _plan_key(path: str, settings: dict, manual: dict | None) -> str | None:
         cfg_m = os.stat(paths.config_path()).st_mtime
     except OSError:
         return None
-    sig = json.dumps([path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual],
+    sig = json.dumps([path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual, rotations.get(path, 0)],
                      sort_keys=True, default=str)
     return hashlib.sha1(sig.encode("utf-8")).hexdigest()
 

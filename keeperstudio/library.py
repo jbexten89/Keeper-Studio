@@ -111,7 +111,7 @@ def _cache_name(path: str, size: int, kind: str) -> Path:
     return paths.thumbs_dir() / (hashlib.sha1(sig.encode("utf-8")).hexdigest() + ".jpg")
 
 
-def _render(path: str, size: int) -> bytes:
+def _render(path: str, size: int, deg: float = 0.0) -> bytes:
     with _decode_slots:
         with Image.open(path) as im:
             if im.format == "JPEG":
@@ -124,18 +124,23 @@ def _render(path: str, size: int) -> bytes:
                 im = bg
             elif im.mode != "RGB":
                 im = im.convert("RGB")
+            if deg:
+                from .engine import straighten
+                # rotate a reduced copy (fast); same geometry as the full-size crop
+                im.thumbnail((size * 2, size * 2), Image.LANCZOS)
+                im = straighten(im, deg)
             im.thumbnail((size, size), Image.LANCZOS)
             buf = io.BytesIO()
             im.save(buf, "JPEG", quality=86 if size <= 600 else 90)
             return buf.getvalue()
 
 
-def thumbnail(path: str, size: int = 400) -> bytes:
+def thumbnail(path: str, size: int = 400, deg: float = 0.0) -> bytes:
     """A cached, orientation-corrected JPEG of at most size x size."""
-    cached = _cache_name(path, size, "t")
+    cached = _cache_name(path, size, f"t{deg:g}" if deg else "t")
     if cached.is_file():
         return cached.read_bytes()
-    data = _render(path, size)
+    data = _render(path, size, deg)
     try:
         tmp = cached.with_suffix(".tmp")
         tmp.write_bytes(data)

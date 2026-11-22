@@ -99,7 +99,7 @@ class Handler(BaseHTTPRequestHandler):
                 data = library.thumbnail(q["p"][0], int((q.get("s") or ["400"])[0]))
                 return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/preview":
-                data = library.thumbnail(q["p"][0], int((q.get("s") or ["2048"])[0]))
+                data = library.thumbnail(q["p"][0], int((q.get("s") or ["2048"])[0]), float((q.get("r") or ["0"])[0]))
                 return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/full":
                 data, ctype = library.full_image(q["p"][0])
@@ -229,6 +229,21 @@ def r_crop_default_out(b):
     return {"out_dir": engine.default_output(b["paths"])}
 
 
+def r_crop_rotate(b):
+    path, deg = b["path"], round(max(-15.0, min(15.0, float(b.get("angle") or 0))), 2)
+    if deg:
+        catalog.put("rotate", path, deg)
+        engine.rotations[path] = deg
+    else:
+        catalog.delete("rotate", path)
+        engine.rotations.pop(path, None)
+    return {"angle": deg}
+
+
+def r_crop_rotations(b):
+    return {"rotations": dict(engine.rotations)}
+
+
 def r_tunables(b):
     if "values" in b:
         engine.write_tunables(b["values"])
@@ -288,7 +303,7 @@ ROUTES = {
     "/api/reveal": r_reveal, "/api/open-file": r_open_file, "/api/exists": r_exists,
     "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan,
     "/api/crop/analyze": r_crop_analyze, "/api/crop/export": r_crop_export,
-    "/api/crop/default-out": r_crop_default_out, "/api/crop/tunables": r_tunables,
+    "/api/crop/default-out": r_crop_default_out, "/api/crop/rotate": r_crop_rotate, "/api/crop/rotations": r_crop_rotations, "/api/crop/tunables": r_tunables,
     "/api/export": r_export, "/api/job/cancel": r_job_cancel,
     "/api/composite/defaults": r_comp_defaults, "/api/composite/order": r_comp_order,
     "/api/composite/build": r_comp_build,
@@ -301,6 +316,7 @@ def serve(port: int = 0) -> ThreadingHTTPServer:
     global catalog
     catalog = Catalog(paths.catalog_path())
     engine.plan_store = catalog
+    engine.rotations.update({k: float(v) for k, v in catalog.entries("rotate")})
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, name="ks-server", daemon=True).start()
