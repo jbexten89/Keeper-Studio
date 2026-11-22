@@ -80,8 +80,9 @@ _install_rotation_hook()
 
 SETTINGS_FIELDS = (
     "preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
-    "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes",
+    "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes", "framing_style",
 )
+FRAMING_STYLES = ("full", "knee_above", "knee_below")
 
 
 # ---------------------------------------------------------------- config ----
@@ -103,6 +104,7 @@ def default_settings(cfg=None) -> dict:
         "orders": bool(cfg.orders_folder),
         "fit_to_frame": bool(cfg.fit_to_frame),
         "disabled_sizes": [],
+        "framing_style": "full",
     }
 
 
@@ -320,6 +322,11 @@ _orig_process_image = pipeline.process_image
 def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None, balance=False,
                    segmenter=None, enhance_when="before", bottom_margin=None, preschool_framing=None):
     m = (getattr(_tl, "group_manual", None) or {}).get(str(path))
+    style = getattr(_tl, "framing_style", "full")
+    if not m and style in ("knee_above", "knee_below") and preschool_framing is None:
+        r = _three_quarter(path, detector, config, out_dir, lut, enhance_when, style)
+        if r is not None:
+            return r
     if not m:
         return _orig_process_image(path, detector, config, out_dir, lut=lut, pose_detector=pose_detector,
                                    balance=balance, segmenter=segmenter, enhance_when=enhance_when,
@@ -334,6 +341,92 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
 
 
 pipeline.process_image = _process_image  # run_job looks it up at call time
+
+
+# ---- 3/4 length ----------------------------------------------------------------
+# The full-length sizes are cut across the knees instead of below the feet: the
+# head keeps its headroom, the bottom edge sits a little above or below the
+# knees (never on the joint itself). The knees come from the same pose model the
+# balance-feet mode uses. The square keeps its own face framing.
+NO_KNEES = "no_knees"
+pipeline.STATUS_LABELS.setdefault(NO_KNEES, "knees not found")
+THREE_QUARTER_HEADROOM = 0.12   # of the frame height, above the crown
+KNEE_OFFSET = 0.22              # of the thigh (above) or shin (below) length
+_KNEES, _HIPS, _ANKLES = (25, 26), (23, 24), (27, 28)
+
+
+def _leg_points(rgb):
+    """(hip_y, knee_y, ankle_y | None) of the one person, or None."""
+    import mediapipe as mp
+    import numpy as np
+    pose = _Resources.pose
+    if pose is None:
+        return None
+    h = rgb.shape[0]
+    res = pose._landmarker.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=np.ascontiguousarray(rgb)))
+    if not res.pose_landmarks:
+        return None
+    lm = res.pose_landmarks[0]
+
+    def ys(ids, need=0.5):
+        return [lm[i].y * h for i in ids if getattr(lm[i], "visibility", 1.0) >= need]
+    knees, hips, ankles = ys(_KNEES), ys(_HIPS, 0.3), ys(_ANKLES)
+    if not knees or not hips:
+        return None
+    hip = sum(hips) / len(hips)
+    # a raised leg puts one knee higher: "above" clears the higher knee, "below" the lower one
+    hi, lo = min(knees), max(knees)
+    ankle = max(ankles) if ankles else None
+    if hi <= hip:
+        return None
+    return hip, hi, lo, ankle if ankle and ankle > lo else None
+
+
+def three_quarter_placement(face, legs, style, cfg, size):
+    from photocropper.geometry import estimate_crown
+    hip, hi, lo, ankle = legs
+    thigh = hi - hip
+    cut = hi - KNEE_OFFSET * thigh if style == "knee_above" else lo + KNEE_OFFSET * (ankle - lo if ankle else lo - hip)
+    crown = estimate_crown(face, cfg.eye_to_chin_multiplier)[1]
+    height = (cut - crown) / (1 - THREE_QUARTER_HEADROOM)
+    top = crown - THREE_QUARTER_HEADROOM * height
+    adjusted = top < 0 or cut > size[1]
+    if adjusted:  # not enough photo above the head or below the cut: shorten, keep the cut line
+        top = max(0.0, top)
+        cut = min(float(size[1]), cut)
+        height = cut - top
+    return {"center_x": face.eye_mid[0], "top": top, "height": height}, adjusted
+
+
+def _three_quarter(path, detector, config, out_dir, lut, enhance_when, style):
+    from photocropper import imageio
+    from photocropper.geometry import estimate_crown
+    source = imageio.load(path)
+    if config.landscape_enabled and config.landscape_ratios and source.size[0] > source.size[1]:
+        return None  # group shot: framed as a group
+    rgb = source.as_rgb_array()
+    faces = detector.detect(rgb)
+    if len(faces) != 1:
+        return None  # the engine explains no face / several faces
+    with _engine_lock:
+        _Resources.ensure(config, True, False)
+        legs = _leg_points(rgb)
+    if legs is None:
+        return pipeline.ImageResult(
+            Path(path), NO_KNEES,
+            "SKIPPED: 3/4 length framing is on, but the knees couldn't be found.\n\n"
+            "Place the framing by hand, or switch Framing style back to Full length.")
+    head = faces[0].chin[1] - estimate_crown(faces[0], config.eye_to_chin_multiplier)[1]
+    if legs[1] - legs[0] < 0.6 * head:
+        return pipeline.ImageResult(
+            Path(path), NO_KNEES,
+            "SKIPPED: 3/4 length framing is on, but this looks like a seated pose.\n\n"
+            "Place the framing by hand, or use Preschool (seated) framing for this batch.")
+    placement, adjusted = three_quarter_placement(faces[0], legs, style, config, source.size)
+    res = pipeline.apply_manual_crop(Path(path), config, out_dir, placement, detector=detector, lut=lut,
+                                     enhance_when=enhance_when, persist=False)
+    res.adjusted = adjusted
+    return res
 
 
 # ---- hand-placed tight sizes (the square) ------------------------------------
@@ -385,7 +478,7 @@ pipeline.apply_manual_crop = _apply_manual
 # restart; change any of them and that photo is checked afresh.
 plan_store = None  # set by the server: a Catalog
 _PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
-                  "landscape", "fit_to_frame", "disabled_sizes")
+                  "landscape", "fit_to_frame", "disabled_sizes", "framing_style")
 _focus_lock = threading.Lock()
 _latest_focus = 0
 
@@ -461,6 +554,7 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
         _Resources.ensure(cfg, balance, cfg.landscape_enabled)
         lut = _lut_for(cfg, settings)
         pipeline._writer_hook.fn = hook
+        _tl.framing_style = settings.get("framing_style") or "full"
         try:
             if manual:
                 result = pipeline.apply_manual_crop(
@@ -478,6 +572,7 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
                 )
         finally:
             pipeline._writer_hook.fn = None
+            _tl.framing_style = "full"
 
     size = size_holder.get("size") or _oriented_size(path)
     status, label = _status(result, manual)
@@ -580,6 +675,7 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
             elif side.is_file():
                 side.unlink()
         _tl.group_manual = group
+        _tl.framing_style = settings.get("framing_style") or "full"
         job.update(message="Loading face detector…", busy=True)
         statuses = {}
 
@@ -601,6 +697,7 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
             preschool_override=bool(settings.get("preschool")),
         )
         _tl.group_manual = None
+        _tl.framing_style = "full"
         med = summary.framing_medians()
         return {
             "out_dir": str(out), "cancelled": summary.cancelled,

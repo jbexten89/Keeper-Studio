@@ -2376,7 +2376,7 @@ const Crop = {
 
   /* ---------- right panel ---------- */
   right() {
-    const s = this.settings; const R = $('#right');
+    const s = this.settings; const R = $('#right'); const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
     if (!s) { R.innerHTML = `<div class="scroll"><div class="hint">${esc(this.planError || 'Loading crop settings…')}</div></div>`; return; }
     const p = this.active(); const plan = p && this.plans.get(p.path);
     const dims = {}; if (plan && plan.boxes) plan.boxes.forEach(b => dims[b.name] = b.box);
@@ -2409,9 +2409,10 @@ const Crop = {
     const html = sectionHTML('c-status', 'Framing', status) + sectionHTML('c-straight', 'Straighten', straight)
       + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${portrait.map(sizeRow).join('')}${land.length ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>
         <div class="hint tight">Hover a size to see just that crop. Pixel sizes are for this photo.</div>`)
-      + sectionHTML('c-frame', 'Framing style', `<div class="pad">${segHTML('cropMode', s.preschool ? 'preschool' : 'full', [['full', 'Full-length'], ['preschool', 'Preschool (seated)']])}</div>
-        ${switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
-        ${s.balance_feet && !s.preschool ? `<div class="slider-row"><span>Bottom margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
+      + sectionHTML('c-frame', 'Framing style', `<div class="pad">${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full length'], ['tq', '3/4 length'], ['preschool', 'Preschool']])}</div>
+        ${tq ? `<div class="pad">${segHTML('kneeLine', s.framing_style, [['knee_above', 'Just above knees'], ['knee_below', 'Just below knees']])}<div class="hint tight">The bottom edge crosses the legs a little ${s.framing_style === 'knee_above' ? 'above' : 'below'} the knees — never on the joint. The ${this.tightSize() ? prettySize(this.tightSize().name) : 'square'} keeps its own face framing.</div></div>` : ''}
+        ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
+        ${s.balance_feet && !s.preschool && !tq ? `<div class="slider-row"><span>Bottom margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
         ${switchHTML('fit_to_frame', s.fit_to_frame, 'Shorten to fit', 'When the ideal frame runs off the photo, shorten it instead of sending the photo to review')}
         ${switchHTML('landscape', s.landscape, 'Crop group shots', 'Landscape photos are cropped to the landscape sizes around the whole group')}
         <div class="pad"><button class="btn sm wide" data-crop="tunables">Framing settings…</button></div>`)
@@ -2702,7 +2703,8 @@ function bindModuleEvents() {
     if (sg) {
       const name = sg.parentElement.dataset.seg, v = sg.dataset.v;
       if (name === 'cropScope') { Crop.scope = v; renderLeft(); }
-      else if (name === 'cropMode') Crop.saveSettings({ preschool: v === 'preschool' });
+      else if (name === 'cropMode') Crop.saveSettings(v === 'tq' ? { preschool: false, framing_style: ['knee_above', 'knee_below'].includes(Crop.settings.framing_style) ? Crop.settings.framing_style : 'knee_above' } : { preschool: v === 'preschool', framing_style: 'full' });
+      else if (name === 'kneeLine') Crop.saveSettings({ framing_style: v });
       else if (name === 'enhanceWhen') Crop.saveSettings({ enhance_when: v });
       else if (name === 'cutScope') { Cut.scope = v; renderLeft(); }
       else if (name === 'cutView') { Cut.view = v; renderView(); }
