@@ -453,6 +453,9 @@ kbd{font-size:10px}
 .circle-tg:hover{color:var(--text)}
 .circle-tg.on{border-color:#fff;color:#fff;background:rgba(255,255,255,.08)}
 .sz-name{display:flex;align-items:center;white-space:nowrap;min-width:0}
+.miss-note{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--amber);color:#1A1206;font-size:12px;line-height:1.45}
+.miss-note b{font-weight:700}
+.miss-note kbd{color:var(--text)}
 </style>
 </head>
 <body>
@@ -2259,7 +2262,23 @@ const Crop = {
     clearTimeout(this._rt); this._rt = setTimeout(() => this.setRotation(v), 450);
   },
   /* ---------- adjust (hand placement) ---------- */
+  tightSize() { return this.sizes.find(z => z.own_framing && z.kind === 'portrait' && !(this.settings.disabled_sizes || []).includes(z.name)); },
+  startSquare() {
+    const p = this.active(); const plan = p && this.plans.get(p.path); const z = this.tightSize();
+    if (!plan || plan.error || !plan.reference) return toast('Still checking this photo — try again in a moment');
+    if (!z) return toast('There is no tight size (like 3.5 × 3.5) switched on');
+    if (plan.landscape) return toast('Group shots don’t get the square size');
+    const m = this.manual.get(p.path); const ex = plan.boxes.find(b => b.name === z.name);
+    let a;
+    if (m && m.square) a = { ...m.square };
+    else if (ex) { const [x, y, w, h] = ex.box; a = { center_x: x + w / 2, top: y, height: h }; }
+    else { const r = plan.reference; const h = Math.min(r.height * 0.8, this.W, this.H); a = { center_x: r.center_x, top: Math.max(0, r.top - h * 0.05), height: h }; }
+    this.A = z.w / z.h; this.group = false; this.target = 'square'; this.targetName = z.name;
+    a.height = Math.min(a.height, this.H, this.W / this.A); a.top = clamp(a.top, 0, this.H - a.height);
+    this.adjusting = a; this.render();
+  },
   startAdjust() {
+    this.target = 'full';
     const p = this.active(); const plan = p && this.plans.get(p.path);
     if (!plan || plan.error) return toast(this.inflight.has(p && p.path) ? 'Still checking this photo — try again in a moment' : 'This photo couldn’t be checked, so it can’t be adjusted');
     const r = plan.reference; if (!r) return toast('Nothing to adjust on this photo');
@@ -2267,14 +2286,25 @@ const Crop = {
     this.adjusting = { center_x: r.center_x, top: r.top, height: Math.min(r.height, this.H, this.W / this.A) };
     this.render();
   },
-  cancelAdjust(quiet) { this.adjusting = null; if (!quiet) this.render(); },
+  cancelAdjust(quiet) { this.adjusting = null; this.target = 'full'; if (!quiet) this.render(); },
   async applyAdjust() {
     const p = this.active(); if (!p || !this.adjusting) return;
-    const m = { center_x: Math.round(this.adjusting.center_x), top: Math.round(this.adjusting.top), height: Math.round(this.adjusting.height) };
-    if (this.group) m.kind = 'group';
+    const box = { center_x: Math.round(this.adjusting.center_x), top: Math.round(this.adjusting.top), height: Math.round(this.adjusting.height) };
+    const prev = this.manual.get(p.path); const plan = this.plans.get(p.path);
+    let m;
+    if (this.target === 'square') {
+      // the full-length sizes keep what they had: a hand placement, or the automatic framing
+      const base = prev && !prev.kind ? prev : plan && plan.reference ? plan.reference : box;
+      m = { center_x: Math.round(base.center_x), top: Math.round(base.top), height: Math.round(base.height), square: box };
+    } else {
+      m = { ...box };
+      if (this.group) m.kind = 'group';
+      else if (prev && prev.square) m.square = prev.square;
+    }
+    const wasSquare = this.target === 'square'; this.target = 'full';
     this.adjusting = null; this.manual.set(p.path, m); DB.put('manual', p.path, m).catch(() => {});
     this.plans.delete(p.path); this.render(); this.ensurePlan(p);
-    toast(m.kind === 'group' ? 'Group framing placed by hand — both group sizes keep everything inside it' : 'Framing placed by hand — every full-length size is cut from it', 3500);
+    toast(wasSquare ? `${prettySize(this.targetName)} placed by hand` : m.kind === 'group' ? 'Group framing placed by hand — both group sizes keep everything inside it' : 'Framing placed by hand — every full-length size is cut from it', 3500);
   },
   async resetManual() {
     const p = this.active(); if (!p || !this.manual.has(p.path)) return;
@@ -2284,7 +2314,7 @@ const Crop = {
   layoutAdjust() {
     const a = this.adjusting; $('#cropAdj').hidden = !a; if (!a) return;
     const w = a.height * (this.A || 0.8), l = a.center_x - w / 2;
-    const tag = $('#adjTag'); if (tag) tag.textContent = this.group ? 'Group framing — keep the whole team inside' : '8 × 10 framing';
+    const tag = $('#adjTag'); if (tag) tag.textContent = this.target === 'square' ? `${prettySize(this.targetName)} framing` : this.group ? 'Group framing — keep the whole team inside' : '8 × 10 framing';
     Object.assign($('#adjBox').style, { left: l / this.W * 100 + '%', top: a.top / this.H * 100 + '%', width: w / this.W * 100 + '%', height: a.height / this.H * 100 + '%' });
   },
   bindAdjust() {
@@ -2358,7 +2388,8 @@ const Crop = {
         ${plan.status === 'review' ? `<div class="sc-label">${esc(plan.label)}</div>` : ''}
         ${plan.reason ? `<details ${plan.status === 'review' ? 'open' : ''}><summary>Details</summary><pre>${esc(plan.reason)}</pre></details>` : ''}
         ${plan.status === 'shortened' ? '<div class="hint tight">The ideal frame ran off the photo, so the bottom edge sits a little higher than usual. Worth a glance.</div>' : ''}
-        <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
+        ${plan.missing && plan.missing.length ? `<div class="miss-note"><b>${plan.missing.map(prettySize).join(', ')} won’t be made</b> — its tight framing couldn’t be placed automatically on this photo (more than one face found, or it runs off the edge). Press <kbd>S</kbd> to place it by hand.</div>` : ''}
+        <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${!plan.landscape && this.tightSize() && plan.status !== 'review' ? `<button class="btn sm" data-crop="square">Place ${prettySize(this.tightSize().name)} <kbd>S</kbd></button>` : ''}${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
         ${this.manual.has(p.path) ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div></div>`;
     } else if (p && plan && plan.error) status = `<div class="status-card review"><div class="sc-head"><span class="st-dot review"></span><b>Couldn’t check this photo</b></div><pre>${esc(plan.error)}</pre></div>`;
     else if (p) status = '<div class="status-card none"><div class="sc-head"><span class="spin-dot"></span><b>Checking framing…</b></div></div>';
@@ -2368,7 +2399,7 @@ const Crop = {
         <button class="chk ${on ? 'on' : ''}" data-sizetoggle="${esc(z.name)}" title="${on ? 'Turn off' : 'Turn on'} this size"></button>
         <span class="swatch-line" style="--c:${this.color(z.name)}"></span>
         <span class="sz-name">${prettySize(z.name)}${z.own_framing ? ' <em>tight</em>' : ''}${this.squareInches(z.name) > this.CIRCLE_IN ? `<button class="circle-tg ${this.circle ? 'on' : ''}" data-circle="${esc(z.name)}" title="Show only what falls inside a ${this.CIRCLE_IN}″ circle centred in this ${prettySize(z.name)} print">◯ ${this.CIRCLE_IN}″</button>` : ''}</span>
-        <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? '—' : 'off'}</span></div>`;
+        <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? (plan && plan.missing && plan.missing.includes(z.name) ? '<span class="warn">not made</span>' : '—') : 'off'}</span></div>`;
     };
     const portrait = this.sizes.filter(z => z.kind === 'portrait'), land = this.sizes.filter(z => z.kind === 'landscape');
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
@@ -2469,6 +2500,7 @@ const Crop = {
       return ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].includes(e.key);
     }
     if (k === 'a') { this.startAdjust(); return true; }
+    if (k === 's') { this.startSquare(); return true; }
     if (e.key === '[' || e.key === '{') { this.nudge(e.shiftKey ? -1 : -0.1); return true; }
     if (e.key === ']' || e.key === '}') { this.nudge(e.shiftKey ? 1 : 0.1); return true; }
     if (k === 'o') { this.overlay = !this.overlay; this.render(); this.modbar(); return true; }
@@ -2685,7 +2717,7 @@ function bindModuleEvents() {
     if (c) {
       const a = c.dataset.crop;
       if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze();
-      else if (a === 'adjust') Crop.startAdjust(); else if (a === 'reset') Crop.resetManual();
+      else if (a === 'adjust') Crop.startAdjust(); else if (a === 'square') Crop.startSquare(); else if (a === 'reset') Crop.resetManual();
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
       else if (a === 'overlay') { Crop.overlay = !Crop.overlay; Crop.render(); Crop.modbar(); }
       else if (a === 'tunables') Crop.tunables();

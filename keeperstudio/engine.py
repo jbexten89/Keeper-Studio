@@ -336,6 +336,48 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
 pipeline.process_image = _process_image  # run_job looks it up at call time
 
 
+# ---- hand-placed tight sizes (the square) ------------------------------------
+# PhotoCropper's hand placement moves only the full-length sizes; the square
+# keeps its own face-anchored framing and is silently skipped when that fails.
+# A manual dict may carry "square": {center_x, top, height}, placed in Crop with
+# S; every size with its own framing is then cut from it instead.
+_orig_apply_manual = pipeline.apply_manual_crop
+
+
+def _apply_manual(path, config, out_dir, manual, *, detector=None, lut=None, enhance_override=None,
+                  enhance_when=None, persist=True):
+    if lut is None and enhance_override is None:
+        # run_job passes lut=None when the colour preset is switched off; without
+        # this the engine falls back to config.yaml's default and grades anyway.
+        enhance_override = False
+    sq = manual.get("square") if isinstance(manual, dict) else None
+    base = {k: manual[k] for k in ("center_x", "top", "height")}
+    if not sq:
+        res = _orig_apply_manual(path, config, out_dir, base, detector=detector, lut=lut,
+                                 enhance_override=enhance_override, enhance_when=enhance_when, persist=False)
+    else:
+        from photocropper import imageio
+        from photocropper.geometry import manual_crop_box
+        own = [r for r in config.ratios if not pipeline._uses_global_framing(r)]
+        cfg2 = dataclasses.replace(config, ratios=[r for r in config.ratios if pipeline._uses_global_framing(r)])
+        res = _orig_apply_manual(path, cfg2, out_dir, base, detector=detector, lut=lut,
+                                 enhance_override=enhance_override, enhance_when=enhance_when, persist=False)
+        source = imageio.load(path)
+        use_lut = lut
+        if use_lut is None and enhance_override:
+            use_lut = enhance.load_lut(Path(config.enhance_lut_path)) if config.enhance_lut_path else None
+        post_lut = pipeline._resolve_enhance(source, use_lut, enhance_when or config.enhance_when)
+        for r in own:
+            box, _ = manual_crop_box(sq["center_x"], sq["top"], sq["height"], r.pair, source.size)
+            res.written[r.name] = pipeline._write_crop(source, box.as_pil(), out_dir, path.stem, r.name, path.suffix, config, post_lut)
+    if persist:
+        pipeline.save_manual_crop(out_dir, path.stem, manual)
+    return res
+
+
+pipeline.apply_manual_crop = _apply_manual
+
+
 # ---- remembered framing checks ---------------------------------------------
 # A check is saved in the catalog under a key made from everything that can
 # change its answer: the photo (path, size, date), config.yaml, the framing
@@ -483,7 +525,9 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
         aspect = group_aspect(cfg) if is_group else REFERENCE_ASPECT
         ref["height"] = min(ref["height"], size[1], size[0] / aspect)
         ref["top"] = max(0, min(ref["top"], size[1] - ref["height"]))
+    missing = [r.name for r in cfg.ratios if result.status == pipeline.OK and not is_group and r.name not in boxes]
     return {
+        "missing": missing,
         "path": path, "status": status, "label": label, "reason": result.reason,
         "adjusted": bool(getattr(result, "adjusted", False)), "boxes": out_boxes,
         "size": list(size), "reference": ref, "landscape": is_group,
