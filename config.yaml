@@ -1,0 +1,196 @@
+# PhotoCropper framing configuration.
+# Everything tunable lives here. Adjust framing without touching code.
+
+detector:
+  # Registered backends: mediapipe_mesh
+  name: mediapipe_mesh
+
+  # Path to the MediaPipe Face Landmarker bundle, relative to this file.
+  model_path: models/face_landmarker.task
+
+  confidence_threshold: 0.5
+  max_faces_to_probe: 5
+
+  # Full-length sources put a small face in a wide frame, so the detector needs
+  # the extra downscaled passes to find it. Keep all three.
+  detection_window_scales: [1.0, 0.5, 0.25]
+
+# Pose model, used only when framing.balance_feet is on, to locate the feet.
+pose:
+  model_path: models/pose_landmarker.task
+
+framing:
+  # GLOBAL framing = the full-length look shared by every size except the
+  # square. Measured from the reference crops (IMG_4094): eyes sit ~0.164 down
+  # the frame, the estimated crown ~0.103 down, which puts the bottom edge at
+  # the feet (~7.5 head-heights below the crown).
+  #
+  # NOTE: the gap here (0.061) is small, so crop height is ~16x the crown-to-eye
+  # distance and crown-estimate error is amplified ~16x. That is inherent to
+  # anchoring a full-length crop on the face alone; the loader will warn about
+  # it. It reproduces this subject exactly; across different students the feet
+  # position can drift a little, which fit_to_frame below absorbs.
+  eye_line_fraction: 0.164
+  headroom_fraction: 0.103
+
+  eye_to_chin_multiplier: 1.05
+
+  # Feet-balanced framing for full-body sizes: the feet sit the same distance
+  # from the bottom edge as the head sits from the top, so shorter and taller
+  # subjects are both centred instead of shorter kids floating with a wide band
+  # of grass below their feet. Needs the pose model below to locate the feet;
+  # when the feet cannot be found (cut off, no pose) it falls back to the normal
+  # head-anchored framing for that image. The square keeps its own tight crop.
+  # Toggle per run with the GUI checkbox or CLI --balance-feet / --no-balance-feet.
+  balance_feet: false
+  # Top and bottom margin as a fraction of frame height. Defaults to the headroom
+  # above, so the balanced look matches the head-anchored one for an average
+  # subject; only shorter/taller kids change.
+  foot_margin_fraction: 0.103
+  # Bottom (feet) margin. Defaults to foot_margin_fraction (symmetric). Raise it
+  # to leave room below a prop the feet rest on -- e.g. a soccer ball, which sits
+  # BELOW the detected feet and otherwise gets jammed against the bottom edge.
+  # Overridable per run in the GUI / with --bottom-margin.
+  bottom_margin_fraction: 0.103
+
+  # Preschool (seated) framing: a tighter 3/4 look for seated preschool
+  # portraits -- eyes high in the frame, the bottom cut at the lap -- instead of
+  # the full-length framing above. It is a MODE, toggled per run (GUI checkbox /
+  # CLI --preschool), that replaces the global eye_line/headroom on every size;
+  # feet-balancing does not apply (the subject is seated) and the square keeps
+  # its own override. `preschool` here is only the default. The fractions were
+  # measured from the reference 5x7 crops (eyes ~0.264 down, crown ~0.133 down,
+  # bottom ~3.3 head-heights below the crown).
+  preschool: false
+  preschool_eye_line_fraction: 0.264
+  preschool_headroom_fraction: 0.133
+
+  # Shorten rather than skip when the ideal frame does not fit. Now applied per
+  # ratio: only the sizes that overflow are shortened, each holding its own eye
+  # line; sizes that already fit keep their framing.
+  fit_to_frame: true
+  min_headroom_fraction: 0.08
+
+# Output ratios. Each name becomes a subfolder and the filename suffix.
+#
+# Aspects are taken from the reference crops' actual pixel dimensions. A ratio
+# may override eye_line_fraction / headroom_fraction to be framed differently
+# from the global full-length look; the square does exactly that.
+ratios:
+  # ---- Full-length sizes (inherit the global framing) --------------------
+  - name: 8x10          # 2400x3000  ->  4:5
+    width: 4
+    height: 5
+
+  - name: 5x7           # 1500x2100  ->  5:7
+    width: 5
+    height: 7
+
+  - name: 4x6           # 1200x1800  ->  2:3
+    width: 2
+    height: 3
+
+  - name: 4x5           # 1200x1500  ->  4:5
+    width: 4
+    height: 5
+
+  - name: 2_5x3_5       # wallet 2.5x3.5 = 750x1050  ->  5:7 (underscore = decimal)
+    width: 5
+    height: 7
+
+  - name: 1_8x2_8       # 525x825  ->  7:11   (label 1.8x2.8; underscore = decimal)
+    width: 7
+    height: 11
+
+  - name: 1_7x2_2       # 510x675  ->  34:45  (label 1.7x2.2; underscore = decimal)
+    width: 34
+    height: 45
+
+  # ---- Square (deliberately tighter: eyes lower, cut at the hip) ---------
+  # A full-length square would be far too wide for a portrait source, so this
+  # size is composed as a tighter portrait instead. Measured from the square
+  # reference crop: eyes ~0.278 down, crown ~0.176 down (~5 head-heights tall).
+  - name: 3_5x3_5       # square 3.5x3.5 = 1050x1050  ->  1:1 (underscore = decimal)
+    width: 1
+    height: 1
+    eye_line_fraction: 0.278
+    headroom_fraction: 0.176
+
+# Colour/tone enhancement applied BEFORE cropping. This is a fixed editing
+# preset captured as a per-channel LUT from a before/after pair (reproduces it
+# to within JPEG noise). `enabled` here is the default; it can be flipped per
+# run with the GUI checkbox or the CLI --enhance / --no-enhance flag.
+enhance:
+  enabled: true
+  lut_path: luts/preset.npy
+  # Separate grading preset for PRESCHOOL mode (seated indoor portraits on the
+  # gray backdrop). When Preschool is on AND enhancement is on, this LUT is used
+  # instead of lut_path above. Measured from 10 before/after preschool pairs
+  # (per-channel fit R^2 ~0.995); a gentle, near-neutral midtone/brightness lift.
+  preschool_lut_path: luts/preschool.npy
+  # Apply the preset "before" cropping (grades the whole source, so detection
+  # sees the graded image) or "after" (grades each crop). For this per-channel
+  # LUT the crop pixels are identical either way; it only changes what face
+  # detection sees. Overridable per run in the GUI / with --enhance-when.
+  when: before
+
+# Landscape (group) shots: a landscape-orientation source is cropped to these
+# landscape print ratios instead of being sent to review. The full height is
+# kept (so the space above/below the group is exactly as framed) and the sides
+# are trimmed to the ratio, centred on the group. Folders/filenames use these
+# names (10x8 / 7x5) to keep them distinct from the portrait 8x10 / 5x7.
+landscape:
+  enabled: true
+  # Proper spacing around the group, as a fraction of the group's size, added
+  # where the frame allows (the crop always contains the whole group first).
+  margin_fraction: 0.08
+  ratios:
+    - name: 10x8        # an 8x10 shot landscape (5:4)
+      width: 10
+      height: 8
+    - name: 7x5         # a 5x7 shot landscape (7:5)
+      width: 7
+      height: 5
+
+# Person-segmentation model, used to locate the group in landscape shots.
+segment:
+  model_path: models/deeplab_v3.tflite
+
+output:
+  jpeg_quality: keep
+  jpeg_subsampling: keep
+
+  # In addition to the per-size folders, copy every crop (all sizes) into one
+  # flat folder with this name, handy for sending a whole order off at once.
+  # Filenames already carry the size suffix, so nothing collides. Set to null
+  # or "" to switch this off.
+  orders_folder: Orders
+
+contact_sheet:
+  # QC preview only (a thumbnail grid per size); nothing downstream needs it.
+  # Set to false to skip building them for faster runs and a tidier output folder.
+  enabled: true
+  columns: 6
+  thumb_width: 320
+
+# Class-composite builder defaults. A composite is one 5x7 (landscape) collage:
+# a title, the teachers in the top corners, and the students in centred rows, all
+# over a background template you supply (the gray backdrop with its white border).
+# These are just the defaults the "Build Composite" screen starts from; every
+# field can be changed per composite in that screen.
+composite:
+  # Fonts -- any installed font file. title_font is used for the title and the
+  # teacher names; name_font for the student names. Two looks from the samples:
+  # Stencil (set name_uppercase: true) or a serif like Book Antiqua (uppercase
+  # off, Title Case from the file name).
+  title_font: C:/Windows/Fonts/BOOKOS.TTF      # Book Antiqua
+  teacher_font: C:/Windows/Fonts/BOOKOSI.TTF   # Book Antiqua Italic
+  name_font: C:/Windows/Fonts/BOOKOSI.TTF      # Book Antiqua Italic
+  # Prefilled title; the year is entered per composite.
+  school_name: Montpelier Nursery School
+  # Max students per row (the class is split into as few rows as this allows,
+  # the fuller rows at the bottom). 8 gives rows like the samples; raise to 9 to
+  # keep 18 students on two rows, or lower it to force a third row.
+  max_per_row: 8
+  # Upper-case student names (the Stencil look). Off = Title Case (serif look).
+  name_uppercase: false

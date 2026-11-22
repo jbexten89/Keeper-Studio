@@ -1,0 +1,59 @@
+name: Build Windows app
+
+# Builds a stand-alone "Keeper Studio" folder (Keeper Studio.exe + its files)
+# so the app runs on a Windows PC with no Python installed. PyInstaller cannot
+# cross-compile, so this runs on a Windows machine at GitHub.
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # mediapipe publishes no wheels for 3.13+.
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install --upgrade pyinstaller
+
+      - name: Build
+        run: pyinstaller --noconfirm keeperstudio.spec
+
+      - name: Ship config, models and colour presets beside the exe
+        run: |
+          $dst = "dist/Keeper Studio"
+          Copy-Item config.yaml "$dst/config.yaml" -Force
+          Copy-Item luts "$dst/luts" -Recurse -Force
+          Copy-Item models "$dst/models" -Recurse -Force
+          Copy-Item LICENSE-PhotoCropper "$dst/LICENSE-PhotoCropper" -Force
+        shell: pwsh
+
+      - name: Smoke test the packaged exe
+        # Runs the real binary and makes it load its config, find its models,
+        # run a face detection and find its interface. A clean PyInstaller exit
+        # only proves a file was written, not that the app works.
+        run: |
+          $exe = "dist/Keeper Studio/Keeper Studio.exe"
+          if (-not (Test-Path $exe)) { throw "exe was not produced" }
+          $result = "dist/Keeper Studio/selftest-result.txt"
+          Remove-Item $result -ErrorAction SilentlyContinue
+          $proc = Start-Process -FilePath (Resolve-Path $exe) -ArgumentList "--selftest" -Wait -PassThru
+          if (Test-Path $result) { Get-Content $result | Write-Host } else { Write-Host "no self-test report was written" }
+          if ($proc.ExitCode -ne 0) { throw "packaged app failed its self test (exit $($proc.ExitCode))" }
+          Remove-Item $result -ErrorAction SilentlyContinue
+          Write-Host "Packaged app runs." -ForegroundColor Green
+        shell: pwsh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KeeperStudio-Windows
+          path: dist/Keeper Studio/
+          retention-days: 30

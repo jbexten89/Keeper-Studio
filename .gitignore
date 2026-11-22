@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+setup-log.txt
+selftest-result.txt
+config.yaml.bak
+# The 220 MB cut-out model is downloaded on first use (or copied from PhotoExtractor)
+models/rembg/
