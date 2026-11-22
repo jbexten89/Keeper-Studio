@@ -212,7 +212,12 @@ img:not([src]){visibility:hidden}
 
 /* ---------- Filmstrip ---------- */
 #film{background:var(--panel);border:1px solid var(--border);border-radius:6px;overflow:hidden;display:flex;flex-direction:column}
-#filmBar{height:24px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;background:var(--panel-2)}
+#film{position:relative}
+.film-grip{position:absolute;left:0;right:0;top:0;height:5px;cursor:ns-resize;z-index:5}
+.film-grip:hover,.film-grip.drag{background:rgba(46,155,255,.45)}
+.film-size{position:absolute;right:10px;top:3px;z-index:4;display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.film-size input{width:110px;height:14px}
+#filmBar{padding-right:170px !important;height:24px;flex:none;display:flex;align-items:center;gap:10px;padding:0 10px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;background:var(--panel-2)}
 #filmBar b{color:var(--text);font-weight:600}
 #filmBar .sep{color:var(--faint)}
 #filmScroll{flex:1;overflow-x:auto;overflow-y:hidden;position:relative;min-height:0}
@@ -529,7 +534,7 @@ kbd{font-size:10px}
   <aside id="right" class="panel"></aside>
   <div class="edge" id="edgeRight"><button data-toggle="right" title="Toggle right panel (Tab)"></button></div>
   <div class="edge" id="edgeBottom"><button data-toggle="film" title="Toggle filmstrip"></button></div>
-  <footer id="film"><div id="filmBar"></div><div id="filmScroll"><div id="filmInner"></div></div></footer>
+  <footer id="film"><div class="film-grip" id="filmGrip" title="Drag to resize the filmstrip"></div><label class="film-size" title="Filmstrip size"><span>Size</span><input type="range" id="filmSize" min="84" max="320" step="4"></label><div id="filmBar"></div><div id="filmScroll"><div id="filmInner"></div></div></footer>
 </div>
 <div id="lights"></div>
 <div id="fs"><img alt=""><div id="fsInfo"></div><button class="qc-pill off" id="fsQc" title="Quick Collection (B)"></button></div>
@@ -551,7 +556,7 @@ const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'bas
 const LABELS = ['red', 'yellow', 'green', 'blue'];
 const LABEL_NAMES = { red: 'Red', yellow: 'Yellow', green: 'Green', blue: 'Blue' };
 const THUMB_MAX = 400;
-const FW = 92; // filmstrip cell width
+let FW = 92; // filmstrip cell width (follows the filmstrip height)
 const QUICK = 'quick';
 const ext = n => (n.match(/\.([^.]+)$/) || ['', ''])[1];
 const sanitize = s => String(s || '').replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
@@ -638,6 +643,7 @@ const S = {
   filter: { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' },
   sort: prefs.sort || 'capture', sortDir: prefs.sortDir || 1,
   thumbSize: prefs.thumbSize || 190,
+  filmH: Math.min(320, Math.max(84, prefs.filmH || 124)),
   compare: { select: null, cand: null, side: 'select' },
   surveyIds: [],
   zoom: { mode: 'fit', cx: .5, cy: .5 },
@@ -650,7 +656,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
@@ -1100,7 +1106,7 @@ function applyPanels() {
   a.style.setProperty('--lw', P.left ? '240px' : '0px');
   a.style.setProperty('--rw', P.right ? '280px' : '0px');
   a.style.setProperty('--th', P.top ? '44px' : '0px');
-  a.style.setProperty('--fh', P.film ? '124px' : '0px');
+  a.style.setProperty('--fh', P.film ? S.filmH + 'px' : '0px'); FW = Math.round(S.filmH - 32);
   a.classList.toggle('no-left', !P.left); a.classList.toggle('no-right', !P.right);
   a.classList.toggle('no-top', !P.top); a.classList.toggle('no-film', !P.film);
   $('#edgeLeft button').textContent = P.left ? '◀' : '▶';
@@ -1108,7 +1114,7 @@ function applyPanels() {
   $('#edgeTop button').textContent = P.top ? '▲' : '▼';
   $('#edgeBottom button').textContent = P.film ? '▼' : '▲';
   $('#toolbar').hidden = !P.toolbar;
-  document.documentElement.style.setProperty('--fh', P.film ? '124px' : '0px');
+  document.documentElement.style.setProperty('--fh', P.film ? S.filmH + 'px' : '0px');
 }
 function togglePanel(k) { S.panels[k] = !S.panels[k]; savePrefs(); renderAll(); }
 function toggleSidePanels() { const v = !(S.panels.left || S.panels.right); S.panels.left = S.panels.right = v; savePrefs(); renderAll(); }
@@ -2854,7 +2860,27 @@ const Cut = {
 };
 
 /* ---------- module UI events ---------- */
+function setFilmH(v, save) {
+  const h = clamp(Math.round(v), 84, 320); if (h === S.filmH && !save) return;
+  const fs = $('#filmScroll'), ratio = fs && fs.scrollWidth ? fs.scrollLeft / fs.scrollWidth : 0;
+  S.filmH = h; applyPanels(); renderFilm(); if (fs) fs.scrollLeft = ratio * fs.scrollWidth; renderFilm();
+  const r = $('#filmSize'); if (r && +r.value !== h) r.value = h;
+  if (S.module !== 'library') renderView(); else if (S.mode !== 'grid') renderView();
+  if (save) { savePrefs(); ensureVisible(); }
+}
+function bindFilmSize() {
+  const r = $('#filmSize'); if (!r) return; r.value = S.filmH;
+  r.addEventListener('input', () => setFilmH(+r.value));
+  r.addEventListener('change', () => { setFilmH(+r.value, true); r.blur(); });
+  const g = $('#filmGrip'); let d = null;
+  g.addEventListener('pointerdown', e => { e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('drag'); d = { y: e.clientY, h: S.filmH }; });
+  g.addEventListener('pointermove', e => { if (d) setFilmH(d.h + (d.y - e.clientY)); });
+  const end = () => { if (!d) return; d = null; g.classList.remove('drag'); setFilmH(S.filmH, true); };
+  g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+  g.addEventListener('dblclick', () => setFilmH(124, true));
+}
 function bindModuleEvents() {
+  bindFilmSize();
   $('#top').addEventListener('click', e => { const b = e.target.closest('[data-module]'); if (b) setModule(b.dataset.module); });
   const onClick = async e => {
     const t = e.target;
