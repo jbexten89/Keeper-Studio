@@ -509,6 +509,13 @@ kbd{font-size:10px}
 .style-rows .row.on{background:rgba(46,155,255,.14)}
 .style-rows .row .lbl{flex:1}
 .style-rows .row .cnt{color:var(--muted);font-variant-numeric:tabular-nums}
+.size-sub{display:flex;align-items:center;gap:8px;padding:0 12px 4px 38px;font-size:12px;color:var(--muted)}
+.size-sub .sub-elbow{width:10px;height:10px;border-left:1px solid var(--border-2);border-bottom:1px solid var(--border-2);margin-top:-8px;flex:none}
+.size-sub .sub-lbl{flex:1}
+.mini-switch{position:relative;width:28px;height:16px;flex:none;border-radius:8px;border:none;background:#2A2E36;cursor:pointer;padding:0}
+.mini-switch::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#C9CED6;transition:left .12s}
+.mini-switch.on{background:var(--accent)}
+.mini-switch.on::after{left:14px;background:#fff}
 </style>
 </head>
 <body>
@@ -2561,8 +2568,9 @@ const Crop = {
       return `<div class="size-row ${on ? '' : 'off'} ${this.hover === z.name ? 'hot' : ''}" data-size="${esc(z.name)}">
         <button class="chk ${on ? 'on' : ''}" data-sizetoggle="${esc(z.name)}" title="${on ? 'Turn off' : 'Turn on'} this size"></button>
         <span class="swatch-line" style="--c:${this.color(z.name)}"></span>
-        <span class="sz-name">${prettySize(z.name)}${z.own_framing ? ' <em>tight</em>' : ''}${this.squareInches(z.name) > this.CIRCLE_IN ? `<button class="circle-tg ${this.circle ? 'on' : ''}" data-circle="${esc(z.name)}" title="Show only what falls inside a ${this.CIRCLE_IN}″ circle centred in this ${prettySize(z.name)} print">◯ ${this.CIRCLE_IN}″</button>` : ''}</span>
-        <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? (plan && plan.missing && plan.missing.includes(z.name) ? '<span class="warn">not made</span>' : '—') : 'off'}</span></div>`;
+        <span class="sz-name" ${z.own_framing ? 'title="Tight face framing, separate from the full-length sizes"' : ''}>${prettySize(z.name)}</span>
+        <span class="sz-dim">${d ? `${d[2]} × ${d[3]}` : on ? (plan && plan.missing && plan.missing.includes(z.name) ? '<span class="warn">not made</span>' : '—') : 'off'}</span></div>
+        ${this.squareInches(z.name) > this.CIRCLE_IN ? `<div class="size-sub" title="Dim everything outside a ${this.CIRCLE_IN}″ circle centred in the ${prettySize(z.name)}, to check a round print"><span class="sub-elbow"></span><span class="sub-lbl">${this.CIRCLE_IN}″ circle mask</span><button class="mini-switch ${this.circle ? 'on' : ''}" data-circle="${esc(z.name)}" aria-label="${this.CIRCLE_IN} inch circle mask"></button></div>` : ''}`;
     };
     const portrait = this.sizes.filter(z => z.kind === 'portrait'), land = this.sizes.filter(z => z.kind === 'landscape');
     const nOn = this.sizes.filter(z => !off.has(z.name)).length, allOn = nOn === this.sizes.length;
