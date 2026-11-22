@@ -2530,7 +2530,7 @@ const Crop = {
     if (p) {
       const own = this.styleOf(p.path), nSel = S.selected.size > 1 && S.selected.has(p.id) ? S.selected.size : 1;
       status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Batch uses the Framing style set on the left."><span>Style</span>
-        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Batch · ${esc(this.STYLE_NAMES[this.batchStyle()])}</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${nSel > 1 ? `<em>${nSel} selected</em>` : ''}</div>`;
+        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as left side (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${nSel > 1 ? `<em>${nSel} selected</em>` : ''}</div>`;
     }
     const html = sectionHTML('c-status', 'Framing', status) + sectionHTML('c-straight', 'Straighten', straight)
       + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
