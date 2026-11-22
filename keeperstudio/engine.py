@@ -8,6 +8,7 @@ Previews use the engine's own planning path with file writing switched off.
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 import re
@@ -20,7 +21,7 @@ from PIL import Image, ImageOps
 from photocropper import detectors, enhance, pipeline
 from photocropper.config import load as load_config
 
-from . import jobs, paths
+from . import jobs, library, paths
 
 _engine_lock = threading.RLock()
 
@@ -267,6 +268,28 @@ def _lut_for(cfg, settings):
         return None
     path = cfg.enhance_preschool_lut_path if settings.get("preschool") else cfg.enhance_lut_path
     return _Resources.lut(path)
+
+
+def graded_preview(path: str, size: int, deg: float, kind: str) -> bytes:
+    """The window's preview of a photo with the standard or preschool colour preset applied."""
+    import io
+    cfg = config()
+    lut_path = cfg.enhance_preschool_lut_path if kind == "preschool" else cfg.enhance_lut_path
+    if not lut_path:
+        raise FileNotFoundError("no colour preset set in config.yaml")
+    key = hashlib.sha1(f"{lut_path}|{os.stat(lut_path).st_mtime}".encode()).hexdigest()[:10]
+    cached = library._cache_name(path, size, f"g{key}{deg:g}")
+    if cached.is_file():
+        return cached.read_bytes()
+    im = Image.open(io.BytesIO(library.thumbnail(path, size, deg))).convert("RGB")
+    out = io.BytesIO()
+    enhance.apply_lut(im, _Resources.lut(str(lut_path))).save(out, "JPEG", quality=90)
+    data = out.getvalue()
+    try:
+        cached.write_bytes(data)
+    except OSError:
+        pass
+    return data
 
 
 def _oriented_size(path: str) -> tuple[int, int]:

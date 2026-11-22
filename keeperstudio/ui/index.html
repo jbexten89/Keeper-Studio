@@ -456,6 +456,9 @@ kbd{font-size:10px}
 .miss-note{margin-top:8px;padding:8px 10px;border-radius:6px;background:var(--amber);color:#1A1206;font-size:12px;line-height:1.45}
 .miss-note b{font-weight:700}
 .miss-note kbd{color:var(--text)}
+.crop-canvas.cmp img{position:absolute;inset:0;width:100%;height:100%;box-shadow:0 6px 30px rgba(0,0,0,.6)}
+.cmp-tag{position:absolute;left:0;bottom:-24px;font-size:12px;color:var(--muted);white-space:nowrap}
+.cmp-tag i{font-style:normal;color:var(--amber)}
 </style>
 </head>
 <body>
@@ -2107,7 +2110,7 @@ const Crop = {
   settings: null, sizes: [], warnings: [], ordersName: 'Orders', configPath: '',
   plans: new Map(), inflight: new Map(), status: new Map(), manual: new Map(),
   outDir: '', outCustom: false, scope: 'all', job: null, jobState: null, result: null,
-  adjusting: null, hover: null, focus: null, circle: false, overlay: true, planError: null, rotations: new Map(), live: null,
+  adjusting: null, hover: null, focus: null, circle: false, compare: false, overlay: true, planError: null, rotations: new Map(), live: null,
   async load() {
     try {
       const r = await api('/api/crop/settings', {});
@@ -2117,6 +2120,7 @@ const Crop = {
     try { for (const [k, v] of await DB.entries('cropstatus')) this.status.set(k, v); } catch {}
     try { for (const [k, v] of Object.entries((await api('/api/crop/rotations', {})).rotations)) this.rotations.set(k, v); } catch {}
     try { this.circle = !!(await DB.get('kv', 'cropCircle')); } catch {}
+    try { this.compare = !!(await DB.get('kv', 'cropCompare')); } catch {}
   },
   CIRCLE_IN: 3,
   squareInches(name) { const m = /^(\d+(?:_\d+)?)x\1$/.exec(name); return m ? parseFloat(m[1].replace('_', '.')) : null; },
@@ -2126,8 +2130,12 @@ const Crop = {
   },
   toggleCircle(name) {
     this.circle = !this.circle; DB.put('kv', 'cropCircle', this.circle).catch(() => {});
-    this.focus = this.circle ? name : (this.focus === name ? null : this.focus);
+    if (this.focus === name) this.focus = null;
     this.center(); renderRight();
+  },
+  toggleCompare() {
+    this.compare = !this.compare; DB.put('kv', 'cropCompare', this.compare).catch(() => {});
+    this.render(); this.modbar();
   },
   color(name) { const i = this.sizes.findIndex(s => s.name === name); return name === 'needed' ? '#E5484D' : SIZE_COLORS[(i < 0 ? 0 : i) % SIZE_COLORS.length]; },
   async libraryLoaded() {
@@ -2175,22 +2183,34 @@ const Crop = {
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
-        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div></div>
+        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
+        <div class="crop-canvas cmp" id="cropCmp" hidden><img id="cropCmpImg" alt="" draggable="false"><svg id="cropCmpSvg" preserveAspectRatio="none"></svg><span class="cmp-tag" id="cmpTagR"></span></div>
         <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div></div>`;
       this.bindAdjust();
     }
     const p = this.active(); const stage = $('#cropStage');
-    if (!p) { $('#cropHud').innerHTML = '<div class="hud-msg">Select a photo in the filmstrip.</div>'; $('#cropCanvas').hidden = true; return; }
+    if (!p) { $('#cropHud').innerHTML = '<div class="hud-msg">Select a photo in the filmstrip.</div>'; $('#cropCanvas').hidden = true; $('#cropCmp').hidden = true; return; }
     $('#cropCanvas').hidden = false;
     if (!this.plans.has(p.path) && !this.inflight.has(p.path)) setTimeout(() => this.ensurePlan(p), 0);
     const plan = this.plans.get(p.path);
     $('#cropSpin').hidden = !this.inflight.has(p.path) || !!plan;
     const W = (plan && plan.size && plan.size[0]) || p.w || 3, H = (plan && plan.size && plan.size[1]) || p.h || 2;
-    const sw = stage.clientWidth - 48, sh = stage.clientHeight - 96;
+    const cmp = this.compare && !this.adjusting, gap = 16;
+    const sw = cmp ? (stage.clientWidth - 48 - gap) / 2 : stage.clientWidth - 48, sh = stage.clientHeight - 96;
     const sc = Math.max(0.01, Math.min(sw / W, sh / H));
     const dw = W * sc, dh = H * sc;
     const cv = $('#cropCanvas');
-    cv.style.cssText = `width:${dw}px;height:${dh}px;left:${(stage.clientWidth - dw) / 2}px;top:${48 + (sh - dh) / 2}px`;
+    const left = cmp ? (stage.clientWidth - 2 * dw - gap) / 2 : (stage.clientWidth - dw) / 2, top = 48 + (sh - dh) / 2;
+    cv.style.cssText = `width:${dw}px;height:${dh}px;left:${left}px;top:${top}px`;
+    const cc = $('#cropCmp'); cc.hidden = !cmp; $('#cmpTagL').hidden = !cmp;
+    if (cmp) {
+      cc.style.cssText = `width:${dw}px;height:${dh}px;left:${left + dw + gap}px;top:${top}px`;
+      const kind = this.settings.preschool ? 'preschool' : 'standard';
+      const rot0 = this.rotations.get(p.path) || 0;
+      const g = `/graded?p=${enc(p.path)}&s=2048&k=${kind}${rot0 ? `&r=${rot0}` : ''}&t=${KS_TOKEN}`;
+      const ci = $('#cropCmpImg'); if (ci.dataset.want !== g) { ci.dataset.want = g; ci.src = g; }
+      $('#cmpTagR').innerHTML = `${kind === 'preschool' ? 'Preschool' : 'Standard'} color preset${this.settings.enhance ? '' : ' <i>· off, won’t be applied</i>'}`;
+    }
     this.scale = sc; this.W = W; this.H = H;
     const img = $('#cropImg'); const rot = this.rotations.get(p.path) || 0;
     const want = previewUrl(p.path, 2048) + (rot ? `&r=${rot}` : '');
@@ -2208,10 +2228,16 @@ const Crop = {
     if (plan && plan.boxes && this.overlay && !this.adjusting) {
       const fname = this.hover || this.focus;
       const focus = fname ? plan.boxes.find(b => b.name === fname) : null;
+      const dimRect = cmp ? `M0 0H${W}V${H}H0Z` : `M${-W} ${-H}H${2 * W}V${2 * H}H${-W}Z`;  // side by side: keep the dimming on its own photo
+      const sq = !focus && plan.boxes.find(b => this.circleFor(b));
+      if (sq) {  // 3" circle on: dim outside the circle, every size still drawn
+        const c = this.circleFor(sq);
+        shapes += `<path d="${dimRect} M${c[0] - c[2]} ${c[1]}a${c[2]} ${c[2]} 0 1 0 ${2 * c[2]} 0a${c[2]} ${c[2]} 0 1 0 ${-2 * c[2]} 0Z" fill="rgba(5,6,8,.6)" fill-rule="evenodd"/>`;
+      }
       if (focus) {
         const [x, y, w, h] = focus.box; const c = this.circleFor(focus);
         const hole = c ? `M${c[0] - c[2]} ${c[1]}a${c[2]} ${c[2]} 0 1 0 ${2 * c[2]} 0a${c[2]} ${c[2]} 0 1 0 ${-2 * c[2]} 0Z` : `M${x} ${y}V${y + h}H${x + w}V${y}Z`;
-        shapes += `<path d="M${-W} ${-H}H${2 * W}V${2 * H}H${-W}Z ${hole}" fill="${c ? 'rgba(5,6,8,.9)' : 'rgba(5,6,8,.62)'}" fill-rule="evenodd"/>`;
+        shapes += `<path d="${dimRect} ${hole}" fill="${c ? 'rgba(5,6,8,.9)' : 'rgba(5,6,8,.62)'}" fill-rule="evenodd"/>`;
       }
       plan.boxes.forEach(b => {
         const [x, y, w, h] = b.box; const col = this.color(b.name); const hot = fname === b.name;
@@ -2223,6 +2249,7 @@ const Crop = {
       });
     }
     svg.innerHTML = shapes; $('#cropLabels').innerHTML = labels;
+    if (cmp) { const s2 = $('#cropCmpSvg'); s2.setAttribute('viewBox', `0 0 ${W} ${H}`); s2.innerHTML = shapes; }
     this.layoutAdjust();
     // HUD
     const st = plan && !plan.error ? STATUS_INFO[plan.status] : null;
@@ -2429,6 +2456,7 @@ const Crop = {
     $('#modbar').innerHTML = `<div class="tb-group"><button class="btn sm" data-crop="adjust" ${p ? '' : 'disabled'}>Adjust framing <kbd>A</kbd></button>
       ${m ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div><div class="tb-sep"></div>
       <button class="toggle ${this.overlay ? 'on' : ''}" data-crop="overlay" title="Show crop boxes (O)">Crop boxes</button>
+      <button class="toggle ${this.compare ? 'on' : ''}" data-crop="compare" title="Original and color preset side by side (C)">Color side by side <kbd>C</kbd></button>
       <div class="tb-spacer"></div><span class="muted small">← → step through photos · P / X flag · 1–5 rate</span>`;
   },
 
@@ -2504,6 +2532,7 @@ const Crop = {
     if (k === 's') { this.startSquare(); return true; }
     if (e.key === '[' || e.key === '{') { this.nudge(e.shiftKey ? -1 : -0.1); return true; }
     if (e.key === ']' || e.key === '}') { this.nudge(e.shiftKey ? 1 : 0.1); return true; }
+    if (k === 'c' && !e.ctrlKey && !e.metaKey) { this.toggleCompare(); return true; }
     if (k === 'o') { this.overlay = !this.overlay; this.render(); this.modbar(); return true; }
     return false;
   },
@@ -2719,6 +2748,7 @@ function bindModuleEvents() {
     if (c) {
       const a = c.dataset.crop;
       if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze();
+      else if (a === 'compare') Crop.toggleCompare();
       else if (a === 'adjust') Crop.startAdjust(); else if (a === 'square') Crop.startSquare(); else if (a === 'reset') Crop.resetManual();
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
       else if (a === 'overlay') { Crop.overlay = !Crop.overlay; Crop.render(); Crop.modbar(); }

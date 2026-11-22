@@ -101,6 +101,10 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/preview":
                 data = library.thumbnail(q["p"][0], int((q.get("s") or ["2048"])[0]), float((q.get("r") or ["0"])[0]))
                 return self._send(200, data, "image/jpeg", cache=True)
+            if u.path == "/graded":  # the preview with a colour preset applied, for side by side
+                data = engine.graded_preview(q["p"][0], int((q.get("s") or ["2048"])[0]),
+                                             float((q.get("r") or ["0"])[0]), (q.get("k") or ["standard"])[0])
+                return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/full":
                 data, ctype = library.full_image(q["p"][0])
                 return self._send(200, data, ctype, cache=True)
