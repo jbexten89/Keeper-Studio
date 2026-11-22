@@ -35,7 +35,7 @@ Switch with the tabs at the top or **Ctrl+1…4**.
 | **Library** | Open a shoot folder; flag picks and rejects; rate and label; use Quick Collection and collections; compare in Grid, Loupe, Compare and Survey with synced zoom; export copies or resized JPEGs. |
 | **Crop** | PhotoCropper's face-anchored framing for every print size. Each photo shows its crop boxes (hover a size to see just that one) and a status: *Ready*, *Shortened to fit*, *Placed by hand* or *Needs review* with the reason. Press **A** to place the framing by hand. **Check framing** previews a whole shoot; **Export prints** writes the same folders PhotoCropper does: one per size, *Orders*, *review*, and contact sheets. |
 | **Composite** | The class composite builder. Students and teachers come from a collection, the selection or the filmstrip, so you can pick them in Library first. |
-| **Cut-out** | Background removal to transparent PNGs, using BiRefNet, the same model PhotoExtractor uses. |
+| **Extract** | Background removal to transparent PNGs, using BiRefNet, the same model PhotoExtractor uses. |
 
 A typical picture day: open the folder → cull in **Library** (P / X, Quick
 Collection) → filter to the picks → **Crop** → *Check framing* → fix anything
@@ -52,11 +52,11 @@ flagged → *Export prints*.
 * Hand-placed crops are also written into the output folder's `manual\` folder
   in PhotoCropper's format when you export, so PhotoCropper honours them too.
 
-## The cut-out model
+## The extraction model
 
 It's 220 MB, so it isn't in the repository. Setup copies it from
 `..\Photo Cropper\models\rembg\` if it finds it there; otherwise Keeper Studio
-downloads it the first time you use Cut-out. You can also copy
+downloads it the first time you use Extract. You can also copy
 `birefnet-general-lite.onnx` into `models\rembg\` yourself.
 
 ## Structure

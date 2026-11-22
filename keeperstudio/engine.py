@@ -1034,8 +1034,8 @@ def start_cutout(photo_paths: list[str], out_dir: str) -> jobs.Job:
         home.mkdir(parents=True, exist_ok=True)
         _adopt_flat_model()
         first = not cutout_model_ready()
-        job.update(message=("Downloading the cut-out model (about 220 MB, first time only)…" if first
-                            else "Loading the cut-out model…"), busy=True)
+        job.update(message=("Downloading the extraction model (about 220 MB, first time only)…" if first
+                            else "Loading the extraction model…"), busy=True)
         session = core.make_session(str(home))
         job.update(message="", busy=False)
         out = Path(out_dir)

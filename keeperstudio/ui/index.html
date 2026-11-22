@@ -1002,7 +1002,7 @@ function selectByClick(id, e, fromFilm) {
 function refreshSelection() {
   $('#app').classList.toggle('multi', S.photos.length > 0 && S.selected.size > 1 && S.mode !== 'grid');
   renderGrid(); renderFilm(); renderFilmBar(); renderRight(); syncToolbar();
-  // Crop / Composite / Cut-out draw their own view: a click in the filmstrip must redraw it
+  // Crop / Composite / Extract draw their own view: a click in the filmstrip must redraw it
   // even when Library was left in Grid view.
   if (S.module !== 'library') renderLeft();
   if (S.mode !== 'grid' || S.module !== 'library') renderView();
@@ -1143,7 +1143,7 @@ function renderBanners() {
 function renderTop() {
   if ($('#top')._built) return; $('#top')._built = true;
   $('#top').innerHTML = `<div class="logo">Keeper<b>.</b><span class="logo-sub">Studio</span></div>
-    <div class="modules">${MODULES.map(([k, l], i) => `${i ? '<span class="bar">|</span>' : ''}<button data-module="${k}" title="${l} (Ctrl+${i + 1})">${l}</button>`).join('')}</div>
+    <div class="modules">${MODULES.map(([k, l], i) => `${i ? '<span class="bar">|</span>' : ''}<button data-module="${k}" title="${k === 'cutout' ? 'Extract the subject from the background' : l} (Ctrl+${i + 1})">${l}</button>`).join('')}</div>
     <div class="top-actions"><button class="btn sm" data-act="open" title="Open folder (Ctrl+O)">Open Folder…</button><button class="btn sm" data-act="export" title="Export (Ctrl+Shift+E)">Export…</button><button class="btn sm" data-act="help" title="Keyboard shortcuts (?)">?</button></div>`;
 }
 function sectionHTML(id, title, body, extra = '') {
@@ -1228,7 +1228,7 @@ function renderEmpty() {
   if (S.loadingMsg) { e.innerHTML = `<div class="empty-card"><div class="logo-big">Keeper<b>.</b> <span class="logo-sub">Studio</span></div><p class="muted">${esc(S.loadingMsg)}</p></div>`; return; }
   const recent = (S.recent || []).slice(0, 6);
   e.innerHTML = `<div class="empty-card"><div class="logo-big">Keeper<b>.</b> <span class="logo-sub">Studio</span></div>
-    <p class="muted">Cull the shoot, crop every print size, build composites and cut-outs — all in one place.</p>
+    <p class="muted">Cull the shoot, crop every print size, build composites and extract subjects from the background — all in one place.</p>
     <button class="btn primary lg" data-act="open">Open Folder…</button>
     ${recent.length ? `<div class="recent"><h4>Recent</h4>${recent.map(p => `<button data-recent="${esc(p)}"><span>${esc(baseName(p))}</span><small>${esc(p)}</small></button>`).join('')}</div>` : ''}
     <p class="muted small">or drag a folder onto this window · photos never leave this computer</p></div>`;
@@ -1939,7 +1939,7 @@ function buildHelp() {
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
-    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Cut-out', 'Ctrl 4'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -2117,8 +2117,8 @@ function onKey(e) {
   }
 }
 
-/* ================= Modules: Library · Crop · Composite · Cut-out ================= */
-const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Cut-out']];
+/* ================= Modules: Library · Crop · Composite · Extract ================= */
+const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract']];
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
@@ -2803,7 +2803,7 @@ const Comp = {
   key() { return false; },
 };
 
-/* ============================================================= Cut-out ==== */
+/* ============================================================= Extract ==== */
 const Cut = {
   scope: 'all', outDir: '', outCustom: false, existing: {}, job: null, jobState: null, result: null, ready: null, view: 'cut', errors: [],
   async libraryLoaded() {
@@ -2823,19 +2823,19 @@ const Cut = {
   left() {
     const list = scopeList(this.scope);
     const html = sectionHTML('cu-scope', 'Photos', `<div class="pad">${segHTML('cutScope', this.scope, [['all', `Filmstrip · ${S.view.length}`], ['selected', `Selected · ${S.selected.size}`]])}</div>`)
-      + sectionHTML('cu-out', 'Save cut-outs to', `<div class="pad"><div class="pathrow"><span class="path" title="${esc(this.outDir)}">${esc(this.outDir || 'Open a folder first')}</span></div>
+      + sectionHTML('cu-out', 'Save extracted photos to', `<div class="pad"><div class="pathrow"><span class="path" title="${esc(this.outDir)}">${esc(this.outDir || 'Open a folder first')}</span></div>
         <div class="btn-row"><button class="btn sm" data-cut="out-change">Change…</button>${this.outCustom ? '<button class="btn sm" data-cut="out-default">Use default</button>' : ''}</div>
         <div class="hint tight">Each photo becomes a PNG with a transparent background, named like the original.</div></div>`)
       + sectionHTML('cu-model', 'Model', `<div class="pad"><div class="model-line"><span class="st-dot ${this.ready ? 'ok' : 'none'}"></span>${this.ready ? 'BiRefNet ready' : this.ready === false ? 'Downloads on first use (about 220 MB)' : 'Checking…'}</div></div>`);
     let foot = '';
-    if (this.job && this.jobState && !this.jobState.finished) foot = progressHTML(this.jobState, 'Removing backgrounds');
-    else if (this.result) foot = `<div class="job-card done"><div class="job-top"><b>${this.result.cancelled ? 'Stopped' : 'Done'}</b></div><div class="hint tight">${plural(this.result.ok, 'cut-out')} saved${this.errors.length ? ` · ${this.errors.length} failed` : ''}.</div><div class="btn-row"><button class="btn sm" data-cut="open-out">Open folder</button></div></div>`;
-    $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot col">${foot}<button class="btn primary big" data-cut="run" ${this.job || !list.length ? 'disabled' : ''}>Remove backgrounds (${list.length})</button></div>`;
+    if (this.job && this.jobState && !this.jobState.finished) foot = progressHTML(this.jobState, 'Extracting');
+    else if (this.result) foot = `<div class="job-card done"><div class="job-top"><b>${this.result.cancelled ? 'Stopped' : 'Done'}</b></div><div class="hint tight">${plural(this.result.ok, 'photo')} extracted${this.errors.length ? ` · ${this.errors.length} failed` : ''}.</div><div class="btn-row"><button class="btn sm" data-cut="open-out">Open folder</button></div></div>`;
+    $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot col">${foot}<button class="btn primary big" data-cut="run" ${this.job || !list.length ? 'disabled' : ''}>Extract (${list.length})</button></div>`;
   },
   right() {
     const p = S.byId.get(S.active);
     $('#right').innerHTML = `<div class="scroll">${sectionHTML('cu-about', 'About', `<div class="hint">Cuts the subject out of each photo with BiRefNet, the same model PhotoExtractor uses — clean edges on hair and pom-poms. It runs on this computer; nothing is uploaded.</div>`)}
-      ${p ? sectionHTML('cu-this', 'This photo', `<div class="hint">${this.existing[p.path] ? `Cut-out saved: ${esc(baseName(this.existing[p.path]))}` : 'No cut-out yet.'}</div>${this.existing[p.path] ? `<div class="pad"><button class="btn sm" data-cut="reveal-one">Show in folder</button></div>` : ''}`) : ''}
+      ${p ? sectionHTML('cu-this', 'This photo', `<div class="hint">${this.existing[p.path] ? `Extracted: ${esc(baseName(this.existing[p.path]))}` : 'Not extracted yet.'}</div>${this.existing[p.path] ? `<div class="pad"><button class="btn sm" data-cut="reveal-one">Show in folder</button></div>` : ''}`) : ''}
       ${this.errors.length ? sectionHTML('cu-err', `Problems · ${this.errors.length}`, this.errors.map(e => `<div class="hint"><b>${esc(baseName(e.path))}</b><br>${esc(e.error)}</div>`).join('')) : ''}</div>`;
   },
   center() {
@@ -2844,9 +2844,9 @@ const Cut = {
     if (!p) { v.innerHTML = '<div class="msg">Select a photo in the filmstrip.</div>'; return; }
     const cut = this.existing[p.path]; const showCut = cut && this.view === 'cut';
     v.innerHTML = `<div class="cut-stage ${showCut ? 'checker' : ''}"><img src="${showCut ? fileUrl(cut, this.stamp || 1) : previewUrl(p.path, 2048)}" alt=""></div>
-      <div class="cut-hud">${cut ? segHTML('cutView', this.view, [['orig', 'Original'], ['cut', 'Cut-out']]) : '<span class="muted small">No cut-out for this photo yet</span>'}<span class="hud-name">${esc(p.name)}</span></div>`;
+      <div class="cut-hud">${cut ? segHTML('cutView', this.view, [['orig', 'Original'], ['cut', 'Extracted']]) : '<span class="muted small">This photo hasn’t been extracted yet</span>'}<span class="hud-name">${esc(p.name)}</span></div>`;
   },
-  modbar() { $('#modbar').innerHTML = `<span class="muted small">← → step through photos · press Remove backgrounds to process the photos on the left</span><div class="tb-spacer"></div>`; },
+  modbar() { $('#modbar').innerHTML = `<span class="muted small">← → step through photos · press Extract to process the photos on the left</span><div class="tb-spacer"></div>`; },
   async setOut(path, custom) {
     this.outDir = path; this.outCustom = custom;
     if (S.root) { if (custom) DB.put('kv', 'cutout|' + S.root, path).catch(() => {}); else DB.del('kv', 'cutout|' + S.root).catch(() => {}); }
@@ -2855,7 +2855,7 @@ const Cut = {
   async run() {
     const list = scopeList(this.scope); if (!list.length || this.job) return;
     let id; try { id = (await api('/api/cutout/run', { paths: list.map(p => p.path), out_dir: this.outDir })).job; } catch (e) { return toast(esc(e.message)); }
-    this.job = id; this.errors = []; this.result = null; this.jobState = { id, busy: true, total: list.length, done: 0, message: 'Loading the cut-out model…' }; renderLeft();
+    this.job = id; this.errors = []; this.result = null; this.jobState = { id, busy: true, total: list.length, done: 0, message: 'Loading the extraction model…' }; renderLeft();
     const fin = await pollJob(id, s => {
       this.jobState = s;
       for (const it of s.items) { if (it.output) this.existing[it.path] = it.output; else this.errors.push(it); }
@@ -2863,9 +2863,9 @@ const Cut = {
       if (S.module === 'cutout') { renderLeft(); if (s.items.some(it => it.path === (S.byId.get(S.active) || {}).path)) renderView(); }
     });
     this.job = null; this.jobState = null; this.ready = true;
-    if (fin.error) { this.render(); return toast('Cut-out failed: ' + esc(fin.error), 6000); }
+    if (fin.error) { this.render(); return toast('Extract failed: ' + esc(fin.error), 6000); }
     this.result = fin.result; this.render();
-    toast(`${plural(fin.result.ok, 'cut-out')} saved <button class="toast-link" onclick="reveal(${esc(JSON.stringify(fin.result.out_dir))})">Show</button>`, 5000);
+    toast(`${plural(fin.result.ok, 'photo')} extracted <button class="toast-link" onclick="reveal(${esc(JSON.stringify(fin.result.out_dir))})">Show</button>`, 5000);
   },
   key() { return false; },
 };
