@@ -154,18 +154,18 @@ landscape:
   # where the frame allows (the crop always contains the whole group first).
   margin_fraction: 0.08
   ratios:
+    - name: 20x16       # a 16x20 shot landscape (5:4)
+      width: 20
+      height: 16
+    - name: 14x11       # an 11x14 shot landscape (14:11)
+      width: 14
+      height: 11
     - name: 10x8        # an 8x10 shot landscape (5:4)
       width: 10
       height: 8
     - name: 7x5         # a 5x7 shot landscape (7:5)
       width: 7
       height: 5
-    - name: 14x11       # an 11x14 shot landscape (14:11)
-      width: 14
-      height: 11
-    - name: 20x16       # a 16x20 shot landscape (5:4)
-      width: 20
-      height: 16
 
 # Person-segmentation model, used to locate the group in landscape shots.
 segment:
