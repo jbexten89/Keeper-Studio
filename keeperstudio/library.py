@@ -26,7 +26,7 @@ JPEG_EXT = {".jpg", ".jpeg"}
 
 # Decoding a 30 MP frame takes real memory; cap how many happen at once so a
 # fast scroll through a big shoot cannot exhaust it.
-_decode_slots = threading.BoundedSemaphore(max(2, min(6, (os.cpu_count() or 4) - 1)))
+_decode_slots = threading.BoundedSemaphore(max(2, min(4, (os.cpu_count() or 4) // 2)))
 
 
 def scan(folder: Path) -> dict:

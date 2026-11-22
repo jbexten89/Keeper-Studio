@@ -698,7 +698,10 @@ const Thumbs = { request(p) { if (p.thumbState >= 2 || p.dead) return; p.thumbUr
 const isHeic = () => false;
 const needsConvert = () => false;
 const ENV = { blobImg: true, ready: Promise.resolve() };
-function fullUrl(p) { return fullUrlFor(p.path); }
+// Large views show a 2560 px preview (fast, light on memory); the 30 MP original
+// is only fetched when you zoom in past the preview's detail.
+const PREVIEW_PX = 2560;
+function fullUrl(p) { return previewUrl(p.path, PREVIEW_PX); }
 async function fullUrlAsync(p) { return fullUrl(p); }
 async function displayBlob() { return null; }
 function preload(p) { if (!p) return; const im = new Image(); im.decoding = 'async'; im.src = fullUrl(p); }
@@ -1248,7 +1251,7 @@ function makePane(parent) {
 }
 function setPaneImage(el, p) {
   if (el._pid !== p.id) {
-    el._pid = p.id; el._full = false;
+    el._pid = p.id; el._full = false; el._orig = null; el._origLoading = null;
     if (p.thumbUrl) el._img.src = p.thumbUrl; else el._img.removeAttribute('src');
     el._loading = null;
     if (el._lazy && S.zoom.mode === 'fit' && Math.max(el.clientWidth, el.clientHeight) < THUMB_MAX * 1.1) return;
@@ -1277,7 +1280,7 @@ function layoutPane(el) {
   el._geom = { left, top, dw, dh, cw, ch };
   const badge = el.parentElement && el.parentElement.querySelector(':scope > .zoom-badge');
   if (badge) badge.textContent = zoomLabel(el);
-  if (el._lazy && z.mode !== 'fit') loadFull(el, p);
+  if (z.mode !== 'fit' && (el._lazy || s * Math.max(nw, nh) > PREVIEW_PX * 0.95)) loadFull(el, p);
 }
 const MAX_ZOOM = 4; // 400 % of the photo's real pixels
 function zoomLabel(el) { return S.zoom.mode === 'fit' || !el ? 'Fit' : Math.round(el._s * (window.devicePixelRatio || 1) * 100) + '%'; }
@@ -1307,12 +1310,10 @@ function syncZoomUI() {
   if (show) $('#tbZoomVal').textContent = zoomLabel(refPane());
 }
 function loadFull(el, p) {
-  if (el._full || el._loading === p.id) return;
-  el._loading = p.id;
-  fullUrlAsync(p).then(url => {
-    if (el._pid !== p.id) return;
-    const im = new Image(); im.onload = () => { if (el._pid === p.id) { el._full = true; el._img.src = url; } }; im.src = url;
-  }).catch(() => {});
+  if (el._orig === p.id || el._origLoading === p.id) return;
+  el._origLoading = p.id;
+  const url = fullUrlFor(p.path);
+  const im = new Image(); im.onload = () => { if (el._pid === p.id) { el._orig = p.id; el._full = true; el._img.src = url; } }; im.src = url;
 }
 function bindZoom(el) {
   let down = null;
@@ -2145,6 +2146,7 @@ const Crop = {
     const p = this.active(); const stage = $('#cropStage');
     if (!p) { $('#cropHud').innerHTML = '<div class="hud-msg">Select a photo in the filmstrip.</div>'; $('#cropCanvas').hidden = true; return; }
     $('#cropCanvas').hidden = false;
+    if (!this.plans.has(p.path) && !this.inflight.has(p.path)) setTimeout(() => this.ensurePlan(p), 0);
     const plan = this.plans.get(p.path);
     $('#cropSpin').hidden = !this.inflight.has(p.path) || !!plan;
     const W = (plan && plan.size && plan.size[0]) || p.w || 3, H = (plan && plan.size && plan.size[1]) || p.h || 2;

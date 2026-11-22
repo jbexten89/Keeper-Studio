@@ -83,8 +83,26 @@ def _selftest() -> int:
     return code
 
 
+def _be_a_good_neighbour() -> None:
+    """Run below normal priority on Windows.
+
+    Checking framing and exporting keep every CPU core busy for minutes. At
+    normal priority that makes the whole PC sluggish; just below normal, the
+    work still uses all the idle CPU but whatever you click elsewhere wins.
+    """
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+        ctypes.windll.kernel32.SetPriorityClass(ctypes.windll.kernel32.GetCurrentProcess(), BELOW_NORMAL_PRIORITY_CLASS)
+    except Exception:
+        pass
+
+
 def main() -> int:
     _unblock_downloaded_files()
+    _be_a_good_neighbour()
     if "--selftest" in sys.argv:
         return _selftest()
 
