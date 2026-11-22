@@ -438,6 +438,9 @@ kbd{font-size:10px}
 .filter-empty{position:absolute;inset:0;min-height:300px}
 .filter-empty>div{display:flex;flex-direction:column;align-items:center;gap:10px;line-height:1.5}
 .filter-empty .btn{margin-top:6px}
+.filter-note{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 12px 0;padding:8px 10px;border-radius:6px;background:var(--amber);color:#1A1206;font-size:12px}
+.filter-note b{font-weight:700}
+.filter-note .btn{margin-left:auto;background:#1A1206;border-color:#1A1206;color:#fff}
 </style>
 </head>
 <body>
@@ -1595,7 +1598,7 @@ function filterSummary() {
 }
 function afterFilter() {
   recomputeView();
-  if (S.active == null && S.view.length && S.mode !== 'grid') S.active = S.view[0].id;
+  if (S.active == null && S.view.length && (S.mode !== 'grid' || S.module !== 'library')) { S.active = S.view[0].id; S.selected = new Set([S.active]); S.anchor = S.active; }
   $('#gridScroll').scrollTop = 0; renderAll(); ensureVisible();
 }
 function setSource(k) {
@@ -2245,7 +2248,8 @@ const Crop = {
       <div class="hint tight">${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.</div></div>`);
     html += sectionHTML('c-check', 'Framing check', `${['ok', 'shortened', 'manual', 'review', 'unchecked'].map(row).join('')}
       <div class="pad"><button class="btn wide" data-crop="analyze" ${this.job ? 'disabled' : ''}>Check framing on ${plural(list.length, 'photo')}</button>
-      ${S.filter.crop && S.filter.crop !== 'any' ? '<button class="btn sm wide ghost" data-cropfilter="any">Show every status</button>' : ''}</div>`);
+      </div>`);
+    if (S.filter.crop && S.filter.crop !== 'any') html = `<div class="filter-note">Showing only <b>${esc(STATUS_INFO[S.filter.crop].label)}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-cropfilter="any">Show all</button></div>` + html;
     let foot = '';
     if (this.job && this.jobState && !this.jobState.finished) foot = progressHTML(this.jobState, this.jobKind === 'analyze' ? 'Checking framing' : 'Exporting prints');
     else if (this.result) {
