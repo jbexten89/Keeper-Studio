@@ -2138,7 +2138,7 @@ const Crop = {
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
-        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag">8 × 10 framing</div></div></div></div>
+        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div></div>
         <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div></div>`;
       this.bindAdjust();
     }
@@ -2178,23 +2178,25 @@ const Crop = {
     const i = S.viewIndex.get(p.id);
     $('#cropHud').innerHTML = `<div class="hud-left">${st ? `<span class="st-pill ${st.cls}">${st.icon} ${plan.status === 'review' ? 'Needs review — ' + esc(plan.label) : st.label}</span>` : plan && plan.error ? `<span class="st-pill review">! ${esc(plan.error)}</span>` : '<span class="st-pill none">Checking framing…</span>'}
       <span class="hud-name">${esc(p.name)}</span><span class="muted">${i != null ? `${i + 1} of ${S.view.length}` : ''}</span></div>
-      ${this.adjusting ? `<div class="hud-right"><span class="muted">Drag to move · drag a corner to resize</span><button class="btn sm" data-crop="adj-cancel">Cancel</button><button class="btn sm primary" data-crop="adj-apply">Apply</button></div>` : ''}`;
+      ${this.adjusting ? `<div class="hud-right"><span class="muted">${this.group ? 'Draw around the whole team · drag a corner to resize' : 'Drag to move · drag a corner to resize'}</span><button class="btn sm" data-crop="adj-cancel">Cancel</button><button class="btn sm primary" data-crop="adj-apply">Apply</button></div>` : ''}`;
   },
   /* ---------- adjust (hand placement) ---------- */
   startAdjust() {
     const p = this.active(); const plan = p && this.plans.get(p.path);
     if (!plan || plan.error) return toast(this.inflight.has(p && p.path) ? 'Still checking this photo — try again in a moment' : 'This photo couldn’t be checked, so it can’t be adjusted');
-    if (plan.landscape) return toast('Team / group shots can’t be placed by hand yet — they are cropped around the whole group automatically', 4000);
-    const r = plan.reference; this.adjusting = { center_x: r.center_x, top: r.top, height: Math.min(r.height, this.H, this.W / 0.8) };
+    const r = plan.reference; if (!r) return toast('Nothing to adjust on this photo');
+    this.A = plan.ref_aspect || 0.8; this.group = !!plan.landscape;
+    this.adjusting = { center_x: r.center_x, top: r.top, height: Math.min(r.height, this.H, this.W / this.A) };
     this.render();
   },
   cancelAdjust(quiet) { this.adjusting = null; if (!quiet) this.render(); },
   async applyAdjust() {
     const p = this.active(); if (!p || !this.adjusting) return;
     const m = { center_x: Math.round(this.adjusting.center_x), top: Math.round(this.adjusting.top), height: Math.round(this.adjusting.height) };
+    if (this.group) m.kind = 'group';
     this.adjusting = null; this.manual.set(p.path, m); DB.put('manual', p.path, m).catch(() => {});
     this.plans.delete(p.path); this.render(); this.ensurePlan(p);
-    toast('Framing placed by hand — every full-length size is cut from it');
+    toast(m.kind === 'group' ? 'Group framing placed by hand — both group sizes keep everything inside it' : 'Framing placed by hand — every full-length size is cut from it', 3500);
   },
   async resetManual() {
     const p = this.active(); if (!p || !this.manual.has(p.path)) return;
@@ -2203,7 +2205,8 @@ const Crop = {
   },
   layoutAdjust() {
     const a = this.adjusting; $('#cropAdj').hidden = !a; if (!a) return;
-    const w = a.height * 0.8, l = a.center_x - w / 2;
+    const w = a.height * (this.A || 0.8), l = a.center_x - w / 2;
+    const tag = $('#adjTag'); if (tag) tag.textContent = this.group ? 'Group framing — keep the whole team inside' : '8 × 10 framing';
     Object.assign($('#adjBox').style, { left: l / this.W * 100 + '%', top: a.top / this.H * 100 + '%', width: w / this.W * 100 + '%', height: a.height / this.H * 100 + '%' });
   },
   bindAdjust() {
@@ -2214,7 +2217,7 @@ const Crop = {
     });
     box.addEventListener('pointermove', e => {
       if (!drag) return;
-      const dx = (e.clientX - drag.x) / this.scale, dy = (e.clientY - drag.y) / this.scale, a0 = drag.a, A = 0.8;
+      const dx = (e.clientX - drag.x) / this.scale, dy = (e.clientY - drag.y) / this.scale, a0 = drag.a, A = this.A || 0.8;
       let { center_x, top, height } = a0; const w0 = height * A, l0 = center_x - w0 / 2;
       if (drag.h === 'move') { center_x = clamp(a0.center_x + dx, w0 / 2, this.W - w0 / 2); top = clamp(a0.top + dy, 0, this.H - height); }
       else {
@@ -2277,7 +2280,7 @@ const Crop = {
         ${plan.status === 'review' ? `<div class="sc-label">${esc(plan.label)}</div>` : ''}
         ${plan.reason ? `<details ${plan.status === 'review' ? 'open' : ''}><summary>Details</summary><pre>${esc(plan.reason)}</pre></details>` : ''}
         ${plan.status === 'shortened' ? '<div class="hint tight">The ideal frame ran off the photo, so the bottom edge sits a little higher than usual. Worth a glance.</div>' : ''}
-        <div class="btn-row">${plan.landscape ? '<span class="muted small">Group shot — framed around the whole group.</span>' : `<button class="btn sm" data-crop="adjust">Adjust framing <kbd>A</kbd></button>`}
+        <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
         ${this.manual.has(p.path) ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div></div>`;
     } else if (p && plan && plan.error) status = `<div class="status-card review"><div class="sc-head"><span class="st-dot review"></span><b>Couldn’t check this photo</b></div><pre>${esc(plan.error)}</pre></div>`;
     else if (p) status = '<div class="status-card none"><div class="sc-head"><span class="spin-dot"></span><b>Checking framing…</b></div></div>';

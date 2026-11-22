@@ -231,6 +231,55 @@ def _status(result, manual) -> tuple[str, str]:
 
 REFERENCE_ASPECT = 4 / 5
 
+# ---- hand-placed group (team) shots ---------------------------------------
+# PhotoCropper frames a landscape group shot around the people it finds and
+# sends it to review when it can't. A hand-placed group box takes the place of
+# the found group: every landscape size is framed to contain the whole box
+# (engine's group_crop_box), or, when the photo isn't tall enough for that,
+# cut at the box's height and centred on it.
+
+def group_aspect(cfg) -> float:
+    return max((r.width / r.height for r in cfg.landscape_ratios), default=1.4)
+
+
+def group_boxes(manual: dict, cfg, size) -> dict:
+    from photocropper.geometry import group_crop_box, manual_crop_box
+    a = group_aspect(cfg)
+    w = manual["height"] * a
+    x0 = manual["center_x"] - w / 2
+    bbox = (int(round(max(0, x0))), int(round(max(0, manual["top"]))),
+            int(round(min(size[0], x0 + w))), int(round(min(size[1], manual["top"] + manual["height"]))))
+    out = {}
+    for r in cfg.landscape_ratios:
+        box = group_crop_box(bbox, size, r.width, r.height, 0.0)
+        if box is None:
+            box, _ = manual_crop_box(manual["center_x"], manual["top"], manual["height"], (r.width, r.height), size)
+        out[r.name] = box
+    return out
+
+
+_tl = threading.local()  # .group_manual: {path: manual} for the export running on this thread
+_orig_process_image = pipeline.process_image
+
+
+def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None, balance=False,
+                   segmenter=None, enhance_when="before", bottom_margin=None, preschool_framing=None):
+    m = (getattr(_tl, "group_manual", None) or {}).get(str(path))
+    if not m:
+        return _orig_process_image(path, detector, config, out_dir, lut=lut, pose_detector=pose_detector,
+                                   balance=balance, segmenter=segmenter, enhance_when=enhance_when,
+                                   bottom_margin=bottom_margin, preschool_framing=preschool_framing)
+    from photocropper import imageio
+    source = imageio.load(path)
+    post_lut = pipeline._resolve_enhance(source, lut, enhance_when)
+    written = {}
+    for name, box in group_boxes(m, config, source.size).items():
+        written[name] = pipeline._write_crop(source, box.as_pil(), out_dir, path.stem, name, path.suffix, config, post_lut)
+    return pipeline.ImageResult(path, pipeline.OK, None, written)
+
+
+pipeline.process_image = _process_image  # run_job looks it up at call time
+
 
 def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
     """Where every size would be cut, without writing anything."""
@@ -239,6 +288,14 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
                 "reason": "Print crops are made from JPEG files only (the engine keeps each JPEG's own quality settings).",
                 "boxes": [], "size": list(_oriented_size(path))}
     cfg = run_config(settings)
+    if manual and manual.get("kind") == "group":
+        size = _oriented_size(path)
+        if cfg.landscape_enabled and size[0] > size[1]:
+            gb = group_boxes(manual, cfg, size)
+            return {"path": path, "status": "manual", "label": "Placed by hand", "reason": None, "adjusted": False,
+                    "boxes": [{"name": n, "box": [b.left, b.top, b.width, b.height], "fits": True, "kind": "landscape"} for n, b in gb.items()],
+                    "size": list(size), "reference": dict(manual), "landscape": True, "ref_aspect": group_aspect(cfg)}
+        manual = None  # group placement on a photo that is no longer treated as a group shot
     preschool = bool(settings.get("preschool"))
     balance = bool(settings.get("balance_feet")) and not preschool
     boxes: dict = {}
@@ -298,6 +355,16 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
         elif result.solution is not None:
             b = result.solution.box
             ref = {"center_x": b.left + b.width / 2, "top": max(0, b.top), "height": min(b.height, size[1])}
+    is_group = bool(cfg.landscape_enabled and size[0] > size[1])
+    if is_group and not manual:
+        a = group_aspect(cfg)
+        widest = max((r for r in cfg.landscape_ratios if r.name in boxes), key=lambda r: r.width / r.height, default=None)
+        if widest:
+            l, t, w, h = boxes[widest.name]
+            ref = {"center_x": l + w / 2, "top": t, "height": h}
+        else:
+            h = min(size[1], size[0] / a) * 0.96
+            ref = {"center_x": size[0] / 2, "top": (size[1] - h) / 2, "height": h}
     if ref is None:
         # No face to anchor on (none found, or more than one): start the Adjust
         # box as the largest 4:5 frame that fits, centred, for the user to place.
@@ -305,13 +372,14 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
         height = min(h, w / REFERENCE_ASPECT) * 0.94
         ref = {"center_x": w / 2, "top": (h - height) / 2, "height": height}
     else:
-        ref["height"] = min(ref["height"], size[1], size[0] / REFERENCE_ASPECT)
+        aspect = group_aspect(cfg) if is_group else REFERENCE_ASPECT
+        ref["height"] = min(ref["height"], size[1], size[0] / aspect)
         ref["top"] = max(0, min(ref["top"], size[1] - ref["height"]))
-    is_group = bool(cfg.landscape_enabled and size[0] > size[1])
     return {
         "path": path, "status": status, "label": label, "reason": result.reason,
         "adjusted": bool(getattr(result, "adjusted", False)), "boxes": out_boxes,
         "size": list(size), "reference": ref, "landscape": is_group,
+        "ref_aspect": group_aspect(cfg) if is_group else REFERENCE_ASPECT,
     }
 
 
@@ -348,13 +416,18 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
         out.mkdir(parents=True, exist_ok=True)
         # Hand placements made in the app become the engine's own sidecars, so
         # the run (and any later PhotoCropper run on this folder) uses them.
+        group = {}
         for img in images:
             side = pipeline.manual_sidecar_path(out, img.stem)
             m = manual.get(str(img))
+            if m and m.get("kind") == "group":
+                group[str(img)] = m
+                m = None
             if m:
                 pipeline.save_manual_crop(out, img.stem, m)
             elif side.is_file():
                 side.unlink()
+        _tl.group_manual = group
         job.update(message="Loading face detector…", busy=True)
         statuses = {}
 
@@ -375,6 +448,7 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
             bottom_margin_override=settings.get("bottom_margin"),
             preschool_override=bool(settings.get("preschool")),
         )
+        _tl.group_manual = None
         med = summary.framing_medians()
         return {
             "out_dir": str(out), "cancelled": summary.cancelled,
