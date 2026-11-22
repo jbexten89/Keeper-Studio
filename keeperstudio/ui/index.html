@@ -2114,6 +2114,7 @@ function onKey(e) {
 
 /* ================= Modules: Library · Crop · Composite · Cut-out ================= */
 const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Cut-out']];
+const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
 const STATUS_INFO = {
@@ -2224,7 +2225,12 @@ const Crop = {
     this.compare = !this.compare; DB.put('kv', 'cropCompare', this.compare).catch(() => {});
     this.render(); this.modbar();
   },
-  color(name) { const i = this.sizes.findIndex(s => s.name === name); return name === 'needed' ? '#E5484D' : SIZE_COLORS[(i < 0 ? 0 : i) % SIZE_COLORS.length]; },
+  // fixed colours per size, so adding a size never repaints the others
+  color(name) {
+    if (name === 'needed') return '#E5484D';
+    if (SIZE_COLOR_BY_NAME[name]) return SIZE_COLOR_BY_NAME[name];
+    const i = this.sizes.findIndex(s => s.name === name); return SIZE_COLORS[(i < 0 ? 0 : i) % SIZE_COLORS.length];
+  },
   async libraryLoaded() {
     this.result = null; this.plans.clear();
     const saved = S.root ? await DB.get('kv', 'cropout|' + S.root).catch(() => null) : null;
