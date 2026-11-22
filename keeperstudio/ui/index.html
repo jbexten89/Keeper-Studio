@@ -459,6 +459,17 @@ kbd{font-size:10px}
 .crop-canvas.cmp img{position:absolute;inset:0;width:100%;height:100%;box-shadow:0 6px 30px rgba(0,0,0,.6)}
 .cmp-tag{position:absolute;left:0;bottom:-24px;font-size:12px;color:var(--muted);white-space:nowrap}
 .cmp-tag i{font-style:normal;color:var(--amber)}
+.straight.compact{display:flex;align-items:center;gap:6px;padding:8px 12px}
+.straight.compact input{flex:1;min-width:0}
+.straight.compact .btn.icon{width:24px;padding:0;justify-content:center;flex:none}
+.straight.compact b{min-width:42px;text-align:right;font-weight:600}
+.straight.compact b.resettable{cursor:pointer;color:var(--accent)}
+.sec-note{margin-left:auto;color:var(--dim);font-size:12px;cursor:help}
+.sizes{padding:3px 0}
+.size-row{padding:3px 12px}
+#left .sec .row{padding-top:3px;padding-bottom:3px}
+#left .sec .pad{padding-top:6px;padding-bottom:6px}
+#left .slider-row{gap:8px;padding-right:14px}#left .slider-row b{min-width:0}
 </style>
 </head>
 <body>
@@ -2382,11 +2393,29 @@ const Crop = {
     const all = S.view.length, sel = S.selected.size;
     const list = scopeList(this.scope); const c = this.counts(S.photos.length ? sourcePhotos().filter(p => matchRules(p, { ...S.filter, crop: 'any' })) : []);
     const row = (k) => { const st = STATUS_INFO[k]; return `<div class="row st-row-${st.cls} ${S.filter.crop === k ? 'on' : ''}" data-cropfilter="${k}"><span class="st-dot ${st.cls}"></span><span class="lbl">${st.label}</span><span class="cnt">${c[k]}</span></div>`; };
-    let html = sectionHTML('c-scope', 'Photos to crop', `<div class="pad">${segHTML('cropScope', this.scope, [['all', `Filmstrip · ${all}`], ['selected', `Selected · ${sel}`]])}
-      <div class="hint tight">${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.</div></div>`);
+    let html = sectionHTML('c-scope', 'Photos to crop', `<div class="pad" title="${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.">${segHTML('cropScope', this.scope, [['all', `Filmstrip · ${all}`], ['selected', `Selected · ${sel}`]])}
+</div>`);
     html += sectionHTML('c-check', 'Framing check', `${['ok', 'shortened', 'manual', 'review', 'unchecked'].map(row).join('')}
       <div class="pad"><button class="btn wide" data-crop="analyze" ${this.job ? 'disabled' : ''}>Check framing on ${plural(list.length, 'photo')}</button>
       </div>`);
+    const s = this.settings;
+    if (s) {
+      const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
+      if (S.sections['c-out'] === undefined) S.sections['c-out'] = false;  // set once, rarely touched
+    html += sectionHTML('c-frame', 'Framing style', `<div class="pad">${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full'], ['tq', '3/4'], ['preschool', 'Preschool']])}</div>
+        ${tq ? `<div class="pad" title="The bottom edge crosses the legs a little above or below the knees — never on the joint. The square keeps its own face framing.">${segHTML('kneeLine', s.framing_style, [['knee_above', 'Just above knees'], ['knee_below', 'Just below knees']])}</div>` : ''}
+        ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
+        ${s.balance_feet && !s.preschool && !tq ? `<div class="slider-row" title="Space under the feet"><span>Margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
+        ${switchHTML('fit_to_frame', s.fit_to_frame, 'Shorten to fit', 'When the ideal frame runs off the photo, shorten it instead of sending the photo to review')}
+        ${switchHTML('landscape', s.landscape, 'Crop group shots', 'Landscape photos are cropped to the landscape sizes around the whole group')}
+        <div class="pad"><button class="btn sm wide" data-crop="tunables">Framing settings…</button></div>`)
+      + sectionHTML('c-color', 'Color', `${switchHTML('enhance', s.enhance, 'Apply color preset', s.preschool ? 'Uses the preschool preset' : 'Uses the standard preset')}
+        <div class="pad ${s.enhance ? '' : 'disabled'}">${segHTML('enhanceWhen', s.enhance_when, [['before', 'Before cropping'], ['after', 'After cropping']])}</div>`)
+      + sectionHTML('c-out', 'Output', `<div class="pad"><div class="pathrow"><span class="path" title="${esc(this.outDir)}">${esc(this.outDir || 'Open a folder first')}</span></div>
+        <div class="btn-row"><button class="btn sm" data-crop="out-change">Change…</button>${this.outCustom ? '<button class="btn sm" data-crop="out-default">Use default</button>' : '<span class="muted small">default</span>'}</div></div>
+        ${switchHTML('orders', s.orders, `Also copy all sizes to “${esc(this.ordersName)}”`)}
+        ${switchHTML('contact_sheets', s.contact_sheets, 'Make contact sheets')}`);
+    }
     if (S.filter.crop && S.filter.crop !== 'any') html = `<div class="filter-note">Showing only <b>${esc(STATUS_INFO[S.filter.crop].label)}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-cropfilter="any">Show all</button></div>` + html;
     let foot = '';
     if (this.job && this.jobState && !this.jobState.finished) foot = progressHTML(this.jobState, this.jobKind === 'analyze' ? 'Checking framing' : 'Exporting prints');
@@ -2403,7 +2432,7 @@ const Crop = {
 
   /* ---------- right panel ---------- */
   right() {
-    const s = this.settings; const R = $('#right'); const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
+    const s = this.settings; const R = $('#right');
     if (!s) { R.innerHTML = `<div class="scroll"><div class="hint">${esc(this.planError || 'Loading crop settings…')}</div></div>`; return; }
     const p = this.active(); const plan = p && this.plans.get(p.path);
     const dims = {}; if (plan && plan.boxes) plan.boxes.forEach(b => dims[b.name] = b.box);
@@ -2430,25 +2459,10 @@ const Crop = {
     };
     const portrait = this.sizes.filter(z => z.kind === 'portrait'), land = this.sizes.filter(z => z.kind === 'landscape');
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
-    const straight = p && plan && !plan.error ? `<div class="straight"><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><b id="rotVal">${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
-      <div class="btn-row pad-x"><button class="btn sm" data-crop="rot-">− 0.1°</button><button class="btn sm" data-crop="rot+">+ 0.1°</button>${rot ? '<button class="btn sm" data-crop="rot0">Reset to 0°</button>' : ''}</div>
-      <div class="hint tight">Drag to level the photo — a grid appears to line up walls and the floor. <kbd>[</kbd> <kbd>]</kbd> nudge 0.1°, with Shift 1°.</div>` : '<div class="hint">Select a photo to straighten it.</div>';
+    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>` : '<div class="hint">Select a photo to straighten it.</div>';
     const html = sectionHTML('c-status', 'Framing', status) + sectionHTML('c-straight', 'Straighten', straight)
-      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${portrait.map(sizeRow).join('')}${land.length ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>
-        <div class="hint tight">Hover a size to see just that crop. Pixel sizes are for this photo.</div>`)
-      + sectionHTML('c-frame', 'Framing style', `<div class="pad">${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full length'], ['tq', '3/4 length'], ['preschool', 'Preschool']])}</div>
-        ${tq ? `<div class="pad">${segHTML('kneeLine', s.framing_style, [['knee_above', 'Just above knees'], ['knee_below', 'Just below knees']])}<div class="hint tight">The bottom edge crosses the legs a little ${s.framing_style === 'knee_above' ? 'above' : 'below'} the knees — never on the joint. The ${this.tightSize() ? prettySize(this.tightSize().name) : 'square'} keeps its own face framing.</div></div>` : ''}
-        ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
-        ${s.balance_feet && !s.preschool && !tq ? `<div class="slider-row"><span>Bottom margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
-        ${switchHTML('fit_to_frame', s.fit_to_frame, 'Shorten to fit', 'When the ideal frame runs off the photo, shorten it instead of sending the photo to review')}
-        ${switchHTML('landscape', s.landscape, 'Crop group shots', 'Landscape photos are cropped to the landscape sizes around the whole group')}
-        <div class="pad"><button class="btn sm wide" data-crop="tunables">Framing settings…</button></div>`)
-      + sectionHTML('c-color', 'Color', `${switchHTML('enhance', s.enhance, 'Apply color preset', s.preschool ? 'Uses the preschool preset' : 'Uses the standard preset')}
-        <div class="pad ${s.enhance ? '' : 'disabled'}">${segHTML('enhanceWhen', s.enhance_when, [['before', 'Before cropping'], ['after', 'After cropping']])}</div>`)
-      + sectionHTML('c-out', 'Output', `<div class="pad"><div class="pathrow"><span class="path" title="${esc(this.outDir)}">${esc(this.outDir || 'Open a folder first')}</span></div>
-        <div class="btn-row"><button class="btn sm" data-crop="out-change">Change…</button>${this.outCustom ? '<button class="btn sm" data-crop="out-default">Use default</button>' : '<span class="muted small">default</span>'}</div></div>
-        ${switchHTML('orders', s.orders, `Also copy all sizes to “${esc(this.ordersName)}”`)}
-        ${switchHTML('contact_sheets', s.contact_sheets, 'Make contact sheets')}`);
+      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
+      ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
   },
   modbar() {
@@ -2779,11 +2793,13 @@ function bindModuleEvents() {
     }
   };
   ['#left', '#right', '#modView', '#modbar'].forEach(s => $(s).addEventListener('click', onClick));
-  $('#right').addEventListener('input', e => {
-    const r = e.target.closest('[data-range]'); if (!r) return;
-    const b = r.parentElement.querySelector('b'); if (b) b.textContent = Math.round(+r.value * 1000) / 10 + '%';
+  ['#left', '#right'].forEach(sel => {  // the bottom-margin slider lives in the left panel now
+    $(sel).addEventListener('input', e => {
+      const r = e.target.closest('[data-range]'); if (!r) return;
+      const b = r.parentElement.querySelector('b'); if (b) b.textContent = Math.round(+r.value * 1000) / 10 + '%';
+    });
+    $(sel).addEventListener('change', e => { const r = e.target.closest('[data-range]'); if (r) Crop.saveSettings({ [r.dataset.range]: +r.value }); });
   });
-  $('#right').addEventListener('change', e => { const r = e.target.closest('[data-range]'); if (r) Crop.saveSettings({ [r.dataset.range]: +r.value }); });
   $('#right').addEventListener('input', e => { const r = e.target.closest('[data-straight]'); if (r) Crop.livePreview(+r.value); });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-straight]'); if (r) { r.blur(); Crop.setRotation(+r.value); } });
   $('#right').addEventListener('mouseover', e => {
