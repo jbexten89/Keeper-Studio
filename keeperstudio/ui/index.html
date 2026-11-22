@@ -2183,8 +2183,8 @@ const Crop = {
   /* ---------- adjust (hand placement) ---------- */
   startAdjust() {
     const p = this.active(); const plan = p && this.plans.get(p.path);
-    if (!plan || !plan.reference) return toast('The framing has to be checked before it can be adjusted');
-    if (plan.landscape) return toast('Group shots are framed around the whole group, so there is nothing to place by hand');
+    if (!plan || plan.error) return toast(this.inflight.has(p && p.path) ? 'Still checking this photo — try again in a moment' : 'This photo couldn’t be checked, so it can’t be adjusted');
+    if (plan.landscape) return toast('Team / group shots can’t be placed by hand yet — they are cropped around the whole group automatically', 4000);
     const r = plan.reference; this.adjusting = { center_x: r.center_x, top: r.top, height: Math.min(r.height, this.H, this.W / 0.8) };
     this.render();
   },

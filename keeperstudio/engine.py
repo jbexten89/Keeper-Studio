@@ -298,10 +298,20 @@ def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
         elif result.solution is not None:
             b = result.solution.box
             ref = {"center_x": b.left + b.width / 2, "top": max(0, b.top), "height": min(b.height, size[1])}
+    if ref is None:
+        # No face to anchor on (none found, or more than one): start the Adjust
+        # box as the largest 4:5 frame that fits, centred, for the user to place.
+        w, h = size
+        height = min(h, w / REFERENCE_ASPECT) * 0.94
+        ref = {"center_x": w / 2, "top": (h - height) / 2, "height": height}
+    else:
+        ref["height"] = min(ref["height"], size[1], size[0] / REFERENCE_ASPECT)
+        ref["top"] = max(0, min(ref["top"], size[1] - ref["height"]))
+    is_group = bool(cfg.landscape_enabled and size[0] > size[1])
     return {
         "path": path, "status": status, "label": label, "reason": result.reason,
         "adjusted": bool(getattr(result, "adjusted", False)), "boxes": out_boxes,
-        "size": list(size), "reference": ref, "landscape": bool(boxes) and all(n in land_names for n in boxes),
+        "size": list(size), "reference": ref, "landscape": is_group,
     }
 
 
