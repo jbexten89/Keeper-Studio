@@ -71,6 +71,12 @@ framing:
   fit_to_frame: true
   min_headroom_fraction: 0.08
 
+  # 3/4 length (Keeper Studio): headroom above the crown, as a share of the
+  # frame height, and how far the bottom edge sits from the knee, as a share
+  # of the thigh (just above) or the shin (just below).
+  three_quarter_headroom_fraction: 0.12
+  knee_offset_fraction: 0.22
+
 # Output ratios. Each name becomes a subfolder and the filename suffix.
 #
 # Aspects are taken from the reference crops' actual pixel dimensions. A ratio

@@ -215,18 +215,19 @@ def r_crop_settings(b):
 
 
 def r_crop_plan(b):
-    settings = engine.merged_settings(catalog.get("settings", "crop"))
+    settings = engine.with_style(engine.merged_settings(catalog.get("settings", "crop")), catalog.get("styles", b["path"]))
     return engine.plan_cached(b["path"], settings, b.get("manual"), int(b.get("seq") or 0), bool(b.get("focus")))
 
 
 def r_crop_analyze(b):
     settings = engine.merged_settings(catalog.get("settings", "crop"))
-    return {"job": engine.start_analyze(b["paths"], settings, b.get("manual") or {}).id}
+    return {"job": engine.start_analyze(b["paths"], settings, b.get("manual") or {}, dict(catalog.entries("styles"))).id}
 
 
 def r_crop_export(b):
     settings = engine.merged_settings(catalog.get("settings", "crop"))
-    return {"job": engine.start_export_prints(b["paths"], b["out_dir"], settings, b.get("manual") or {}).id}
+    return {"job": engine.start_export_prints(b["paths"], b["out_dir"], settings, b.get("manual") or {},
+                                              dict(catalog.entries("styles"))).id}
 
 
 def r_crop_default_out(b):

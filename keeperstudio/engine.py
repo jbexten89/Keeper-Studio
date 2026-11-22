@@ -154,6 +154,19 @@ SETTINGS_FIELDS = (
     "landscape", "contact_sheets", "orders", "fit_to_frame", "disabled_sizes", "framing_style",
 )
 FRAMING_STYLES = ("full", "knee_above", "knee_below")
+PHOTO_STYLES = ("full", "knee_above", "knee_below", "preschool")
+
+
+def with_style(settings: dict, style: str | None) -> dict:
+    """The batch settings with one photo's own framing style laid over them."""
+    if style not in PHOTO_STYLES:
+        return settings
+    s = dict(settings)
+    if style == "preschool":
+        s["preschool"], s["framing_style"] = True, "full"
+    else:
+        s["preschool"], s["framing_style"] = False, style
+    return s
 
 
 # ---------------------------------------------------------------- config ----
@@ -219,20 +232,54 @@ def run_config(settings: dict):
 
 # A few framing numbers are offered in the app's Framing Settings dialog. They
 # are written back into config.yaml in place, keeping every comment.
+# (group, section, key, label, min, max, default when missing from config.yaml)
+# section "ratio:NAME" is a value inside that size's entry in the ratios list.
 TUNABLES = [
-    ("framing", "eye_line_fraction", "Eye line (full-length)", 0.02, 0.6),
-    ("framing", "headroom_fraction", "Headroom (full-length)", 0.0, 0.5),
-    ("framing", "eye_to_chin_multiplier", "Crown estimate (eye-to-chin ×)", 0.5, 2.5),
-    ("framing", "min_headroom_fraction", "Minimum headroom", 0.0, 0.3),
-    ("framing", "preschool_eye_line_fraction", "Eye line (preschool)", 0.02, 0.6),
-    ("framing", "preschool_headroom_fraction", "Headroom (preschool)", 0.0, 0.5),
-    ("framing", "foot_margin_fraction", "Top margin (balance feet)", 0.0, 0.4),
-    ("detector", "confidence_threshold", "Face detection confidence", 0.05, 0.99),
-    ("landscape", "margin_fraction", "Group shot margin", 0.0, 0.5),
+    ("Full length", "framing", "eye_line_fraction", "Eye line", 0.02, 0.6, None),
+    ("Full length", "framing", "headroom_fraction", "Headroom", 0.0, 0.5, None),
+    ("Full length", "framing", "min_headroom_fraction", "Minimum headroom (shorten to fit)", 0.0, 0.3, None),
+    ("Full length", "framing", "foot_margin_fraction", "Top margin (balance feet)", 0.0, 0.4, None),
+    ("3/4 length", "framing", "three_quarter_headroom_fraction", "Headroom", 0.0, 0.4, 0.12),
+    ("3/4 length", "framing", "knee_offset_fraction", "Distance from the knee", 0.0, 0.6, 0.22),
+    ("Preschool", "framing", "preschool_eye_line_fraction", "Eye line", 0.02, 0.6, None),
+    ("Preschool", "framing", "preschool_headroom_fraction", "Headroom", 0.0, 0.5, None),
+    ("Square (tight)", "ratio:3_5x3_5", "eye_line_fraction", "Eye line", 0.02, 0.8, None),
+    ("Square (tight)", "ratio:3_5x3_5", "headroom_fraction", "Headroom", 0.0, 0.6, None),
+    ("Group shots", "landscape", "margin_fraction", "Margin around the group", 0.0, 0.5, None),
+    ("Face finding", "framing", "eye_to_chin_multiplier", "Crown estimate (eye-to-chin ×)", 0.5, 2.5, None),
+    ("Face finding", "detector", "confidence_threshold", "Face detection confidence", 0.05, 0.99, None),
 ]
+TUNE_HELP = {
+    "framing.eye_line_fraction": "Where the eyes sit, as a share of the frame height from the top. Higher pulls the frame up and shows more legs.",
+    "framing.headroom_fraction": "Space above the head, as a share of the frame height.",
+    "framing.min_headroom_fraction": "When the frame runs off the photo, it may shrink headroom down to this before shortening.",
+    "framing.foot_margin_fraction": "With Balance feet on: space above the head, matched by the space below the feet.",
+    "framing.three_quarter_headroom_fraction": "Space above the head in 3/4 length, as a share of the frame height.",
+    "framing.knee_offset_fraction": "How far the bottom edge sits from the knee, as a share of the thigh (above) or shin (below).",
+    "framing.preschool_eye_line_fraction": "Eye line for seated preschool framing.",
+    "framing.preschool_headroom_fraction": "Headroom for seated preschool framing.",
+    "ratio:3_5x3_5.eye_line_fraction": "Where the eyes sit in the tight square.",
+    "ratio:3_5x3_5.headroom_fraction": "Space above the head in the tight square.",
+    "landscape.margin_fraction": "Space kept around the whole group in group shots.",
+    "framing.eye_to_chin_multiplier": "How far above the eyes the top of the head is estimated, in eye-to-chin lengths.",
+    "detector.confidence_threshold": "Lower finds more faces (including false ones); higher finds fewer.",
+}
 
 
 def _section_line(lines: list[str], section: str, key: str) -> int | None:
+    if section.startswith("ratio:"):
+        name = section.split(":", 1)[1]
+        in_item = False
+        for i, line in enumerate(lines):
+            m = re.match(r"^\s*-\s*name\s*:\s*([^#\s]+)", line)
+            if m:
+                in_item = m.group(1) == name
+                continue
+            if re.match(r"^[A-Za-z_]", line):
+                in_item = False
+            if in_item and re.match(rf"^\s+{re.escape(key)}\s*:", line):
+                return i
+        return None
     in_sec = False
     for i, line in enumerate(lines):
         if re.match(r"^[A-Za-z_]", line):
@@ -243,10 +290,42 @@ def _section_line(lines: list[str], section: str, key: str) -> int | None:
     return None
 
 
+def _section_end(lines: list[str], section: str) -> int | None:
+    """Index just after the last line of a top-level section."""
+    start = next((i for i, l in enumerate(lines) if re.match(rf"^{re.escape(section)}\s*:", l)), None)
+    if start is None:
+        return None
+    end = start + 1
+    for i in range(start + 1, len(lines)):
+        if re.match(r"^[A-Za-z_]", lines[i]):
+            break
+        if lines[i].strip() and not lines[i].lstrip().startswith("#"):
+            end = i + 1
+    return end
+
+
+_extra_cache: dict = {}
+
+
+def tune_value(section: str, key: str, default: float) -> float:
+    """A fine-tuning value read straight from config.yaml (for values the engine itself doesn't know)."""
+    p = paths.config_path()
+    try:
+        m = p.stat().st_mtime
+    except OSError:
+        return default
+    if _extra_cache.get("m") != m:
+        _extra_cache.clear()
+        _extra_cache["m"] = m
+        _extra_cache["vals"] = {(t["section"], t["key"]): t["value"] for t in read_tunables()}
+    v = _extra_cache["vals"].get((section, key))
+    return default if v is None else v
+
+
 def read_tunables() -> list[dict]:
     lines = paths.config_path().read_text(encoding="utf-8").splitlines()
     out = []
-    for section, key, label, lo, hi in TUNABLES:
+    for group, section, key, label, lo, hi, default in TUNABLES:
         i = _section_line(lines, section, key)
         val = None
         if i is not None:
@@ -256,7 +335,10 @@ def read_tunables() -> list[dict]:
                     val = float(m.group(1))
                 except ValueError:
                     pass
-        out.append({"section": section, "key": key, "label": label, "min": lo, "max": hi, "value": val})
+        if val is None:
+            val = default
+        out.append({"group": group, "section": section, "key": key, "label": label, "min": lo, "max": hi,
+                    "value": val, "help": TUNE_HELP.get(f"{section}.{key}", "")})
     return out
 
 
@@ -264,13 +346,19 @@ def write_tunables(values: dict) -> None:
     p = paths.config_path()
     text = p.read_text(encoding="utf-8")
     lines = text.splitlines()
-    for section, key, _label, lo, hi in TUNABLES:
+    for _group, section, key, _label, lo, hi, _default in TUNABLES:
         k = f"{section}.{key}"
         if k not in values or values[k] is None:
             continue
         v = min(hi, max(lo, float(values[k])))
         i = _section_line(lines, section, key)
         if i is None:
+            if section.startswith("ratio:"):
+                continue
+            end = _section_end(lines, section)  # a value config.yaml doesn't have yet: add it
+            if end is None:
+                continue
+            lines.insert(end, f"  {key}: {v:g}")
             continue
         lines[i] = re.sub(rf"^(\s*{re.escape(key)}\s*:\s*)([^#\s]+)", lambda m: m.group(1) + f"{v:g}", lines[i])
     new = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
@@ -479,10 +567,12 @@ def three_quarter_placement(face, legs, style, cfg, size):
     from photocropper.geometry import estimate_crown
     hip, hi, lo, ankle = legs
     thigh = hi - hip
-    cut = hi - KNEE_OFFSET * thigh if style == "knee_above" else lo + KNEE_OFFSET * (ankle - lo if ankle else lo - hip)
+    off = tune_value("framing", "knee_offset_fraction", KNEE_OFFSET)
+    room = tune_value("framing", "three_quarter_headroom_fraction", THREE_QUARTER_HEADROOM)
+    cut = hi - off * thigh if style == "knee_above" else lo + off * (ankle - lo if ankle else lo - hip)
     crown = estimate_crown(face, cfg.eye_to_chin_multiplier)[1]
-    height = (cut - crown) / (1 - THREE_QUARTER_HEADROOM)
-    top = crown - THREE_QUARTER_HEADROOM * height
+    height = (cut - crown) / (1 - room)
+    top = crown - room * height
     adjusted = top < 0 or cut > size[1]
     if adjusted:  # not enough photo above the head or below the cut: shorten, keep the cut line
         top = max(0.0, top)
@@ -731,14 +821,15 @@ def default_output(paths_: list[str]) -> str:
     return str(first.parent / f"{first.name}_out")
 
 
-def start_analyze(photo_paths: list[str], settings: dict, manual: dict) -> jobs.Job:
+def start_analyze(photo_paths: list[str], settings: dict, manual: dict, styles: dict | None = None) -> jobs.Job:
+    styles = styles or {}
     def work(job):
         for i, p in enumerate(photo_paths, 1):
             if job.cancelled:
                 break
             job.update(current=Path(p).name)
             try:
-                r = plan_cached(p, settings, manual.get(p))
+                r = plan_cached(p, with_style(settings, styles.get(p)), manual.get(p))
                 job.add_item({"path": p, "status": r["status"], "label": r["label"], "reason": r["reason"], "plan": r})
             except Exception as exc:
                 job.add_item({"path": p, "status": "review", "label": "error", "reason": f"{type(exc).__name__}: {exc}"})
@@ -747,13 +838,17 @@ def start_analyze(photo_paths: list[str], settings: dict, manual: dict) -> jobs.
     return jobs.start("analyze", work, total=len(photo_paths))
 
 
-def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, manual: dict) -> jobs.Job:
+def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, manual: dict,
+                        styles: dict | None = None) -> jobs.Job:
     images = [Path(p) for p in photo_paths if Path(p).suffix.lower() in {".jpg", ".jpeg"}]
     skipped = [p for p in photo_paths if Path(p).suffix.lower() not in {".jpg", ".jpeg"}]
     out = Path(out_dir)
+    styles = styles or {}
 
     def work(job):
-        cfg = run_config(settings)
+        import time
+        from photocropper import contact_sheet
+        started = time.monotonic()
         out.mkdir(parents=True, exist_ok=True)
         # Hand placements made in the app become the engine's own sidecars, so
         # the run (and any later PhotoCropper run on this folder) uses them.
@@ -768,37 +863,70 @@ def start_export_prints(photo_paths: list[str], out_dir: str, settings: dict, ma
                 pipeline.save_manual_crop(out, img.stem, m)
             elif side.is_file():
                 side.unlink()
-        _tl.group_manual = group
-        _tl.framing_style = settings.get("framing_style") or "full"
+        # Photos with their own framing style run as their own batch.
+        runs: dict[str | None, list[Path]] = {}
+        for img in images:
+            st = styles.get(str(img))
+            runs.setdefault(st if st in PHOTO_STYLES else None, []).append(img)
         job.update(message="Loading face detector…", busy=True)
-        statuses = {}
+        totals = {"ok": 0, "review": 0, "shortened": 0, "cancelled": False}
+        sheets_by_ratio: dict[str, list] = {}
+        meds = []
+        offset = 0
+        for st, batch in runs.items():
+            if job.cancelled:
+                totals["cancelled"] = True
+                break
+            s = with_style(settings, st)
+            cfg = run_config(s)
+            _tl.group_manual = group
+            _tl.framing_style = s.get("framing_style") or "full"
 
-        def progress(done, total, result):
-            st, label = _status(result, str(result.path) in manual)
-            statuses[str(result.path)] = st
-            job.add_item({"path": str(result.path), "status": st, "label": label, "reason": result.reason,
-                          "written": {k: str(v) for k, v in result.written.items()}})
-            job.update(done=done, current=result.path.name, message="", busy=False)
+            def progress(done, total, result, offset=offset):
+                st_, label = _status(result, str(result.path) in manual)
+                job.add_item({"path": str(result.path), "status": st_, "label": label, "reason": result.reason,
+                              "written": {k: str(v) for k, v in result.written.items()}})
+                for k, v in result.written.items():
+                    sheets_by_ratio.setdefault(k, []).append((Path(v), result.path.name))
+                job.update(done=offset + done, current=result.path.name, message="", busy=False)
 
-        summary = pipeline.run_job(
-            images, out, cfg,
-            on_progress=progress, should_cancel=lambda: job.cancelled,
-            build_sheets=bool(settings.get("contact_sheets")),
-            enhance_override=bool(settings.get("enhance")),
-            enhance_when_override=settings.get("enhance_when"),
-            balance_override=bool(settings.get("balance_feet")),
-            bottom_margin_override=settings.get("bottom_margin"),
-            preschool_override=bool(settings.get("preschool")),
-        )
-        _tl.group_manual = None
-        _tl.framing_style = "full"
-        med = summary.framing_medians()
+            try:
+                summary = pipeline.run_job(
+                    batch, out, cfg,
+                    on_progress=progress, should_cancel=lambda: job.cancelled,
+                    build_sheets=False,
+                    enhance_override=bool(s.get("enhance")),
+                    enhance_when_override=s.get("enhance_when"),
+                    balance_override=bool(s.get("balance_feet")),
+                    bottom_margin_override=s.get("bottom_margin"),
+                    preschool_override=bool(s.get("preschool")),
+                )
+            finally:
+                _tl.group_manual = None
+                _tl.framing_style = "full"
+            offset += len(batch)
+            totals["ok"] += summary.count(pipeline.OK)
+            totals["review"] += len(summary.review)
+            totals["shortened"] += len(summary.adjusted)
+            totals["cancelled"] = totals["cancelled"] or summary.cancelled
+            m = summary.framing_medians()
+            if m:
+                meds.append(m)
+        sheets = []
+        if settings.get("contact_sheets") and not totals["cancelled"]:
+            ccfg = config().contact_sheet
+            for name, entries in sheets_by_ratio.items():
+                sh = contact_sheet.build(sorted(entries, key=lambda e: e[1].lower()), out / f"contact_sheet_{name}.png",
+                                         columns=int(ccfg.get("columns", 6)), thumb_width=int(ccfg.get("thumb_width", 320)))
+                if sh:
+                    sheets.append(sh)
         return {
-            "out_dir": str(out), "cancelled": summary.cancelled,
-            "cropped": summary.count(pipeline.OK), "review": len(summary.review),
-            "shortened": len(summary.adjusted), "sheets": [str(s) for s in summary.sheets],
-            "skipped_non_jpeg": skipped,
-            "medians": {"frame_heads": med[0], "bottom_heads": med[1]} if med else None,
+            "out_dir": str(out), "cancelled": totals["cancelled"],
+            "cropped": totals["ok"], "review": totals["review"],
+            "shortened": totals["shortened"], "sheets": [str(x) for x in sheets],
+            "skipped_non_jpeg": skipped, "seconds": round(time.monotonic() - started, 1),
+            "styles_used": len(runs),
+            "medians": {"frame_heads": meds[0][0], "bottom_heads": meds[0][1]} if meds else None,
         }
     return jobs.start("prints", work, total=len(images))
 
