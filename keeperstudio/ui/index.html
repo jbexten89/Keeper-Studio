@@ -1171,8 +1171,16 @@ function folderTree() {
 }
 function keepScroll(sel, draw) {
   // panels are redrawn often (every check, every click): keep where the user had scrolled to
-  const old = $(sel + ' .scroll'), y = old ? old.scrollTop : 0; draw();
+  const old = $(sel + ' .scroll'), y = old ? old.scrollTop : 0;
+  // …and keep the cursor in a box the user is typing in (it is rebuilt by the redraw)
+  const ae = document.activeElement; let key = null, ss = null, se = null;
+  if (ae && $(sel).contains(ae) && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName)) {
+    const at = [...ae.attributes].find(x => x.name.startsWith('data-'));
+    if (at) { key = `[${at.name}="${CSS.escape(at.value)}"]`; try { ss = ae.selectionStart; se = ae.selectionEnd; } catch {} }
+  }
+  draw();
   const neu = $(sel + ' .scroll'); if (neu && y) neu.scrollTop = y;
+  if (key) { const el = $(sel + ' ' + key); if (el && el !== document.activeElement) { el.focus({ preventScroll: true }); try { if (ss != null) el.setSelectionRange(ss, se); } catch {} } }
 }
 function renderLeft() {
   if (!S.panels.left) return;
