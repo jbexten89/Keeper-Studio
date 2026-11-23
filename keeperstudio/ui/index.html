@@ -1218,7 +1218,7 @@ function renderLeft() {
   const q = quickColl();
   let html = sectionHTML('catalog', 'Catalog',
     row('all', '<span class="ico">▦</span><span class="lbl">All Photographs</span>', S.photos.length) +
-    row('coll:' + QUICK, '<span class="ico">●</span><span class="lbl">Quick Collection <span class="plus">+</span></span>', collCount(q), '', `data-drop="${QUICK}"`));
+    row('coll:' + QUICK, '<span class="ico">●</span><span class="lbl">Quick Collection <span class="plus">+</span></span>', collCount(q), collCount(q) ? `<span class="row-acts"><button data-saveqc title="Save Quick Collection as a new collection (Ctrl/Cmd+Alt+B)">⤓</button></span>` : '', `data-drop="${QUICK}"`));
   const folders = folderTree();
   html += sectionHTML('folders', 'Folders', folders.length ? folders.map(([path, n]) => {
     const depth = path.split('/').length - 1;
@@ -1845,6 +1845,25 @@ function openCollDialog(editId) {
     });
   });
 }
+function saveQuickAs() {
+  const q = quickColl(), n = collCount(q);
+  if (!n) return toast('The Quick Collection is empty');
+  openModal(`<h3>Save Quick Collection</h3>
+    <label class="fld"><span>Name</span><input id="qName" placeholder="e.g. Tigers 10U — Glare fixes" autofocus></label>
+    <label class="radio"><input type="checkbox" id="qClear" checked> Clear the Quick Collection afterwards</label>
+    <div class="m-actions"><button class="btn" data-close>Cancel</button><button class="btn primary" data-ok>Save · ${plural(n, 'photo')}</button></div>`, card => {
+    const go = () => {
+      const name = $('#qName', card).value.trim() || 'Untitled Collection';
+      const nc = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, keys: new Set(q.keys), smart: null, created: Date.now() };
+      collections.push(nc); saveColl(nc);
+      if ($('#qClear', card).checked) { q.keys.clear(); saveColl(q); if (S.source.type === 'coll' && S.source.id === QUICK) S.source = { type: 'coll', id: nc.id }; }
+      closeModal(); recomputeView(); renderAll();
+      toast(`Saved “${esc(name)}” · ${plural(collCount(nc), 'photo')}`);
+    };
+    $('[data-ok]', card).addEventListener('click', go);
+    $('#qName', card).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } });
+  });
+}
 function deleteColl(id) {
   const c = getColl(id); if (!c || c.id === QUICK) return;
   confirmDialog(`Delete the collection “${c.name}”?`, 'The photos themselves are not touched.', 'Delete', () => {
@@ -1988,9 +2007,9 @@ function buildHelp() {
   const g = (title, rows) => `<div><h4>${title}</h4>${rows.map(([d, k]) => `<div class="hk"><span>${d}</span><span>${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</span></div>`).join('')}</div>`;
   $('#help').innerHTML = `<div class="help-card"><h3>Keyboard Shortcuts <span class="help-ver">Keeper Studio ${esc((S.hello && S.hello.version) || '')}</span></h3><div class="help-grid">
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
-    ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
+    ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Save Quick Collection as…', 'Ctrl Alt B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
-    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Retouch (eye swap)', 'Ctrl 5  Q'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Modules', [['Library', 'Ctrl 1'], ['Retouch (eye swap)', 'Ctrl 2  Q'], ['Crop', 'Ctrl 3  R'], ['Composite', 'Ctrl 4'], ['Extract', 'Ctrl 5'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -2052,6 +2071,7 @@ function bindEvents() {
   $('#left').addEventListener('click', e => {
     const t = e.target;
     if (t.closest('[data-newcoll]')) { e.stopPropagation(); return openCollDialog(); }
+    if (t.closest('[data-saveqc]')) { e.stopPropagation(); return saveQuickAs(); }
     const ed = t.closest('[data-edit]'); if (ed) { e.stopPropagation(); return openCollDialog(ed.dataset.edit); }
     const dl = t.closest('[data-delete]'); if (dl) { e.stopPropagation(); return deleteColl(dl.dataset.delete); }
     const hd = t.closest('.sec > header'); if (hd) { const id = hd.parentElement.dataset.sec; S.sections[id] = S.sections[id] === false; savePrefs(); renderLeft(); return; }
@@ -2124,6 +2144,7 @@ function onKey(e) {
   if (mod && k === 'd') { e.preventDefault(); return deselect(); }
   if (mod && k === 'o') { e.preventDefault(); return openFolder(); }
   if (mod && k === 'n') { e.preventDefault(); return openCollDialog(); }
+  if (mod && e.altKey && e.code === 'KeyB') { e.preventDefault(); return saveQuickAs(); }
   if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
   if (mod || (e.altKey && S.module !== 'retouch')) return;
   if (e.key === '?') return toggleHelp();
@@ -2170,7 +2191,7 @@ function onKey(e) {
 }
 
 /* ================= Modules: Library · Crop · Composite · Extract ================= */
-const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract'], ['retouch', 'Retouch']];
+const MODULES = [['library', 'Library'], ['retouch', 'Retouch'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract']];
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
