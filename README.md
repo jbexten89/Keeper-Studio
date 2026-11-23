@@ -18,8 +18,9 @@ To update, replace the old Keeper Studio folder with the new one; settings, fram
 and the catalog live in `%LOCALAPPDATA%\KeeperStudio` and are kept. The app shows a
 banner when a newer release is out.
 
-Releases are made by pushing a version tag (`git tag v1.1.0 && git push origin v1.1.0`);
-the build stamps that version into the app and attaches the zip. Ordinary pushes still
+To make a release: on GitHub open **Releases → Draft a new release**, type a new tag
+such as `v1.1.0`, give it a title and press **Publish release**. The build stamps that
+version into the app and attaches the zip a few minutes later. Ordinary pushes still
 make test builds under Actions, kept for 30 days.
 
 ## Install
