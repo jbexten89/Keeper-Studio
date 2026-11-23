@@ -2726,19 +2726,37 @@ const Comp = {
       this.f = Object.assign({ students: 'quick', teachers: 'none', out_path: '' }, r.defaults, r.saved || {});
     } catch { this.f = { students: 'quick', teachers: 'none' }; }
   },
-  libraryLoaded() { this.order = null; this.built = null; },
+  libraryLoaded() { this.order = null; this.built = null; this.needPick = true; this.autoNote = ''; },
   save() { api('/api/composite/defaults', { settings: this.f }).catch(() => {}); },
   sources() {
+    // folders below the shoot's top folder, e.g. "Students" and "Teachers"
+    const dirs = folderTree().filter(([k]) => k.includes('/')).map(([k, n]) => ['dir:' + k, `▸ ${k.split('/').slice(1).join(' / ')} (${n})`]);
     return [['selected', `Selected photos (${S.selected.size})`], ['quick', `Quick Collection (${collCount(quickColl())})`],
-      ...userColls().map(c => ['coll:' + c.id, `${c.name} (${collCount(c)})`]), ['filmstrip', `Filmstrip (${S.view.length})`]];
+      ...userColls().map(c => ['coll:' + c.id, `${c.name} (${collCount(c)})`]), ...dirs, ['filmstrip', `Filmstrip (${S.view.length})`]];
+  },
+  // a collection or folder called Students / Teachers is picked for you when a folder is opened
+  autoPick() {
+    const find = re => {
+      const c = userColls().find(c => re.test(c.name.trim()) && collCount(c));
+      if (c) return 'coll:' + c.id;
+      const d = folderTree().find(([k]) => k.includes('/') && re.test(k.split('/').pop().trim()));
+      return d ? 'dir:' + d[0] : null;
+    };
+    const st = find(/^(students?|kids|players?|athletes?)$/i), te = find(/^(teachers?|staff|coach(es)?)$/i);
+    const got = [];
+    if (st && this.f.students !== st) { this.f.students = st; got.push('Students'); }
+    if (te && this.f.teachers !== te) { this.f.teachers = te; got.push('Teachers'); }
+    if (got.length) { this.save(); this.autoNote = `${got.join(' and ')} picked from the folder or collection of that name.`; }
   },
   photosFor(src) {
     if (!src || src === 'none') return [];
     if (src === 'selected') return orderedSelection().map(id => S.byId.get(id)).filter(Boolean);
     if (src === 'filmstrip') return S.view.slice();
+    if (src.startsWith('dir:')) { const k = src.slice(4); return S.photos.filter(p => p.folder === k || p.folder.startsWith(k + '/')).sort((a, b) => collator.compare(a.name, b.name)); }
     const c = getColl(src === 'quick' ? QUICK : src.slice(5)); return c ? collPhotos(c) : [];
   },
   async refreshOrder() {
+    if (this.needPick && this.f && S.photos.length) { this.needPick = false; this.autoPick(); }
     const st = this.photosFor(this.f.students).map(p => p.path), te = this.photosFor(this.f.teachers).map(p => p.path);
     try { this.order = await api('/api/composite/order', { students: st, teachers: te, max_per_row: +this.f.max_per_row || 8, row_counts: this.f.row_counts || '' }); } catch { this.order = null; }
     const fonts = [this.f.title_font, this.f.teacher_font, this.f.name_font, this.f.background].filter(Boolean);
@@ -2770,7 +2788,7 @@ const Comp = {
         <div class="frow"><span class="flabel">Year</span><input data-cf="year" value="${esc(f.year || '')}" placeholder="e.g. 2026–2027"></div></div>`)
       + sectionHTML('cp-photos', 'Photos', `<div class="form">
         <div class="frow"><span class="flabel">Students</span><select data-cf="students">${srcOpts(f.students)}</select></div>
-        <div class="frow"><span class="flabel">Teachers</span><select data-cf="teachers">${srcOpts(f.teachers, true)}</select></div>
+        <div class="frow"><span class="flabel">Teachers</span><select data-cf="teachers">${srcOpts(f.teachers, true)}</select></div>${this.autoNote ? `<div class="hint tight">${esc(this.autoNote)}</div>` : ''}
         ${this.fileRow('background', 'Background', 'image')}
         <div class="hint tight">Names come from the file names. Students sort by last name; number teacher files (“1 Ms Sheila”) to set their order.</div></div>`)
       + sectionHTML('cp-layout', 'Layout', `<div class="form">
@@ -3025,6 +3043,7 @@ function bindModuleEvents() {
   $('#left').addEventListener('input', e => {
     const i = e.target.closest('[data-cf]'); if (!i || S.module !== 'composite') return;
     Comp.f[i.dataset.cf] = i.type === 'number' ? +i.value : i.value; Comp.save();
+    if (i.dataset.cf === 'students' || i.dataset.cf === 'teachers') Comp.autoNote = '';
     clearTimeout(Comp._t); Comp._t = setTimeout(() => { if (['max_per_row', 'row_counts'].includes(i.dataset.cf)) Comp.refreshOrder(); else renderRight(); }, 300);
   });
   $('#left').addEventListener('change', e => { const i = e.target.closest('select[data-cf]'); if (i && S.module === 'composite') { Comp.refreshOrder(); i.blur(); } });
