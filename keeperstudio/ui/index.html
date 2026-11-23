@@ -528,6 +528,18 @@ kbd{font-size:10px}
 .help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
 /* Framing card keeps one height, so the size list below never moves while stepping through photos */
 #right .sec[data-sec=c-status]:not(.closed) > .body{height:198px;overflow-y:auto;scrollbar-width:thin}
+/* ---- Retouch ---- */
+.rt-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.rt-stage canvas{box-shadow:0 6px 30px rgba(0,0,0,.6);cursor:crosshair;touch-action:none;image-rendering:auto}
+.rt-msg{color:var(--muted);font-size:14px}
+.rt-tag{position:absolute;bottom:5px;right:5px;z-index:2;padding:0 5px;border-radius:4px;background:#3CC7A0;color:#06140F;font-size:10.5px;font-weight:700;line-height:15px}
+.rt-tag.donor{background:#2A2E36;color:#C9CED6}
+.cell .rt-tag{bottom:auto;top:30px;right:8px}
+.rt-donor{display:flex;gap:10px;align-items:center;padding:8px 12px}
+.rt-donor img{width:64px;height:80px;object-fit:cover;border-radius:4px;border:1px solid var(--border)}
+.rt-donor b{display:block;font-size:12.5px;margin-bottom:6px;word-break:break-all}
+.rt-row{display:flex;align-items:center;gap:8px;padding:3px 12px;cursor:pointer;font-size:12.5px}
+.rt-row:hover{background:rgba(255,255,255,.04)}
 </style>
 </head>
 <body>
@@ -601,9 +613,11 @@ async function api(path, body) {
   return j;
 }
 const enc = encodeURIComponent;
-const thumbUrl = (path, s = 400) => `/thumb?p=${enc(path)}&s=${s}&t=${KS_TOKEN}`;
-const previewUrl = (path, s = 2048) => `/preview?p=${enc(path)}&s=${s}&t=${KS_TOKEN}`;
-const fullUrlFor = path => `/full?p=${enc(path)}&t=${KS_TOKEN}`;
+const EDIT_VER = new Map();  // path -> retouch time, so a retouched photo's pictures refresh
+const ev = path => { const v = EDIT_VER.get(path); return v ? `&v=${v}` : ''; };
+const thumbUrl = (path, s = 400) => `/thumb?p=${enc(path)}&s=${s}&t=${KS_TOKEN}${ev(path)}`;
+const previewUrl = (path, s = 2048) => `/preview?p=${enc(path)}&s=${s}&t=${KS_TOKEN}${ev(path)}`;
+const fullUrlFor = path => `/full?p=${enc(path)}&t=${KS_TOKEN}${ev(path)}`;
 const fileUrl = (path, bust) => `/file?p=${enc(path)}&t=${KS_TOKEN}${bust ? '&v=' + bust : ''}`;
 const DB = {
   get: (s, k) => api('/api/db/get', { store: s, key: k }).then(r => r.value),
@@ -1275,14 +1289,14 @@ function gridMetrics() {
 function cropDot(p) { const c = Crop.status.get(p.path); if (!c) return ''; const cls = (STATUS_INFO[c.status] || {}).cls; return cls && cls !== 'none' ? `<span class="crop-dot ${cls}" title="${esc((STATUS_INFO[c.status] || {}).label || '')}${c.status === 'review' ? ': ' + esc(c.label || '') : ''}"></span>` : ''; }
 function cellSig(p, i) {
   const m = getMeta(p.key);
-  return `${i}|${p.thumbState}|${m.flag}|${m.rating}|${m.label}|${S.selected.has(p.id) ? 1 : 0}|${S.active === p.id ? 1 : 0}|${inQuick(p) ? 1 : 0}|${cropDot(p)}|${Crop.styleOf(p.path) || ''}`;
+  return `${i}|${p.thumbState}|${m.flag}|${m.rating}|${m.label}|${S.selected.has(p.id) ? 1 : 0}|${S.active === p.id ? 1 : 0}|${inQuick(p) ? 1 : 0}|${cropDot(p)}|${Crop.styleOf(p.path) || ''}|${EDIT_VER.get(p.path) || ''}${Ret.isDonor(p.path) ? 'D' : ''}`;
 }
 function updateCell(el, p, i) {
   const sig = cellSig(p, i); if (el._sig === sig) return; el._sig = sig;
   const m = getMeta(p.key);
   el.className = 'cell' + (S.selected.has(p.id) ? ' sel' : '') + (S.active === p.id ? ' active' : '') + (m.flag === -1 ? ' rejected' : '') + (m.label ? ` has-lbl lbl-${m.label}` : '');
   el.title = p.name;
-  el.innerHTML = `<div class="cell-in"><span class="num">${i + 1}</span>${cropDot(p)}${styleTag(p)}<button class="qc ${inQuick(p) ? 'on' : ''}" data-act="qc" title="Quick Collection (B)"></button>
+  el.innerHTML = `<div class="cell-in"><span class="num">${i + 1}</span>${cropDot(p)}${styleTag(p)}${retouchTag(p)}<button class="qc ${inQuick(p) ? 'on' : ''}" data-act="qc" title="Quick Collection (B)"></button>
     <div class="cell-img">${p.thumbUrl ? `<img src="${p.thumbUrl}" alt="" draggable="false">` : '<div class="ph"></div>'}</div>
     <div class="cell-foot">${flagHTML(m.flag, true)}${starsHTML(m.rating, true)}<span class="ext">${esc(ext(p.name))}</span></div></div>`;
 }
@@ -1334,7 +1348,7 @@ function renderFilm() {
       el.className = 'fcell' + (S.selected.has(p.id) ? ' sel' : '') + (S.active === p.id ? ' active' : '') + (m.flag === -1 ? ' rejected' : '') + (m.label ? ` has-lbl lbl-${m.label}` : '');
       el.title = `${i + 1}. ${p.name}`;
       el.innerHTML = `<div class="fcell-in">${p.thumbUrl ? `<img src="${p.thumbUrl}" alt="" draggable="false">` : '<div class="ph"></div>'}
-        ${cropDot(p)}${styleTag(p)}<div class="fbadges">${m.flag ? flagHTML(m.flag, false) : ''}${m.rating ? starsHTML(m.rating, false) : ''}${inQuick(p) ? '<span class="qcdot"></span>' : ''}</div></div>`;
+        ${cropDot(p)}${styleTag(p)}${retouchTag(p)}<div class="fbadges">${m.flag ? flagHTML(m.flag, false) : ''}${m.rating ? starsHTML(m.rating, false) : ''}${inQuick(p) ? '<span class="qcdot"></span>' : ''}</div></div>`;
     }
     if (p.thumbState < 2) Thumbs.request(p, true);
   }
@@ -1968,7 +1982,7 @@ function buildHelp() {
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
-    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Retouch (eye swap)', 'Ctrl 5  Q'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -2102,7 +2116,7 @@ function onKey(e) {
   if (mod && k === 'd') { e.preventDefault(); return deselect(); }
   if (mod && k === 'o') { e.preventDefault(); return openFolder(); }
   if (mod && k === 'n') { e.preventDefault(); return openCollDialog(); }
-  if (mod && /^[1-4]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
+  if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
   if (mod || e.altKey) return;
   if (e.key === '?') return toggleHelp();
   if (!$('#help').hidden) { if (e.key === 'Escape') toggleHelp(false); return; }
@@ -2129,6 +2143,7 @@ function onKey(e) {
   }
   if ('gecn'.includes(k) && k && S.module !== 'library') setModule('library');
   if (k === 'r' && S.module !== 'crop') return setModule('crop');
+  if (k === 'q' && S.module !== 'retouch') return setModule('retouch');
   switch (k) {
     case 'g': if (S.fs) exitFs(); return setMode('grid');
     case 'e': if (S.fs) exitFs(); return setMode('loupe');
@@ -2147,7 +2162,7 @@ function onKey(e) {
 }
 
 /* ================= Modules: Library · Crop · Composite · Extract ================= */
-const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract']];
+const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract'], ['retouch', 'Retouch']];
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
@@ -2169,8 +2184,8 @@ function setModule(m) {
   const mod = Mods.get(m); if (mod && mod.enter) mod.enter();
 }
 const Mods = {
-  get(m) { return { crop: Crop, composite: Comp, cutout: Cut }[m]; },
-  libraryLoaded() { Crop.libraryLoaded(); Cut.libraryLoaded(); Comp.libraryLoaded(); },
+  get(m) { return { crop: Crop, composite: Comp, cutout: Cut, retouch: Ret }[m]; },
+  libraryLoaded() { Crop.libraryLoaded(); Cut.libraryLoaded(); Comp.libraryLoaded(); Ret.libraryLoaded(); },
   chrome() {
     const lib = S.module === 'library';
     $('#modView').hidden = lib || !S.photos.length && S.module !== 'composite';
@@ -2194,7 +2209,8 @@ function progressHTML(s, verb) {
     <button class="btn sm" data-cancel-job="${s.id}">Cancel</button></div>`;
 }
 function scopeList(scope) {
-  return scope === 'selected' ? orderedSelection().map(id => S.byId.get(id)).filter(Boolean) : S.view.slice();
+  const l = scope === 'selected' ? orderedSelection().map(id => S.byId.get(id)).filter(Boolean) : S.view.slice();
+  return l.filter(p => !Ret.isDonor(p.path));  // eye donors (Retouch) are never printed
 }
 
 /* ================================================================ Crop ==== */
@@ -2772,7 +2788,8 @@ const Comp = {
     if (te && this.f.teachers !== te) { this.f.teachers = te; got.push('Teachers'); }
     if (got.length) { this.save(); this.autoNote = `${got.join(' and ')} picked from the folder or collection of that name.`; }
   },
-  photosFor(src) {
+  photosFor(src) { return this.photosFrom(src).filter(p => !Ret.isDonor(p.path)); },  // eye donors never go on a composite
+  photosFrom(src) {
     if (!src || src === 'none') return [];
     if (src === 'selected') return orderedSelection().map(id => S.byId.get(id)).filter(Boolean);
     if (src === 'filmstrip') return S.view.slice();
@@ -3005,6 +3022,7 @@ function bindModuleEvents() {
       const k = sw.dataset.sw;
       if (S.module === 'crop') { const v = !sw.classList.contains('on'); Crop.saveSettings({ [k]: v }); }
       else if (S.module === 'composite') { Comp.f[k] = !sw.classList.contains('on'); Comp.save(); Comp.render(); }
+      else if (S.module === 'retouch' && k === 'rtMatch') { Ret.match = !Ret.match; Ret.right(); }
       return;
     }
     const sg = t.closest('.seg button');
@@ -3016,9 +3034,21 @@ function bindModuleEvents() {
       else if (name === 'enhanceWhen') Crop.saveSettings({ enhance_when: v });
       else if (name === 'cutScope') { Cut.scope = v; renderLeft(); }
       else if (name === 'cutView') { Cut.view = v; renderView(); }
+      else if (name === 'rtStep') Ret.setStep(v);
+      else if (name === 'rtMode') { Ret.brush.erase = v === 'erase'; Ret.right(); }
       return;
     }
     const ci = t.closest('[data-circle]'); if (ci) { Crop.toggleCircle(ci.dataset.circle); return; }
+    const rt = t.closest('[data-rt]');
+    if (rt) {
+      const a = rt.dataset.rt;
+      if (a === 'save') Ret.save(); else if (a === 'remove') Ret.remove(); else if (a === 'auto') Ret.autoMask();
+      else if (a === 'clear') Ret.clearMask(); else if (a === 'undo') Ret.undoMask(); else if (a === 'reset') Ret.resetAlign();
+      else if (a === 'to-brush') Ret.setStep('brush'); else if (a === 'donor-prev') Ret.stepDonor(-1); else if (a === 'donor-next') Ret.stepDonor(1);
+      else if (a === 'before') { Ret.showBefore = !Ret.showBefore; Ret.draw(); Ret.modbar(); }
+      return;
+    }
+    const rg = t.closest('[data-rt-go]'); if (rg) { const id = +rg.dataset.rtGo; S.active = id; S.selected = new Set([id]); S.anchor = id; refreshSelection(); ensureVisible(); return; }
     const sa = t.closest('[data-sizeall]');
     if (sa) { Crop.saveSettings({ disabled_sizes: sa.dataset.sizeall === 'on' ? [] : Crop.sizes.map(z => z.name) }); return; }
     const st = t.closest('[data-sizetoggle]');
@@ -3069,7 +3099,7 @@ function bindModuleEvents() {
     });
     $(sel).addEventListener('change', e => { const r = e.target.closest('[data-range]'); if (r) Crop.saveSettings({ [r.dataset.range]: +r.value }); });
   });
-  $('#right').addEventListener('input', e => { const r = e.target.closest('[data-straight]'); if (r) Crop.livePreview(+r.value); });
+  $('#right').addEventListener('input', e => { const r = e.target.closest('[data-straight]'); if (r) Crop.livePreview(+r.value); const b = e.target.closest('[data-rt-size]'); if (b) Ret.setSize(+b.value); });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-photostyle]'); if (r) { r.blur(); Crop.setStyle(r.value || null); } });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-straight]'); if (r) { r.blur(); Crop.setRotation(+r.value); } });
   $('#right').addEventListener('mouseover', e => {
@@ -3089,6 +3119,262 @@ function bindModuleEvents() {
   $('#left').addEventListener('change', e => { const i = e.target.closest('select[data-cf]'); if (i && S.module === 'composite') { Comp.refreshOrder(); i.blur(); } });
 }
 
+/* ============================================================= Retouch ==== */
+// Eye swap for glasses glare: the photographer's Photoshop routine, automated.
+//   1 Line up — the no-glasses frame is laid over at 50%, already aligned from
+//               the face; nudge it if needed.
+//   2 Brush in — a hidden layer mask: paint to reveal the clear eyes.
+// Saved as a copy in _retouched/ beside the photo; everything else uses it.
+const Ret = {
+  info: { edits: {}, donors: {} },
+  work: new Map(),          // path -> unsaved session state, so stepping away keeps your brushing
+  s: null,                  // the session on screen
+  busy: false, showBefore: false, match: true,
+  brush: { size: 0, erase: false },
+  isDonor(path) { return !!this.info.donors[path]; },
+  isEdited(path) { return !!this.info.edits[path]; },
+  async loadInfo() {
+    if (!S.photos.length) { this.info = { edits: {}, donors: {} }; return; }
+    try { this.info = await api('/api/retouch/info', { paths: S.photos.map(p => p.path) }); } catch { this.info = { edits: {}, donors: {} }; }
+    EDIT_VER.clear(); for (const [k, v] of Object.entries(this.info.edits)) EDIT_VER.set(k, v.mtime);
+    // thumbnails asked for before we knew: point them at the retouched copy
+    for (const p of S.photos) if (p.thumbUrl && p.thumbUrl !== thumbUrl(p.path)) { p.thumbState = 0; Thumbs.request(p); }
+    schedule(R_CELLS);
+  },
+  libraryLoaded() { this.work.clear(); this.s = null; this.loadInfo(); },
+  active() { return S.byId.get(S.active) || null; },
+  enter() { this.render(); this.open(); },
+  render() { renderView(); renderLeft(); renderRight(); this.modbar(); },
+
+  // the frame shot without glasses: what was used before, else the next photo, else the previous one
+  defaultDonor(p) {
+    const e = this.info.edits[p.path]; if (e && e.donor && S.byPath.get(e.donor)) return e.donor;
+    const i = S.viewIndex.get(p.id); const n = S.view[i + 1], b = S.view[i - 1];
+    return (n && n.folder === p.folder ? n : b && b.folder === p.folder ? b : n || b || null)?.path || null;
+  },
+  async open(p = this.active(), donor) {
+    if (!p || S.module !== 'retouch') return;
+    const kept = this.work.get(p.path);
+    if (kept && (!donor || kept.donor === donor)) { this.s = kept; return this.render(); }
+    donor = donor || this.defaultDonor(p);
+    if (!donor) { this.s = { path: p.path, error: 'There’s no other photo in this folder to take the eyes from.' }; return this.render(); }
+    this.s = { path: p.path, donor, loading: true }; this.render();
+    let r;
+    try { r = await api('/api/retouch/prepare', { path: p.path, donor }); }
+    catch (e) { if (this.active() === p) { this.s = { path: p.path, donor, error: e.message }; this.render(); } return; }
+    if (this.active() !== p) return;  // moved on while it loaded
+    const load = w => new Promise((ok, bad) => { const im = new Image(); im.onload = () => ok(im); im.onerror = bad; im.src = `/retouch-img?id=${r.id}&w=${w}&t=${KS_TOKEN}`; });
+    const [tImg, dImg] = await Promise.all([load('target'), load('donor')]);
+    const [, , w, h] = r.region;
+    const mask = document.createElement('canvas'); mask.width = w; mask.height = h;
+    const s = { path: p.path, donor, id: r.id, found: r.found, w, h, pad: r.pad, ed: r.ed, eyes: r.eyes, lensR: r.lens_r,
+      tImg, dImg, mask, undo: [], adj: r.adjust || { dx: 0, dy: 0, s: 1, r: 0 }, step: r.mask ? 'brush' : 'align', dirty: false };
+    if (r.mask) { const im = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.src = r.mask; }); mask.getContext('2d').drawImage(im, 0, 0); }
+    if (!this.brush.size) this.brush.size = Math.round(r.ed * 0.22);
+    this.work.set(p.path, s); this.s = s; this.render();
+  },
+  stepDonor(dir) {
+    const s = this.s, p = this.active(); if (!s || !p || !s.donor) return;
+    const same = S.view.filter(x => x.folder === p.folder && x.path !== p.path);
+    const i = same.findIndex(x => x.path === s.donor);
+    const n = same[(i + dir + same.length) % same.length]; if (!n) return;
+    this.work.delete(p.path); this.open(p, n.path);
+  },
+
+  /* ---------- center ---------- */
+  center() {
+    const v = $('#modView');
+    const p = this.active();
+    if (p && (!this.s || this.s.path !== p.path)) { this.s = null; setTimeout(() => this.open(p), 0); }  // stepped to another photo
+    if (v.dataset.mod !== 'retouch') {
+      v.dataset.mod = 'retouch';
+      v.innerHTML = `<div class="rt-stage" id="rtStage"><canvas id="rtCanvas"></canvas><div class="rt-msg" id="rtMsg"></div></div>`;
+      this.bindCanvas();
+    }
+    this.draw();
+  },
+  layout() {
+    const s = this.s, st = $('#rtStage'), cv = $('#rtCanvas'); if (!s || !s.tImg || !st) return null;
+    const sw = st.clientWidth - 40, sh = st.clientHeight - 40;
+    const k = Math.max(0.05, Math.min(sw / s.w, sh / s.h));
+    const dpr = window.devicePixelRatio || 1;
+    const W = Math.round(s.w * k), H = Math.round(s.h * k);
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    return { k, dpr };
+  },
+  drawDonor(ctx, s) {
+    const a = s.adj, cx = s.w / 2, cy = s.h / 2;
+    ctx.save(); ctx.translate(cx + a.dx, cy + a.dy); ctx.rotate(a.r * Math.PI / 180); ctx.scale(a.s, a.s); ctx.translate(-cx, -cy);
+    ctx.drawImage(s.dImg, -s.pad, -s.pad); ctx.restore();
+  },
+  draw() {
+    const s = this.s, cv = $('#rtCanvas'), msg = $('#rtMsg'); if (!cv) return;
+    const p = this.active();
+    msg.textContent = !p ? 'Select a photo with glasses glare in the filmstrip.' : !s || s.loading ? 'Lining up the no-glasses frame…' : s.error || '';
+    msg.hidden = !msg.textContent; cv.hidden = !(s && s.tImg);
+    if (!s || !s.tImg) return;
+    const L = this.layout(); if (!L) return;
+    cv.style.cursor = this.showBefore ? 'default' : s.step === 'brush' ? 'none' : 'move';
+    const ctx = cv.getContext('2d'); ctx.setTransform(L.k * L.dpr, 0, 0, L.k * L.dpr, 0, 0);
+    ctx.clearRect(0, 0, s.w, s.h); ctx.drawImage(s.tImg, 0, 0);
+    if (this.showBefore) return;
+    if (s.step === 'align') { ctx.globalAlpha = 0.5; this.drawDonor(ctx, s); ctx.globalAlpha = 1; return; }
+    // brush: the clear eyes, through the mask
+    const c = this._comp || (this._comp = document.createElement('canvas'));
+    c.width = s.w; c.height = s.h; const cx = c.getContext('2d');
+    this.drawDonor(cx, s); cx.globalCompositeOperation = 'destination-in'; cx.drawImage(s.mask, 0, 0); cx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(c, 0, 0);
+    if (this.cursor) {
+      ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2, 0, Math.PI * 2);
+      ctx.lineWidth = 1.5 / L.k; ctx.strokeStyle = this.brush.erase ? '#E3A04F' : '#fff'; ctx.stroke();
+      ctx.lineWidth = 1 / L.k; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2 + 1.5 / L.k, 0, Math.PI * 2); ctx.stroke();
+    }
+  },
+  toRegion(e) { const cv = $('#rtCanvas'), r = cv.getBoundingClientRect(), s = this.s; return { x: (e.clientX - r.left) / r.width * s.w, y: (e.clientY - r.top) / r.height * s.h }; },
+  stamp(x, y) {
+    const s = this.s, m = s.mask.getContext('2d'), rad = this.brush.size / 2;
+    const g = m.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    m.globalCompositeOperation = this.brush.erase ? 'destination-out' : 'source-over';
+    m.fillStyle = g; m.beginPath(); m.arc(x, y, rad, 0, Math.PI * 2); m.fill(); m.globalCompositeOperation = 'source-over';
+  },
+  pushUndo() { const s = this.s; s.undo.push(s.mask.getContext('2d').getImageData(0, 0, s.w, s.h)); if (s.undo.length > 25) s.undo.shift(); },
+  undoMask() { const s = this.s; if (!s || !s.undo.length) return toast('Nothing to undo'); s.mask.getContext('2d').putImageData(s.undo.pop(), 0, 0); s.dirty = true; this.draw(); },
+  bindCanvas() {
+    const cv = $('#rtCanvas'); let last = null, drag = null;
+    cv.addEventListener('pointerdown', e => {
+      const s = this.s; if (!s || !s.tImg) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+      const pt = this.toRegion(e);
+      if (s.step === 'align') { drag = { x: pt.x, y: pt.y, dx: s.adj.dx, dy: s.adj.dy }; return; }
+      this.pushUndo(); this.stamp(pt.x, pt.y); last = pt; s.dirty = true; this.draw();
+    });
+    cv.addEventListener('pointermove', e => {
+      const s = this.s; if (!s || !s.tImg) return; const pt = this.toRegion(e);
+      if (s.step === 'align') { if (drag) { s.adj.dx = drag.dx + pt.x - drag.x; s.adj.dy = drag.dy + pt.y - drag.y; s.dirty = true; this.draw(); } return; }
+      this.cursor = pt;
+      if (last) {  // stamps along the stroke, close enough to look continuous
+        const d = Math.hypot(pt.x - last.x, pt.y - last.y), step = Math.max(1, this.brush.size * 0.12);
+        for (let t = step; t <= d; t += step) this.stamp(last.x + (pt.x - last.x) * t / d, last.y + (pt.y - last.y) * t / d);
+        if (d >= step) last = pt;
+      }
+      this.draw();
+    });
+    const end = () => { last = null; drag = null; };
+    cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+    cv.addEventListener('pointerleave', () => { this.cursor = null; this.draw(); });
+    cv.addEventListener('wheel', e => { if (this.s && this.s.step === 'brush') { e.preventDefault(); this.setSize(this.brush.size * (e.deltaY < 0 ? 1.1 : 0.9)); } }, { passive: false });
+  },
+  setSize(v) { this.brush.size = clamp(Math.round(v), 4, 600); this.draw(); const r = $('[data-rt-size]'); if (r) r.value = this.brush.size; const b = $('#rtSizeVal'); if (b) b.textContent = this.brush.size + ' px'; },
+  autoMask() {
+    const s = this.s; if (!s || !s.tImg) return; this.pushUndo();
+    const m = s.mask.getContext('2d'); const [rx, ry] = s.lensR;
+    m.save(); m.filter = `blur(${Math.max(1, s.ed * 0.04)}px)`; m.fillStyle = '#fff';
+    for (const [x, y] of s.eyes) { m.beginPath(); m.ellipse(x, y, rx * 0.9, ry * 0.9, 0, 0, Math.PI * 2); m.fill(); }
+    m.restore(); s.step = 'brush'; s.dirty = true; this.render();
+  },
+  clearMask() { const s = this.s; if (!s || !s.tImg) return; this.pushUndo(); s.mask.getContext('2d').clearRect(0, 0, s.w, s.h); s.dirty = true; this.draw(); },
+  nudge(dx, dy, big) { const s = this.s; if (!s) return; const f = big ? 10 : 1; s.adj.dx += dx * f; s.adj.dy += dy * f; s.dirty = true; this.draw(); this.right(); },
+  zoom(dir, big) { const s = this.s; if (!s) return; s.adj.s = clamp(s.adj.s * (1 + dir * (big ? 0.02 : 0.004)), 0.5, 2); s.dirty = true; this.draw(); this.right(); },
+  turn(dir, big) { const s = this.s; if (!s) return; s.adj.r = Math.round((s.adj.r + dir * (big ? 1 : 0.25)) * 100) / 100; s.dirty = true; this.draw(); this.right(); },
+  resetAlign() { const s = this.s; if (!s) return; s.adj = { dx: 0, dy: 0, s: 1, r: 0 }; s.dirty = true; this.draw(); this.right(); },
+  setStep(st) { const s = this.s; if (!s || !s.tImg) return; s.step = st; this.render(); },
+  async save() {
+    const s = this.s, p = this.active(); if (!s || !s.tImg || this.busy || !p) return;
+    if (s.step === 'align') return this.setStep('brush');
+    // anything painted at all?
+    const d = s.mask.getContext('2d').getImageData(0, 0, s.w, s.h).data; let any = false;
+    for (let i = 3; i < d.length; i += 16) if (d[i] > 8) { any = true; break; }
+    if (!any) return toast('Brush the eyes in first (or press M to paint them for you)');
+    this.busy = true; this.right();
+    try {
+      await api('/api/retouch/save', { path: p.path, id: s.id, adjust: s.adj, mask: s.mask.toDataURL('image/png'), match: this.match });
+      s.dirty = false;
+      await this.loadInfo();
+      Crop.plans.delete(p.path); Crop.status.delete(p.path);
+      p.thumbState = 0; Thumbs.request(p);
+      toast(`Retouched — ${esc(p.name)} now uses the clear eyes everywhere`, 3500);
+    } catch (e) { toast('Couldn’t save: ' + esc(e.message), 6000); }
+    this.busy = false; renderAll();
+  },
+  async remove() {
+    const p = this.active(); if (!p || !this.isEdited(p.path)) return;
+    try { await api('/api/retouch/remove', { path: p.path }); } catch (e) { return toast(esc(e.message)); }
+    this.work.delete(p.path); await this.loadInfo(); Crop.plans.delete(p.path); Crop.status.delete(p.path);
+    p.thumbState = 0; Thumbs.request(p); toast('Retouch removed — back to the original photo'); this.open(p);
+    renderAll();
+  },
+
+  /* ---------- panels ---------- */
+  left() {
+    const L = $('#left');
+    const mine = S.photos.filter(p => this.isEdited(p.path)), donors = S.photos.filter(p => this.isDonor(p.path));
+    const row = (p, tag) => `<div class="row rt-row" data-rt-go="${p.id}"><span class="style-tag inline">${tag}</span><span class="lbl">${esc(p.name)}</span></div>`;
+    let html = sectionHTML('rt-how', 'Eye swap', `<div class="pad hint tight">For glasses glare: take the eyes from the frame shot without glasses.<br>
+      <b>1 Line up</b> — it’s already lined up from the face; drag or use the arrow keys if it’s off.<br>
+      <b>2 Brush in</b> — paint over the lenses to reveal the clear eyes.<br>
+      <b>Enter</b> saves a retouched copy (the camera file is never changed). Crop, Composite and Extract use it automatically.</div>`);
+    html += sectionHTML('rt-done', `Retouched in this folder (${mine.length})`, mine.length ? `<div class="style-rows">${mine.map(p => row(p, 'Fixed')).join('')}</div>` : '<div class="hint">None yet.</div>');
+    html += sectionHTML('rt-don', `Eye donors (${donors.length})`, donors.length ? `<div class="hint tight">Frames the eyes came from. They’re left out of prints, composites and extracts.</div><div class="style-rows">${donors.map(p => row(p, 'Donor')).join('')}</div>` : '<div class="hint">None yet.</div>');
+    L.innerHTML = `<div class="scroll">${html}</div>`;
+  },
+  right() {
+    const R = $('#right'), p = this.active(), s = this.s;
+    if (!p) { R.innerHTML = '<div class="scroll"><div class="hint">Select a photo with glasses glare.</div></div>'; return; }
+    const edited = this.isEdited(p.path);
+    const dn = s && s.donor ? S.byPath.get(s.donor) : null;
+    let html = sectionHTML('rt-status', 'This photo', `<div class="status-card ${edited ? 'ok' : 'none'}"><div class="sc-head"><span class="st-dot ${edited ? 'ok' : 'none'}"></span><b>${edited ? 'Retouched' : this.isDonor(p.path) ? 'Eye donor' : 'Not retouched'}</b></div>
+      <div class="sc-label">${edited ? 'Previews and exports use the retouched copy.' : this.isDonor(p.path) ? 'Its eyes were used for another photo; it’s left out of prints.' : 'Line up and brush in the clear eyes, then press Enter.'}</div>
+      ${edited ? '<div class="btn-row"><button class="btn sm" data-rt="remove">Remove retouch</button></div>' : ''}</div>`);
+    html += sectionHTML('rt-donor', 'Frame without glasses', dn ? `<div class="rt-donor"><img src="${thumbUrl(dn.path)}" alt=""><div><b>${esc(dn.name)}</b><div class="btn-row"><button class="btn sm" data-rt="donor-prev" title="Use the previous photo">◀</button><button class="btn sm" data-rt="donor-next" title="Use the next photo">▶</button></div></div></div>
+      ${s && s.tImg && !s.found ? '<div class="miss-note">The face wasn’t found in one of the frames, so line them up by hand: drag the overlay, arrow keys to nudge, + − to resize, , . to turn.</div>' : ''}` : '<div class="hint">—</div>');
+    if (s && s.tImg) {
+      const a = s.adj;
+      html += sectionHTML('rt-steps', 'Steps', `<div class="pad">${segHTML('rtStep', s.step, [['align', '1 Line up'], ['brush', '2 Brush in']])}</div>
+        ${s.step === 'align' ? `<div class="hint tight">The no-glasses frame is laid over at 50%. If the eyes don’t line up: <b>drag</b> it, <b>arrow keys</b> nudge (Shift ×10), <b>+ −</b> resize, <b>, .</b> turn.<br>Moved ${Math.round(a.dx)}, ${Math.round(a.dy)} px · size ${(a.s * 100).toFixed(1)}% · ${a.r.toFixed(2)}°</div>
+          <div class="btn-row pad-x"><button class="btn sm" data-rt="reset">Reset alignment</button><button class="btn sm primary" data-rt="to-brush">Looks good <kbd>Enter</kbd></button></div>`
+        : `<div class="slider-row"><span>Brush</span><input type="range" min="4" max="${Math.max(60, Math.round(s.ed))}" value="${this.brush.size}" data-rt-size><b id="rtSizeVal">${this.brush.size} px</b></div>
+          <div class="pad">${segHTML('rtMode', this.brush.erase ? 'erase' : 'reveal', [['reveal', 'Reveal'], ['erase', 'Erase <kbd>X</kbd>']])}</div>
+          <div class="btn-row pad-x"><button class="btn sm" data-rt="auto">Paint eyes for me <kbd>M</kbd></button><button class="btn sm" data-rt="clear">Clear</button><button class="btn sm" data-rt="undo">Undo</button></div>
+          <div class="hint tight"><kbd>[</kbd> <kbd>]</kbd> or the mouse wheel size the brush · <kbd>\\</kbd> before/after</div>`}`);
+      html += sectionHTML('rt-opts', 'Options', `${switchHTML('rtMatch', this.match, 'Match brightness and colour', 'Evens out small exposure and colour differences between the two frames')}`);
+      html += `<div class="pad"><button class="btn primary wide" data-rt="save" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Saving…' : s.step === 'align' ? 'Next: brush in  ⏎' : (edited ? 'Save changes  ⏎' : 'Save retouch  ⏎')}</button></div>`;
+    }
+    R.innerHTML = `<div class="scroll">${html}</div>`;
+  },
+  modbar() {
+    const s = this.s, mb = $('#modbar'); if (!mb || S.module !== 'retouch') return;
+    mb.innerHTML = `<button class="toggle ${this.showBefore ? 'on' : ''}" data-rt="before" title="Before / after (\\)">Before / after <kbd>\\</kbd></button>
+      <span class="hint-keys">${!s || !s.tImg ? '' : s.step === 'align' ? 'drag or ← ↑ → ↓ nudge · + − size · , . turn · Enter next' : '[ ] brush size · X erase · M paint eyes · Ctrl+Z undo · Enter save · A back to line up'}</span>`;
+  },
+  key(e, k) {
+    const s = this.s, ready = s && s.tImg;
+    if (e.ctrlKey || e.metaKey) { if (k === 'z' && ready) { this.undoMask(); return true; } return false; }
+    if (e.key === '\\') { this.showBefore = !this.showBefore; this.draw(); this.modbar(); return true; }
+    if (!ready) return false;
+    if (e.key === 'Enter') { this.save(); return true; }
+    if (s.step === 'align') {
+      const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+      if (mv) { this.nudge(mv[0], mv[1], e.shiftKey); return true; }
+      if (e.key === '+' || e.key === '=') { this.zoom(1, e.shiftKey); return true; }
+      if (e.key === '-' || e.key === '_') { this.zoom(-1, e.shiftKey); return true; }
+      if (e.key === ',' || e.key === '<') { this.turn(-1, e.shiftKey); return true; }
+      if (e.key === '.' || e.key === '>') { this.turn(1, e.shiftKey); return true; }
+      if (k === 'm') { this.autoMask(); return true; }
+      return false;
+    }
+    if (e.key === '[') { this.setSize(this.brush.size / 1.15); return true; }
+    if (e.key === ']') { this.setSize(this.brush.size * 1.15); return true; }
+    if (k === 'x') { this.brush.erase = !this.brush.erase; this.right(); this.draw(); return true; }
+    if (k === 'm') { this.autoMask(); return true; }
+    if (k === 'a') { this.setStep('align'); return true; }
+    return false;
+  },
+};
+function retouchTag(p) {
+  return Ret.isEdited(p.path) ? '<span class="rt-tag" title="Retouched (eye swap)">Fixed</span>' : Ret.isDonor(p.path) ? '<span class="rt-tag donor" title="Eye donor — left out of prints">Donor</span>' : '';
+}
+
 /* ================= Boot ================= */
 async function init() {
   buildFilterBar(); buildToolbar(); buildLoupe(); buildCompare(); buildHelp();
@@ -3105,7 +3391,7 @@ async function init() {
 init();
 
 // Small hook for automated testing / power users
-window.KeeperStudio = { loadFolder, state: S, Crop, Comp, Cut };
+window.KeeperStudio = { loadFolder, state: S, Crop, Comp, Cut, Ret };
 })();
 </script>
 </body>

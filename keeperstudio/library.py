@@ -34,7 +34,7 @@ def scan(folder: Path) -> dict:
     folder = folder.resolve()
     photos, skipped = [], {}
     for root, dirs, files in os.walk(folder):
-        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not d.endswith("_out"))
+        dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not d.endswith("_out") and d != "_retouched")
         for name in sorted(files):
             if name.startswith("."):
                 continue

@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__, engine, jobs, library, paths
+from . import retouch, __version__, engine, jobs, library, paths
 from .catalog import Catalog
 
 TOKEN = secrets.token_urlsafe(24)
@@ -96,18 +96,20 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(403, b"forbidden", "text/plain")
         try:
             if u.path == "/thumb":
-                data = library.thumbnail(q["p"][0], int((q.get("s") or ["400"])[0]))
+                data = library.thumbnail(retouch.source_path(q["p"][0]), int((q.get("s") or ["400"])[0]))
                 return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/preview":
-                data = library.thumbnail(q["p"][0], int((q.get("s") or ["2048"])[0]), float((q.get("r") or ["0"])[0]))
+                data = library.thumbnail(retouch.source_path(q["p"][0]), int((q.get("s") or ["2048"])[0]), float((q.get("r") or ["0"])[0]))
                 return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/graded":  # the preview with a colour preset applied, for side by side
                 data = engine.graded_preview(q["p"][0], int((q.get("s") or ["2048"])[0]),
                                              float((q.get("r") or ["0"])[0]), (q.get("k") or ["standard"])[0])
                 return self._send(200, data, "image/jpeg", cache=True)
             if u.path == "/full":
-                data, ctype = library.full_image(q["p"][0])
+                data, ctype = library.full_image(retouch.source_path(q["p"][0]))
                 return self._send(200, data, ctype, cache=True)
+            if u.path == "/retouch-img":  # the working area of a Retouch session
+                return self._send(200, retouch.image(q["id"][0], q["w"][0]), "image/jpeg")
             if u.path == "/file":  # an output we wrote (composite, cut-out, contact sheet)
                 p = q["p"][0]
                 ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(Path(p).suffix.lower(), "application/octet-stream")
@@ -256,6 +258,26 @@ def r_crop_plan(b):
     return engine.plan_cached(b["path"], settings, b.get("manual"), int(b.get("seq") or 0), bool(b.get("focus")))
 
 
+def r_retouch_info(b):
+    return retouch.info(b.get("paths") or [])
+
+
+def r_retouch_prepare(b):
+    with engine._engine_lock:
+        cfg = engine.config()
+        engine._Resources.ensure(cfg, False, False)
+        det = engine._Resources.detector
+        return retouch.prepare(b["path"], b["donor"], det, engine.raw_load)
+
+
+def r_retouch_save(b):
+    return retouch.save(b["path"], b["id"], b.get("adjust") or {}, b["mask"], bool(b.get("match", True)), engine.raw_load)
+
+
+def r_retouch_remove(b):
+    return retouch.remove(b["path"])
+
+
 def r_crop_known(b):
     """Saved framing checks for a whole folder in one go, so stepping through is instant."""
     base = engine.merged_settings(catalog.get("settings", "crop"))
@@ -352,7 +374,9 @@ ROUTES = {
     "/api/dialog": r_dialog,
     "/api/library/open": r_open_folder, "/api/library/info": r_info,
     "/api/reveal": r_reveal, "/api/open-file": r_open_file, "/api/exists": r_exists,
-    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan, "/api/crop/known": r_crop_known,
+    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan,
+    "/api/retouch/info": r_retouch_info, "/api/retouch/prepare": r_retouch_prepare,
+    "/api/retouch/save": r_retouch_save, "/api/retouch/remove": r_retouch_remove, "/api/crop/known": r_crop_known,
     "/api/crop/analyze": r_crop_analyze, "/api/crop/export": r_crop_export,
     "/api/crop/default-out": r_crop_default_out, "/api/crop/rotate": r_crop_rotate, "/api/crop/rotations": r_crop_rotations, "/api/crop/tunables": r_tunables,
     "/api/export": r_export, "/api/job/cancel": r_job_cancel,
