@@ -2240,7 +2240,6 @@ const Crop = {
     try { for (const [k, v] of Object.entries((await api('/api/crop/rotations', {})).rotations)) this.rotations.set(k, v); } catch {}
     try { this.circle = !!(await DB.get('kv', 'cropCircle')); } catch {}
     try { this.compare = !!(await DB.get('kv', 'cropCompare')); } catch {}
-    try { const g = await DB.get('kv', 'autoGlasses'); if (g === false) Ret.autoGlasses = false; } catch {}
   },
   CIRCLE_IN: 3,
   squareInches(name) { const m = /^(\d+(?:_\d+)?)x\1$/.exec(name); return m ? parseFloat(m[1].replace('_', '.')) : null; },
@@ -3032,7 +3031,6 @@ function bindModuleEvents() {
       if (S.module === 'crop') { const v = !sw.classList.contains('on'); Crop.saveSettings({ [k]: v }); }
       else if (S.module === 'composite') { Comp.f[k] = !sw.classList.contains('on'); Comp.save(); Comp.render(); }
       else if (S.module === 'retouch' && k === 'rtMatch') { Ret.match = !Ret.match; Ret.right(); }
-      else if (k === 'autoGlasses') { Ret.autoGlasses = !Ret.autoGlasses; DB.put('kv', 'autoGlasses', Ret.autoGlasses).catch(() => {}); Ret.left(); if (Ret.autoGlasses && !Ret.gState) Ret.findGlasses(true); }
       return;
     }
     const sg = t.closest('.seg button');
@@ -3056,7 +3054,6 @@ function bindModuleEvents() {
       else if (a === 'clear') Ret.clearMask(); else if (a === 'undo') Ret.undoMask(); else if (a === 'reset') Ret.resetAlign();
       else if (a === 'to-brush') Ret.setStep('brush'); else if (a === 'donor-prev') Ret.stepDonor(-1); else if (a === 'donor-next') Ret.stepDonor(1);
       else if (a === 'before') { Ret.showBefore = !Ret.showBefore; Ret.draw(); Ret.modbar(); }
-      else if (a === 'find-glasses') Ret.findGlasses(false);
       else if (a === 'zoom-in') Ret.zoomView(1.25); else if (a === 'zoom-out') Ret.zoomView(0.8);
       else if (a === 'fit') Ret.fitView(); else if (a === 'px') Ret.actualPixels();
       return;
@@ -3157,49 +3154,7 @@ const Ret = {
     for (const p of S.photos) if (p.thumbUrl && p.thumbUrl !== thumbUrl(p.path)) { p.thumbState = 0; Thumbs.request(p); }
     schedule(R_CELLS);
   },
-  libraryLoaded() {
-    this.work.clear(); this.s = null; this.loadInfo();
-    if (this.gJob) { cancelJob(this.gJob); this.gJob = null; }
-    this.gState = null;
-    // let the thumbnails load first, then look for glasses in the background
-    clearTimeout(this._gT); this._gT = setTimeout(() => { if (this.autoGlasses && S.photos.length) this.findGlasses(true); }, 1500);
-  },
-
-  /* ---------- Glasses collection ----------
-     Every photo with glasses, plus the photo right after each one (the frame shot
-     without glasses), gathered into a collection called "Glasses". */
-  autoGlasses: true, gJob: null, gState: null,
-  async findGlasses(auto) {
-    if (!S.photos.length) return;
-    if (this.gJob) cancelJob(this.gJob);
-    const root = S.root;
-    let id;
-    try { id = (await api('/api/glasses/find', { paths: S.photos.map(p => p.path) })).job; } catch (e) { if (!auto) toast(esc(e.message)); return; }
-    this.gJob = id; this.gState = { done: 0, total: S.photos.length };
-    const fin = await pollJob(id, st => { if (this.gJob === id) { this.gState = { done: st.done || 0, total: st.total || 0 }; if (S.module === 'retouch') this.left(); } });
-    if (this.gJob !== id || S.root !== root) return;   // another folder was opened meanwhile
-    this.gJob = null;
-    if (fin.error || !fin.result || fin.result.cancelled) { this.gState = null; if (S.module === 'retouch') this.left(); return; }
-    const r = fin.result;
-    this.gState = { found: r.glasses.length, members: r.members.length };
-    this.fillGlassesColl(r.members);
-    if (S.module === 'retouch') this.left();
-    if (r.glasses.length) toast(`Glasses: ${plural(r.glasses.length, 'photo')} with glasses — ${plural(r.members.length, 'photo')} in the “Glasses” collection`, 5000);
-    else if (!auto) toast('No glasses found in this folder');
-  },
-  fillGlassesColl(members) {
-    const want = new Set(members.map(p => (S.byPath.get(p) || {}).key).filter(Boolean));
-    let c = collections.find(c => !c.smart && c.id !== QUICK && c.name.trim().toLowerCase() === 'glasses');
-    if (!c) {
-      if (!want.size) return;
-      c = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: 'Glasses', keys: new Set(), smart: null, created: Date.now() };
-      collections.push(c);
-    }
-    // this folder's photos are replaced; photos from other folders stay
-    for (const p of S.photos) c.keys.delete(p.key);
-    for (const k of want) c.keys.add(k);
-    saveColl(c); renderAll();
-  },
+  libraryLoaded() { this.work.clear(); this.s = null; this.loadInfo(); },
   active() { return S.byId.get(S.active) || null; },
   enter() { this.render(); this.open(); },
   render() { renderView(); renderLeft(); renderRight(); this.modbar(); },
@@ -3476,11 +3431,7 @@ const Ret = {
     const L = $('#left');
     const mine = S.photos.filter(p => this.isEdited(p.path)), donors = S.photos.filter(p => this.isDonor(p.path));
     const row = (p, tag) => `<div class="row rt-row" data-rt-go="${p.id}"><span class="style-tag inline">${tag}</span><span class="lbl">${esc(p.name)}</span></div>`;
-    const g = this.gState;
-    const gLine = this.gJob && g ? `Looking for glasses… ${g.done} of ${g.total}` : g && g.found != null ? (g.found ? `${plural(g.found, 'photo')} with glasses · ${g.members} in the collection` : 'No glasses found in this folder') : '';
-    let html = sectionHTML('rt-glasses', 'Glasses collection', `${switchHTML('autoGlasses', this.autoGlasses, 'Find glasses when a folder opens', 'Puts every photo with glasses, plus the photo right after it, in a collection called “Glasses”')}
-      <div class="pad"><button class="btn sm wide" data-rt="find-glasses" ${this.gJob ? 'disabled' : ''}>${this.gJob ? 'Looking…' : 'Find glasses now'}</button>${gLine ? `<div class="hint tight" style="padding:6px 0 0">${gLine}</div>` : ''}</div>`);
-    html += sectionHTML('rt-how', 'Eye swap', `<div class="pad hint tight">For glasses glare: take the eyes from the frame shot without glasses.<br>
+    let html = sectionHTML('rt-how', 'Eye swap', `<div class="pad hint tight">For glasses glare: take the eyes from the frame shot without glasses.<br>
       <b>1 Line up</b> — it’s already lined up from the face; drag or use the arrow keys if it’s off.<br>
       <b>2 Brush in</b> — paint over the lenses to reveal the clear eyes.<br>
       <b>Enter</b> saves a retouched copy (the camera file is never changed). Crop, Composite and Extract use it automatically.</div>`);
