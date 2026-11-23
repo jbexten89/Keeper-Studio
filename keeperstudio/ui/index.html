@@ -523,6 +523,8 @@ kbd{font-size:10px}
 .banner.info button[data-dismiss]{color:#03111E}
 .banner .banner-act{margin-left:auto;background:#03111E;color:#fff;border-color:#03111E}
 .help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
+/* Framing card keeps one height, so the size list below never moves while stepping through photos */
+#right .sec[data-sec=c-status]:not(.closed) > .body{height:198px;overflow-y:auto;scrollbar-width:thin}
 </style>
 </head>
 <body>
@@ -2568,7 +2570,7 @@ const Crop = {
       const st = STATUS_INFO[plan.status];
       status = `<div class="status-card ${st.cls}"><div class="sc-head"><span class="st-dot ${st.cls}"></span><b>${plan.status === 'review' ? 'Needs review' : st.label}</b></div>
         ${plan.status === 'review' ? `<div class="sc-label">${esc(plan.label)}</div>` : ''}
-        ${plan.reason ? `<details ${plan.status === 'review' ? 'open' : ''}><summary>Details</summary><pre>${esc(plan.reason)}</pre></details>` : ''}
+        ${plan.reason ? `<details data-reason ${this.detailsOpen ? 'open' : ''}><summary>Details</summary><pre>${esc(plan.reason)}</pre></details>` : ''}
         ${plan.status === 'shortened' ? '<div class="hint tight">The ideal frame ran off the photo, so the bottom edge sits a little higher than usual. Worth a glance.</div>' : ''}
         ${plan.missing && plan.missing.length ? `<div class="miss-note"><b>${plan.missing.map(prettySize).join(', ')} won’t be made</b> — its tight framing couldn’t be placed automatically on this photo (more than one face found, or it runs off the edge). Press <kbd>S</kbd> to place it by hand.</div>` : ''}
         <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${!plan.landscape && this.tightSize() && plan.status !== 'review' ? `<button class="btn sm" data-crop="square">Place ${prettySize(this.tightSize().name)} <kbd>S</kbd></button>` : ''}${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
@@ -3039,6 +3041,8 @@ function bindModuleEvents() {
     const row = e.target.closest('[data-size]'); const n = row ? row.dataset.size : null;
     if (n !== Crop.hover) { Crop.hover = n; Crop.center(); $$('#right .size-row').forEach(r => r.classList.toggle('hot', r.dataset.size === n)); }
   });
+  // Framing card Details: remember open/closed while stepping through photos
+  $('#right').addEventListener('toggle', e => { if (e.target.matches && e.target.matches('details[data-reason]')) Crop.detailsOpen = e.target.open; }, true);
   $('#right').addEventListener('mouseleave', () => { if (Crop.hover) { Crop.hover = null; if (S.module === 'crop') Crop.center(); } });
   $('#left').addEventListener('input', e => {
     const i = e.target.closest('[data-cf]'); if (!i || S.module !== 'composite') return;
