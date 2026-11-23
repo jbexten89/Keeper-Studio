@@ -2251,9 +2251,9 @@ const Crop = {
     return `<div class="style-rows">${row('batch', 'Same as left side')}${row('full', 'Full length', 'Full')}${row('knee_above', '3/4 · above knees', '¾↑')}${row('knee_below', '3/4 · below knees', '¾↓')}${row('preschool', 'Preschool', 'Pre')}</div>`;
   },
   async clearStyles() {
-    const n = this.styles.size; if (!n) return;
-    for (const k of this.styles.keys()) { this.plans.delete(k); DB.del('styles', k).catch(() => {}); }
-    this.styles.clear(); S.filter.cstyle = 'any'; afterFilter(); toast(`${plural(n, 'photo')} back on the batch style`); renderAll(); this.ensurePlan();
+    // only this folder's photos: other folders keep their own styles
+    const mine = S.photos.map(p => p.path).filter(k => this.styles.has(k)); const n = mine.length; if (!n) return;
+    for (const k of mine) { this.plans.delete(k); this.styles.delete(k); DB.del('styles', k).catch(() => {}); } S.filter.cstyle = 'any'; afterFilter(); toast(`${plural(n, 'photo')} back on the batch style`); renderAll(); this.ensurePlan();
   },
   toggleCompare() {
     this.compare = !this.compare; DB.put('kv', 'cropCompare', this.compare).catch(() => {});
@@ -2550,7 +2550,7 @@ const Crop = {
     if (s) {
       const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
       if (S.sections['c-out'] === undefined) S.sections['c-out'] = false;  // set once, rarely touched
-    const nOwn = [...this.styles.keys()].length;
+    const nOwn = S.photos.filter(p => this.styles.has(p.path)).length;  // this folder only
     html += sectionHTML('c-frame', 'Framing style', `<div class="pad">${nOwn ? `<div class="own-note">${plural(nOwn, 'photo')} use${nOwn === 1 ? 's' : ''} its own style <button class="btn sm" data-crop="clear-styles">Clear</button></div>${this.styleRows()}` : ''}${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full'], ['tq', '3/4'], ['preschool', 'Preschool']])}</div>
         ${tq ? `<div class="pad" title="The bottom edge crosses the legs a little above or below the knees — never on the joint. The square keeps its own face framing.">${segHTML('kneeLine', s.framing_style, [['knee_above', 'Just above knees'], ['knee_below', 'Just below knees']])}</div>` : ''}
         ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}

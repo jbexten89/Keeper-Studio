@@ -531,6 +531,8 @@ pipeline.process_image = _process_image  # run_job looks it up at call time
 # balance-feet mode uses. The square keeps its own face framing.
 NO_KNEES = "no_knees"
 pipeline.STATUS_LABELS.setdefault(NO_KNEES, "knees not found")
+SEATED = "seated"
+pipeline.STATUS_LABELS.setdefault(SEATED, "seated pose — use Preschool")
 THREE_QUARTER_HEADROOM = 0.12   # of the frame height, above the crown
 KNEE_OFFSET = 0.22              # of the thigh (above) or shin (below) length
 _KNEES, _HIPS, _ANKLES = (25, 26), (23, 24), (27, 28)
@@ -558,8 +560,8 @@ def _leg_points(rgb):
     # a raised leg puts one knee higher: "above" clears the higher knee, "below" the lower one
     hi, lo = min(knees), max(knees)
     ankle = max(ankles) if ankles else None
-    if hi <= hip:
-        return None
+    if hi <= hip + 0.02 * h:
+        return "seated"  # knees level with (or above) the hips: sitting down
     return hip, hi, lo, ankle if ankle and ankle > lo else None
 
 
@@ -594,17 +596,18 @@ def _three_quarter(path, detector, config, out_dir, lut, enhance_when, style):
     with _engine_lock:
         _Resources.ensure(config, True, False)
         legs = _leg_points(rgb)
+    head = faces[0].chin[1] - estimate_crown(faces[0], config.eye_to_chin_multiplier)[1]
+    if legs == "seated" or (legs is not None and legs[1] - legs[0] < 0.6 * head):
+        return pipeline.ImageResult(
+            Path(path), SEATED,
+            "SKIPPED: 3/4 length framing is on, but this looks like a seated pose.\n\n"
+            "Use Preschool framing for seated photos (set it on the left, or just for these photos with the Style box), "
+            "or place the framing by hand.")
     if legs is None:
         return pipeline.ImageResult(
             Path(path), NO_KNEES,
             "SKIPPED: 3/4 length framing is on, but the knees couldn't be found.\n\n"
             "Place the framing by hand, or switch Framing style back to Full length.")
-    head = faces[0].chin[1] - estimate_crown(faces[0], config.eye_to_chin_multiplier)[1]
-    if legs[1] - legs[0] < 0.6 * head:
-        return pipeline.ImageResult(
-            Path(path), NO_KNEES,
-            "SKIPPED: 3/4 length framing is on, but this looks like a seated pose.\n\n"
-            "Place the framing by hand, or use Preschool (seated) framing for this batch.")
     placement, adjusted = three_quarter_placement(faces[0], legs, style, config, source.size)
     res = pipeline.apply_manual_crop(Path(path), config, out_dir, placement, detector=detector, lut=lut,
                                      enhance_when=enhance_when, persist=False)
@@ -660,7 +663,7 @@ pipeline.apply_manual_crop = _apply_manual
 # settings and any hand placement. Same inputs -> instant answer, even after a
 # restart; change any of them and that photo is checked afresh.
 plan_store = None  # set by the server: a Catalog
-PLAN_VERSION = 2  # bump when the engine would answer differently, so saved checks are redone
+PLAN_VERSION = 3  # bump when the engine would answer differently, so saved checks are redone
 _PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
                   "landscape", "fit_to_frame", "disabled_sizes", "framing_style")
 _focus_lock = threading.Lock()
