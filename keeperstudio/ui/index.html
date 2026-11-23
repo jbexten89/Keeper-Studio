@@ -3104,7 +3104,7 @@ function bindModuleEvents() {
     });
     $(sel).addEventListener('change', e => { const r = e.target.closest('[data-range]'); if (r) Crop.saveSettings({ [r.dataset.range]: +r.value }); });
   });
-  $('#right').addEventListener('input', e => { const r = e.target.closest('[data-straight]'); if (r) Crop.livePreview(+r.value); const b = e.target.closest('[data-rt-size]'); if (b) Ret.setSize(+b.value); });
+  $('#right').addEventListener('input', e => { const r = e.target.closest('[data-straight]'); if (r) Crop.livePreview(+r.value); const b = e.target.closest('[data-rt-size]'); if (b) Ret.setSize(+b.value); const sf = e.target.closest('[data-rt-soft]'); if (sf) Ret.setSoft(+sf.value); });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-photostyle]'); if (r) { r.blur(); Crop.setStyle(r.value || null); } });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-straight]'); if (r) { r.blur(); Crop.setRotation(+r.value); } });
   $('#right').addEventListener('mouseover', e => {
@@ -3136,7 +3136,7 @@ const Ret = {
   s: null,                  // the session on screen
   busy: false, showBefore: false, match: true,
   view: { z: 1, px: 0, py: 0 },   // zoom (1 = eye area fits the window) and pan, in screen px
-  brush: { size: 0, erase: false },
+  brush: { size: 0, erase: false, soft: 50 },   // soft: 0 = hard edge, 100 = feathered all the way in
   isDonor(path) { return !!this.info.donors[path]; },
   isEdited(path) { return !!this.info.edits[path]; },
   async loadInfo() {
@@ -3254,13 +3254,18 @@ const Ret = {
       ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2, 0, Math.PI * 2);
       ctx.lineWidth = 1.5 / L.k; ctx.strokeStyle = this.brush.erase ? '#E3A04F' : '#fff'; ctx.stroke();
       ctx.lineWidth = 1 / L.k; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2 + 1.5 / L.k, 0, Math.PI * 2); ctx.stroke();
+      const core = (1 - this.brush.soft / 100) * this.brush.size / 2;  // where full strength ends
+      if (core > 2 / L.k && this.brush.soft > 2) { ctx.setLineDash([4 / L.k, 4 / L.k]); ctx.lineWidth = 1 / L.k; ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, core, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
     }
   },
   toRegion(e) { const cv = $('#rtCanvas'), r = cv.getBoundingClientRect(), L = this._L; return { x: (e.clientX - r.left - L.ox) / L.k, y: (e.clientY - r.top - L.oy) / L.k }; },
   stamp(x, y) {
     const s = this.s, m = s.mask.getContext('2d'), rad = this.brush.size / 2;
+    // full strength out to the hard core, then a smooth fall-off to the edge
+    const core = clamp(1 - this.brush.soft / 100, 0, 0.98);
     const g = m.createRadialGradient(x, y, 0, x, y, rad);
-    g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(0.5, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, 'rgba(255,255,255,0.95)'); g.addColorStop(core, 'rgba(255,255,255,0.95)');
+    const n = 6; for (let i = 1; i <= n; i++) { const t = i / n, f = 1 - t * t * (3 - 2 * t); g.addColorStop(core + (1 - core) * t, `rgba(255,255,255,${(0.95 * f).toFixed(3)})`); }
     m.globalCompositeOperation = this.brush.erase ? 'destination-out' : 'source-over';
     m.fillStyle = g; m.beginPath(); m.arc(x, y, rad, 0, Math.PI * 2); m.fill(); m.globalCompositeOperation = 'source-over';
   },
@@ -3302,6 +3307,7 @@ const Ret = {
     // Space held = hand tool
     window.addEventListener('keyup', e => { if (e.key === ' ' && this.space) { this.space = false; this.draw(); } });
   },
+  setSoft(v) { this.brush.soft = clamp(Math.round(v), 0, 100); this.draw(); const r = $('[data-rt-soft]'); if (r) r.value = this.brush.soft; const b = $('#rtSoftVal'); if (b) b.textContent = this.brush.soft + '%'; },
   setSize(v) { this.brush.size = clamp(Math.round(v), 4, 600); this.draw(); const r = $('[data-rt-size]'); if (r) r.value = this.brush.size; const b = $('#rtSizeVal'); if (b) b.textContent = this.brush.size + ' px'; },
   autoMask() {
     const s = this.s; if (!s || !s.tImg) return; this.pushUndo();
@@ -3371,9 +3377,10 @@ const Ret = {
         ${s.step === 'align' ? `<div class="hint tight">The no-glasses frame is laid over at 50%. If the eyes don’t line up: <b>drag</b> it, <b>arrow keys</b> nudge (Shift ×10), <b>+ −</b> resize, <b>, .</b> turn.<br>Moved ${Math.round(a.dx)}, ${Math.round(a.dy)} px · size ${(a.s * 100).toFixed(1)}% · ${a.r.toFixed(2)}°</div>
           <div class="btn-row pad-x"><button class="btn sm" data-rt="reset">Reset alignment</button><button class="btn sm primary" data-rt="to-brush">Looks good <kbd>Enter</kbd></button></div>`
         : `<div class="slider-row"><span>Brush</span><input type="range" min="4" max="${Math.max(60, Math.round(s.ed))}" value="${this.brush.size}" data-rt-size><b id="rtSizeVal">${this.brush.size} px</b></div>
+          <div class="slider-row" title="How gradually the brush fades at its edge. Shift+[ softer, Shift+] harder"><span>Softness</span><input type="range" min="0" max="100" value="${this.brush.soft}" data-rt-soft><b id="rtSoftVal">${this.brush.soft}%</b></div>
           <div class="pad">${segHTML('rtMode', this.brush.erase ? 'erase' : 'reveal', [['reveal', 'Reveal'], ['erase', 'Erase <kbd>X</kbd>']])}</div>
           <div class="btn-row pad-x"><button class="btn sm" data-rt="auto">Paint eyes for me <kbd>M</kbd></button><button class="btn sm" data-rt="clear">Clear</button><button class="btn sm" data-rt="undo">Undo</button></div>
-          <div class="hint tight"><kbd>[</kbd> <kbd>]</kbd> brush size · mouse wheel or <kbd>+</kbd> <kbd>−</kbd> zoom · hold <kbd>Space</kbd> and drag to move around · <kbd>0</kbd> fit · <kbd>\\</kbd> before/after</div>`}`);
+          <div class="hint tight"><kbd>[</kbd> <kbd>]</kbd> brush size · <kbd>Shift</kbd>+<kbd>[</kbd> <kbd>]</kbd> softness · mouse wheel or <kbd>+</kbd> <kbd>−</kbd> zoom · hold <kbd>Space</kbd> and drag to move around · <kbd>0</kbd> fit · <kbd>\\</kbd> before/after</div>`}`);
       html += sectionHTML('rt-opts', 'Options', `${switchHTML('rtMatch', this.match, 'Match brightness and colour', 'Evens out small exposure and colour differences between the two frames')}`);
       html += `<div class="pad"><button class="btn primary wide" data-rt="save" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Saving…' : s.step === 'align' ? 'Next: brush in  ⏎' : (edited ? 'Save changes  ⏎' : 'Save retouch  ⏎')}</button></div>`;
     }
@@ -3384,7 +3391,7 @@ const Ret = {
     const zpct = this._L ? Math.round(this._L.k * 100) : 100;
     mb.innerHTML = `<button class="toggle ${this.showBefore ? 'on' : ''}" data-rt="before" title="Before / after (\\)">Before / after <kbd>\\</kbd></button>
       <span class="rt-zoom"><button class="btn sm" data-rt="zoom-out" title="Zoom out">−</button><b>${zpct}%</b><button class="btn sm" data-rt="zoom-in" title="Zoom in (mouse wheel)">+</button><button class="btn sm" data-rt="fit" title="Fit (0)">Fit</button><button class="btn sm" data-rt="px" title="Actual pixels (1)">1:1</button></span>
-      <span class="hint-keys">${!s || !s.tImg ? '' : s.step === 'align' ? 'drag or ← ↑ → ↓ nudge · + − size · , . turn · wheel zoom · Space-drag pan · Enter next' : 'wheel or + − zoom · Space-drag pan · [ ] brush · X erase · M paint eyes · Ctrl+Z undo · Enter save'}</span>`;
+      <span class="hint-keys">${!s || !s.tImg ? '' : s.step === 'align' ? 'drag or ← ↑ → ↓ nudge · + − size · , . turn · wheel zoom · Space-drag pan · Enter next' : 'wheel or + − zoom · Space-drag pan · [ ] brush · Shift+[ ] softness · X erase · M paint eyes · Ctrl+Z undo · Enter save'}</span>`;
   },
   key(e, k) {
     const s = this.s, ready = s && s.tImg;
@@ -3407,6 +3414,8 @@ const Ret = {
     }
     if (e.key === '+' || e.key === '=') { this.zoomView(1.25); return true; }
     if (e.key === '-' || e.key === '_') { this.zoomView(0.8); return true; }
+    if (e.key === '{' || (e.key === '[' && e.shiftKey)) { this.setSoft(this.brush.soft + 10); return true; }
+    if (e.key === '}' || (e.key === ']' && e.shiftKey)) { this.setSoft(this.brush.soft - 10); return true; }
     if (e.key === '[') { this.setSize(this.brush.size / 1.15); return true; }
     if (e.key === ']') { this.setSize(this.brush.size * 1.15); return true; }
     if (k === 'x') { this.brush.erase = !this.brush.erase; this.right(); this.draw(); return true; }
