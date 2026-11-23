@@ -667,16 +667,50 @@ _focus_lock = threading.Lock()
 _latest_focus = 0
 
 
+_cfg_sig: dict = {}
+
+
+def _config_sig() -> str | None:
+    """What's in config.yaml, not when it was written: unzipping a new version
+    of the app gives the file a new date, and that alone must not make every
+    saved framing check look out of date."""
+    import hashlib
+    p = paths.config_path()
+    try:
+        m = os.stat(p).st_mtime
+    except OSError:
+        return None
+    if _cfg_sig.get("m") != m:
+        _cfg_sig["m"] = m
+        _cfg_sig["h"] = hashlib.sha1(p.read_bytes()).hexdigest()[:16]
+    return _cfg_sig["h"]
+
+
 def _plan_key(path: str, settings: dict, manual: dict | None) -> str | None:
     import hashlib
     try:
         st = os.stat(path)
-        cfg_m = os.stat(paths.config_path()).st_mtime
     except OSError:
         return None
-    sig = json.dumps([PLAN_VERSION, path, st.st_size, int(st.st_mtime), cfg_m, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual, rotations.get(path, 0)],
+    cfg = _config_sig()
+    if cfg is None:
+        return None
+    sig = json.dumps([PLAN_VERSION, path, st.st_size, int(st.st_mtime), cfg, {k: settings.get(k) for k in _PLAN_SETTINGS}, manual, rotations.get(path, 0)],
                      sort_keys=True, default=str)
     return hashlib.sha1(sig.encode("utf-8")).hexdigest()
+
+
+def plans_known(items: list[tuple[str, dict, dict | None]]) -> dict:
+    """The saved framing checks that are still current, without checking anything new."""
+    out = {}
+    if plan_store is None:
+        return out
+    for path, settings, manual in items:
+        key = _plan_key(path, settings, manual)
+        hit = plan_store.get("plans", key) if key else None
+        if hit:
+            out[path] = hit
+    return out
 
 
 def plan_cached(path: str, settings: dict, manual: dict | None = None, seq: int = 0, focus: bool = False) -> dict:

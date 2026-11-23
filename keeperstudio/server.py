@@ -256,6 +256,15 @@ def r_crop_plan(b):
     return engine.plan_cached(b["path"], settings, b.get("manual"), int(b.get("seq") or 0), bool(b.get("focus")))
 
 
+def r_crop_known(b):
+    """Saved framing checks for a whole folder in one go, so stepping through is instant."""
+    base = engine.merged_settings(catalog.get("settings", "crop"))
+    styles = dict(catalog.entries("styles"))
+    manual = b.get("manual") or {}
+    items = [(p, engine.with_style(base, styles.get(p)), manual.get(p)) for p in b.get("paths") or []]
+    return {"plans": engine.plans_known(items)}
+
+
 def r_crop_analyze(b):
     settings = engine.merged_settings(catalog.get("settings", "crop"))
     return {"job": engine.start_analyze(b["paths"], settings, b.get("manual") or {}, dict(catalog.entries("styles"))).id}
@@ -343,7 +352,7 @@ ROUTES = {
     "/api/dialog": r_dialog,
     "/api/library/open": r_open_folder, "/api/library/info": r_info,
     "/api/reveal": r_reveal, "/api/open-file": r_open_file, "/api/exists": r_exists,
-    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan,
+    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan, "/api/crop/known": r_crop_known,
     "/api/crop/analyze": r_crop_analyze, "/api/crop/export": r_crop_export,
     "/api/crop/default-out": r_crop_default_out, "/api/crop/rotate": r_crop_rotate, "/api/crop/rotations": r_crop_rotations, "/api/crop/tunables": r_tunables,
     "/api/export": r_export, "/api/job/cancel": r_job_cancel,

@@ -2265,14 +2265,32 @@ const Crop = {
     this.result = null; this.plans.clear();
     const saved = S.root ? await DB.get('kv', 'cropout|' + S.root).catch(() => null) : null;
     this.outCustom = !!saved; this.outDir = saved || (S.root ? `${S.root}_out` : '');
+    if (S.module === 'crop') this.loadKnown();
   },
-  enter() { this.render(); this.ensurePlan(); },
+  enter() { this.render(); this.loadKnown(); },
+  // every framing check already saved for this folder, fetched in one go, so
+  // stepping through photos that were checked before never waits
+  async loadKnown() {
+    const paths = S.photos.map(p => p.path).filter(p => !this.plans.has(p));
+    if (paths.length) {
+      const manual = {}; for (const p of paths) { const m = this.manual.get(p); if (m) manual[p] = m; }
+      try {
+        const r = await api('/api/crop/known', { paths, manual });
+        for (const [path, plan] of Object.entries(r.plans || {})) {
+          if (this.plans.has(path)) continue;
+          this.plans.set(path, plan);
+          this.status.set(path, { status: plan.status, label: plan.label, reason: plan.reason, src: 'check' });
+        }
+      } catch {}
+    }
+    if (S.module === 'crop') { renderView(); renderRight(); renderLeft(); schedule(R_CELLS); this.ensurePlan(); }
+  },
   async saveSettings(patch) {
     Object.assign(this.settings, patch);
     try { await api('/api/crop/settings', { settings: this.settings }); } catch (e) { toast(esc(e.message)); }
     this.plans.clear();
     for (const [k, v] of [...this.status]) if (v.src === 'check') this.status.delete(k);
-    renderAll(); this.ensurePlan();
+    renderAll(); this.loadKnown();
   },
   active() { return S.byId.get(S.active) || null; },
   seq: 0,
