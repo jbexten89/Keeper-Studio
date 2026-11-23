@@ -42,7 +42,10 @@ input[type=radio],input[type=checkbox]{accent-color:var(--accent);margin:0}
 #left{grid-area:left}
 #leftGrip{grid-area:left;justify-self:end;width:8px;margin-right:-10px;z-index:6;cursor:ew-resize;border-radius:3px}
 #leftGrip:hover,#leftGrip.drag{background:rgba(46,155,255,.45)}
-#app.no-left #leftGrip{display:none}#right{grid-area:right}#center{grid-area:center}#film{grid-area:film;margin:0 12px}
+#app.no-left #leftGrip{display:none}
+#rightGrip{grid-area:right;justify-self:start;width:8px;margin-left:-10px;z-index:6;cursor:ew-resize;border-radius:3px}
+#rightGrip:hover,#rightGrip.drag{background:rgba(46,155,255,.45)}
+#app.no-right #rightGrip{display:none}#right{grid-area:right}#center{grid-area:center}#film{grid-area:film;margin:0 12px}
 .edge{display:flex;align-items:center;justify-content:center}
 .edge button{background:none;border:0;color:var(--dim);cursor:pointer;font-size:10px;line-height:1;padding:2px 8px;border-radius:3px}
 .edge button:hover{color:var(--accent)}
@@ -547,7 +550,7 @@ kbd{font-size:10px}
     <div id="toolbar"></div>
     <div id="modbar" hidden></div>
   </main>
-  <aside id="right" class="panel"></aside>
+  <div id="rightGrip" class="side-grip" title="Drag to resize · double-click to reset"></div><aside id="right" class="panel"></aside>
   <div class="edge" id="edgeRight"><button data-toggle="right" title="Toggle right panel (Tab)"></button></div>
   <div class="edge" id="edgeBottom"><button data-toggle="film" title="Toggle filmstrip"></button></div>
   <footer id="film"><div class="film-grip" id="filmGrip" title="Drag to resize the filmstrip"></div><label class="film-size" title="Filmstrip size"><span>Size</span><input type="range" id="filmSize" min="84" max="320" step="4"></label><div id="filmBar"></div><div id="filmScroll"><div id="filmInner"></div></div></footer>
@@ -661,6 +664,7 @@ const S = {
   thumbSize: prefs.thumbSize || 190,
   filmH: Math.min(320, Math.max(84, prefs.filmH || 124)),
   leftW: Math.min(520, Math.max(200, prefs.leftW || 240)),
+  rightW: Math.min(560, Math.max(240, prefs.rightW || 280)),
   compare: { select: null, cand: null, side: 'select' },
   surveyIds: [],
   zoom: { mode: 'fit', cx: .5, cy: .5 },
@@ -673,7 +677,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
@@ -1121,7 +1125,7 @@ function exitFs() {
 function applyPanels() {
   const a = $('#app'), P = S.panels;
   a.style.setProperty('--lw', P.left ? S.leftW + 'px' : '0px');
-  a.style.setProperty('--rw', P.right ? '280px' : '0px');
+  a.style.setProperty('--rw', P.right ? S.rightW + 'px' : '0px');
   a.style.setProperty('--th', P.top ? '44px' : '0px');
   a.style.setProperty('--fh', P.film ? S.filmH + 'px' : '0px'); FW = Math.round(S.filmH - 32);
   a.classList.toggle('no-left', !P.left); a.classList.toggle('no-right', !P.right);
@@ -2955,7 +2959,21 @@ function setLeftW(v, save) {
   S.leftW = w; applyPanels(); renderView(); renderFilm();
   if (save) savePrefs();
 }
+function setRightW(v, save) {
+  const w = clamp(Math.round(v), 240, Math.min(560, innerWidth * 0.45)); if (w === S.rightW && !save) return;
+  S.rightW = w; applyPanels(); renderView(); renderFilm();
+  if (save) savePrefs();
+}
+function bindRightSize() {
+  const g = $('#rightGrip'); if (!g) return; let d = null;
+  g.addEventListener('pointerdown', e => { e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('drag'); d = { x: e.clientX, w: S.rightW }; });
+  g.addEventListener('pointermove', e => { if (d) setRightW(d.w - (e.clientX - d.x)); });
+  const end = () => { if (!d) return; d = null; g.classList.remove('drag'); setRightW(S.rightW, true); };
+  g.addEventListener('pointerup', end); g.addEventListener('pointercancel', end);
+  g.addEventListener('dblclick', () => setRightW(280, true));
+}
 function bindLeftSize() {
+  bindRightSize();
   const g = $('#leftGrip'); if (!g) return; let d = null;
   g.addEventListener('pointerdown', e => { e.preventDefault(); g.setPointerCapture(e.pointerId); g.classList.add('drag'); d = { x: e.clientX, w: S.leftW }; });
   g.addEventListener('pointermove', e => { if (d) setLeftW(d.w + (e.clientX - d.x)); });
