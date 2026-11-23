@@ -119,8 +119,10 @@ def capture_time(path: str) -> float:
         return 0.0
 
 
-def collection_members(found: dict[str, bool], times: dict[str, float]) -> list[str]:
-    """Every glasses photo, plus the photo right after it in the same folder (shot without glasses)."""
+def collection_members(found: dict[str, bool], times: dict[str, float], groups: set[str] | None = None) -> list[str]:
+    """Every glasses photo, plus the photo right after it in the same folder (shot without glasses).
+    Group photos (more than one face) are left out altogether."""
+    groups = groups or set()
     by_folder: dict[str, list[str]] = {}
     for p in found:
         by_folder.setdefault(str(Path(p).parent), []).append(p)
@@ -128,9 +130,9 @@ def collection_members(found: dict[str, bool], times: dict[str, float]) -> list[
     for paths in by_folder.values():
         paths.sort(key=lambda p: (times.get(p, 0), Path(p).name.lower()))
         for i, p in enumerate(paths):
-            if found.get(p):
+            if found.get(p) and p not in groups:
                 out.append(p)
-                if i + 1 < len(paths):
+                if i + 1 < len(paths) and paths[i + 1] not in groups:
                     out.append(paths[i + 1])
     seen, res = set(), []
     for p in out:
@@ -142,12 +144,14 @@ def collection_members(found: dict[str, bool], times: dict[str, float]) -> list[
 
 def run(job, paths: list[str], store, detector_factory, load) -> dict:
     """Check every photo (saved answers are reused), then work out the collection."""
-    found, times, todo = {}, {}, []
+    found, times, todo, groups = {}, {}, [], set()
     for p in paths:
         k = _key(p)
         hit = store.get("glasses", k) if (store is not None and k) else None
         if hit:
             found[p], times[p] = bool(hit.get("glasses")), float(hit.get("t", 0))
+            if hit.get("faces", 1) > 1:
+                groups.add(p)
         else:
             todo.append(p)
     job.update(total=len(paths), done=len(paths) - len(todo), message="Looking for glasses…")
@@ -167,12 +171,14 @@ def run(job, paths: list[str], store, detector_factory, load) -> dict:
             r = {"glasses": False, "error": f"{type(exc).__name__}: {exc}"}
         r["t"] = capture_time(p)
         found[p], times[p] = bool(r.get("glasses")), r["t"]
+        if r.get("faces", 1) > 1:
+            groups.add(p)
         k = _key(p)
         if store is not None and k:
             store.put("glasses", k, r)
-        if r.get("glasses"):
+        if r.get("glasses") and p not in groups:
             job.add_item({"path": p, **r})
         job.update(done=len(paths) - len(todo) + i)
-    members = collection_members(found, times)
-    return {"glasses": [p for p, v in found.items() if v], "members": members,
+    members = collection_members(found, times, groups)
+    return {"glasses": [p for p, v in found.items() if v and p not in groups], "members": members, "groups": len(groups),
             "checked": len(paths), "cancelled": job.cancelled}
