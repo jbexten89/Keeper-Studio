@@ -282,6 +282,10 @@ def r_retouch_remove(b):
     return retouch.remove(b["path"])
 
 
+def r_glasses_find(b):
+    return {"job": engine.start_glasses(b.get("paths") or []).id}
+
+
 def r_crop_known(b):
     """Saved framing checks for a whole folder in one go, so stepping through is instant."""
     base = engine.merged_settings(catalog.get("settings", "crop"))
@@ -378,7 +382,7 @@ ROUTES = {
     "/api/dialog": r_dialog,
     "/api/library/open": r_open_folder, "/api/library/info": r_info,
     "/api/reveal": r_reveal, "/api/open-file": r_open_file, "/api/exists": r_exists,
-    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan,
+    "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan, "/api/glasses/find": r_glasses_find,
     "/api/retouch/info": r_retouch_info, "/api/retouch/prepare": r_retouch_prepare,
     "/api/retouch/save": r_retouch_save, "/api/retouch/remove": r_retouch_remove, "/api/retouch/copy": r_retouch_copy, "/api/crop/known": r_crop_known,
     "/api/crop/analyze": r_crop_analyze, "/api/crop/export": r_crop_export,

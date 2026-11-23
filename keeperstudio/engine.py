@@ -1026,6 +1026,18 @@ def composite_order(students: list[str], teachers: list[str], max_per_row: int =
     }
 
 
+def start_glasses(photo_paths: list[str]) -> jobs.Job:
+    """Find photos with glasses (Library: auto Glasses collection)."""
+    from . import glasses
+    jpgs = [p for p in photo_paths if Path(p).suffix.lower() in {".jpg", ".jpeg"}]
+
+    def factory():
+        cfg = config()
+        return detectors.build(cfg.detector["name"], cfg.detector)
+
+    return jobs.start("glasses", lambda job: glasses.run(job, jpgs, plan_store, factory, raw_load), total=len(jpgs))
+
+
 def _src(p: str) -> str:
     from . import retouch
     return retouch.source_path(p)
