@@ -3227,7 +3227,8 @@ const Ret = {
   actualPixels() { const L = this._L || this.layout(); if (L) this.zoomView(1 / L.fit / this.view.z); },
   drawDonor(ctx, s) {
     const a = s.adj, cx = s.w / 2, cy = s.h / 2;
-    ctx.save(); ctx.translate(cx + a.dx, cy + a.dy); ctx.rotate(a.r * Math.PI / 180); ctx.scale(a.s, a.s); ctx.translate(-cx, -cy);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, 0, s.w, s.h); ctx.clip();  // keep the overlay inside the eye area
+    ctx.translate(cx + a.dx, cy + a.dy); ctx.rotate(a.r * Math.PI / 180); ctx.scale(a.s, a.s); ctx.translate(-cx, -cy);
     ctx.drawImage(s.dImg, -s.pad, -s.pad); ctx.restore();
   },
   draw() {
