@@ -1900,7 +1900,8 @@ function openExport() {
       <label class="radio"><input type="radio" name="xImg" value="resize"> Resized JPEG</label>
       <div class="sub" id="xResize" hidden>Long edge <input type="number" id="xEdge" value="2048" min="200" max="12000" step="1"> px
         <span style="margin-left:8px">Quality</span> <input type="range" id="xQ" min="40" max="100" value="85"> <span id="xQv">85</span></div>
-      <label class="radio"><input type="radio" name="xImg" value="none"> No photos — just the CSV list</label></div>
+      <label class="radio"><input type="radio" name="xImg" value="none"> No photos — just the CSV list</label>
+      ${Object.keys(Ret.info.edits).length ? `<label class="check" id="xRetWrap" title="Photos fixed in Retouch go out with the clear eyes, under their normal file names"><input type="checkbox" id="xRet" checked> Use retouched versions <em>(${Object.keys(Ret.info.edits).length} in this folder)</em></label>` : ''}</div>
     <div class="fld" id="xNameFld"><span>File names</span>
       <select id="xName"><option value="orig">Original filename</option><option value="seq">{collection}_{sequence}</option></select>
       <div class="muted small" id="xNamePrev"></div></div>
@@ -1911,7 +1912,7 @@ function openExport() {
       src: $('input[name=xSrc]:checked', card).value, coll: $('#xColl', card).value,
       img: $('input[name=xImg]:checked', card).value, resize: $('input[name=xImg]:checked', card).value === 'resize',
       edge: clamp(+$('#xEdge', card).value || 2048, 200, 12000), q: +$('#xQ', card).value,
-      naming: $('#xName', card).value, csv: $('#xCsv', card).checked || $('input[name=xImg]:checked', card).value === 'none',
+      naming: $('#xName', card).value, retouched: !$('#xRet', card) || $('#xRet', card).checked, csv: $('#xCsv', card).checked || $('input[name=xImg]:checked', card).value === 'none',
     });
     const sync = () => {
       const o = opts(); const list = exportList(o);
@@ -1943,7 +1944,7 @@ async function runExport(o, card, dest) {
   $$('input,select', card).forEach(i => i.disabled = true); $('#xDestBtn', card).disabled = true;
   $('[data-ok]', card).hidden = true;
   let job;
-  try { job = (await api('/api/export', { items, dest, opts: { resize: o.resize, edge: o.edge, quality: o.q, csv, csv_name: `${sanitize(base) || 'Export'}_list.csv` } })).job; }
+  try { job = (await api('/api/export', { items, dest, opts: { resize: o.resize, edge: o.edge, quality: o.q, retouched: o.retouched, csv, csv_name: `${sanitize(base) || 'Export'}_list.csv` } })).job; }
   catch (e) { closeModal(); return toast('Export failed: ' + esc(e.message)); }
   S.exporting = { id: job };
   const cancelBtn = $('#xCancel', card); cancelBtn.textContent = 'Cancel export'; cancelBtn.removeAttribute('data-close');
@@ -3045,7 +3046,7 @@ function bindModuleEvents() {
     const rt = t.closest('[data-rt]');
     if (rt) {
       const a = rt.dataset.rt;
-      if (a === 'save') Ret.save(); else if (a === 'remove') Ret.remove(); else if (a === 'auto') Ret.autoMask();
+      if (a === 'save') Ret.save(); else if (a === 'remove') Ret.remove(); else if (a === 'show') Ret.showFile(); else if (a === 'copy') Ret.saveCopy(); else if (a === 'auto') Ret.autoMask();
       else if (a === 'clear') Ret.clearMask(); else if (a === 'undo') Ret.undoMask(); else if (a === 'reset') Ret.resetAlign();
       else if (a === 'to-brush') Ret.setStep('brush'); else if (a === 'donor-prev') Ret.stepDonor(-1); else if (a === 'donor-next') Ret.stepDonor(1);
       else if (a === 'before') { Ret.showBefore = !Ret.showBefore; Ret.draw(); Ret.modbar(); }
@@ -3341,6 +3342,14 @@ const Ret = {
     } catch (e) { toast('Couldn’t save: ' + esc(e.message), 6000); }
     this.busy = false; renderAll();
   },
+  showFile() { const e = this.info.edits[(this.active() || {}).path]; if (e) reveal(e.file); },
+  async saveCopy() {
+    const p = this.active(), e = p && this.info.edits[p.path]; if (!e) return;
+    const stem = p.name.replace(/\.[^.]+$/, '');
+    const dest = await pickPath('save', { initial: S.root || '', filename: `${stem}_retouched.jpg` }); if (!dest) return;
+    try { const r = await api('/api/retouch/copy', { path: p.path, dest }); toast(`Saved ${esc(baseName(r.saved))} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.saved))})">Show</button>`, 5000); }
+    catch (err) { toast('Couldn’t save the copy: ' + esc(err.message), 6000); }
+  },
   async remove() {
     const p = this.active(); if (!p || !this.isEdited(p.path)) return;
     try { await api('/api/retouch/remove', { path: p.path }); } catch (e) { return toast(esc(e.message)); }
@@ -3369,7 +3378,7 @@ const Ret = {
     const dn = s && s.donor ? S.byPath.get(s.donor) : null;
     let html = sectionHTML('rt-status', 'This photo', `<div class="status-card ${edited ? 'ok' : 'none'}"><div class="sc-head"><span class="st-dot ${edited ? 'ok' : 'none'}"></span><b>${edited ? 'Retouched' : this.isDonor(p.path) ? 'Eye donor' : 'Not retouched'}</b></div>
       <div class="sc-label">${edited ? 'Previews and exports use the retouched copy.' : this.isDonor(p.path) ? 'Its eyes were used for another photo; it’s left out of prints.' : 'Line up and brush in the clear eyes, then press Enter.'}</div>
-      ${edited ? '<div class="btn-row"><button class="btn sm" data-rt="remove">Remove retouch</button></div>' : ''}</div>`);
+      ${edited ? '<div class="btn-row"><button class="btn sm" data-rt="show" title="Open its folder in File Explorer">Show file</button><button class="btn sm" data-rt="copy" title="Save a copy of the retouched JPG somewhere else">Save a copy as…</button><button class="btn sm" data-rt="remove">Remove retouch</button></div>' : ''}</div>`);
     html += sectionHTML('rt-donor', 'Frame without glasses', dn ? `<div class="rt-donor"><img src="${thumbUrl(dn.path)}" alt=""><div><b>${esc(dn.name)}</b><div class="btn-row"><button class="btn sm" data-rt="donor-prev" title="Use the previous photo">◀</button><button class="btn sm" data-rt="donor-next" title="Use the next photo">▶</button></div></div></div>
       ${s && s.tImg && !s.found ? '<div class="miss-note">The face wasn’t found in one of the frames, so line them up by hand: drag the overlay, arrow keys to nudge, + − to resize, , . to turn.</div>' : ''}` : '<div class="hint">—</div>');
     if (s && s.tImg) {

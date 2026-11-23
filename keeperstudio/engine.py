@@ -985,6 +985,8 @@ def start_library_export(items: list[dict], dest: str, opts: dict) -> jobs.Job:
             if job.cancelled:
                 break
             src, name = Path(it["path"]), it["name"]
+            if opts.get("retouched", True):
+                src = Path(_src(str(src)))  # the retouched copy (Retouch tab) when there is one
             job.update(current=src.name)
             try:
                 target = out / name

@@ -274,6 +274,10 @@ def r_retouch_save(b):
     return retouch.save(b["path"], b["id"], b.get("adjust") or {}, b["mask"], bool(b.get("match", True)), engine.raw_load)
 
 
+def r_retouch_copy(b):
+    return retouch.save_copy(b["path"], b["dest"])
+
+
 def r_retouch_remove(b):
     return retouch.remove(b["path"])
 
@@ -376,7 +380,7 @@ ROUTES = {
     "/api/reveal": r_reveal, "/api/open-file": r_open_file, "/api/exists": r_exists,
     "/api/crop/settings": r_crop_settings, "/api/crop/plan": r_crop_plan,
     "/api/retouch/info": r_retouch_info, "/api/retouch/prepare": r_retouch_prepare,
-    "/api/retouch/save": r_retouch_save, "/api/retouch/remove": r_retouch_remove, "/api/crop/known": r_crop_known,
+    "/api/retouch/save": r_retouch_save, "/api/retouch/remove": r_retouch_remove, "/api/retouch/copy": r_retouch_copy, "/api/crop/known": r_crop_known,
     "/api/crop/analyze": r_crop_analyze, "/api/crop/export": r_crop_export,
     "/api/crop/default-out": r_crop_default_out, "/api/crop/rotate": r_crop_rotate, "/api/crop/rotations": r_crop_rotations, "/api/crop/tunables": r_tunables,
     "/api/export": r_export, "/api/job/cancel": r_job_cancel,

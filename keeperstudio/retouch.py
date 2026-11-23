@@ -64,7 +64,7 @@ def info(paths: list[str]) -> dict:
             meta = json.loads(side_file(p).read_text(encoding="utf-8"))
         except Exception:
             pass
-        edits[p] = {"mtime": int(e.stat().st_mtime), "donor": meta.get("donor")}
+        edits[p] = {"mtime": int(e.stat().st_mtime), "donor": meta.get("donor"), "file": str(e)}
         if meta.get("donor"):
             donors[meta["donor"]] = p
     return {"edits": edits, "donors": donors}
@@ -258,6 +258,22 @@ def save(path: str, sid: str, adjust: dict, mask_png: str, match: bool, raw_load
         "original": Path(path).name, "saved": time.strftime("%Y-%m-%d %H:%M:%S"),
     }, indent=2), encoding="utf-8")
     return {"edited": str(dest)}
+
+
+def save_copy(path: str, dest: str) -> dict:
+    """A copy of the retouched JPG somewhere the user chose."""
+    import shutil
+    src = edit_file(path)
+    if not src.is_file():
+        raise FileNotFoundError("this photo hasn't been retouched")
+    d = Path(dest)
+    if d.suffix.lower() not in (".jpg", ".jpeg"):
+        d = d.with_suffix(".jpg")
+    if d.resolve() == Path(path).resolve():
+        raise ValueError("that would replace the camera file - choose another name")
+    d.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, d)
+    return {"saved": str(d)}
 
 
 def remove(path: str) -> dict:
