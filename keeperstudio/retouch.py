@@ -85,15 +85,21 @@ def _similarity(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
 
 
 def _adjust(adj: dict, w: int, h: int) -> np.ndarray:
-    """The user's nudge: scale and rotate about the region centre, then shift."""
+    """The user's free transform of the no-glasses frame, about the region centre:
+    stretch (width sx, height sy) along the layer's own axes, rotate, then shift.
+    (An older single `s` is a uniform size and multiplies both.)"""
     s = float(adj.get("s", 1) or 1)
+    sx = s * float(adj.get("sx", 1) or 1)
+    sy = s * float(adj.get("sy", 1) or 1)
     r = math.radians(float(adj.get("r", 0) or 0))
     dx, dy = float(adj.get("dx", 0) or 0), float(adj.get("dy", 0) or 0)
     cx, cy = w / 2, h / 2
-    c, sn = math.cos(r) * s, math.sin(r) * s
-    return np.array([[c, -sn, cx - c * cx + sn * cy + dx],
-                     [sn, c, cy - sn * cx - c * cy + dy],
-                     [0, 0, 1.0]])
+    c, sn = math.cos(r), math.sin(r)
+    rs = np.array([[c * sx, -sn * sy], [sn * sx, c * sy]])   # rotate . stretch
+    m = np.eye(3)
+    m[:2, :2] = rs
+    m[:2, 2] = np.array([cx + dx, cy + dy]) - rs @ np.array([cx, cy])
+    return m
 
 
 def _warp(img: Image.Image, donor_to_out: np.ndarray, size: tuple[int, int]) -> Image.Image:
