@@ -529,8 +529,8 @@ kbd{font-size:10px}
 /* Framing card keeps one height, so the size list below never moves while stepping through photos */
 #right .sec[data-sec=c-status]:not(.closed) > .body{height:198px;overflow-y:auto;scrollbar-width:thin}
 /* ---- Retouch ---- */
-.rt-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
-.rt-stage canvas{box-shadow:0 6px 30px rgba(0,0,0,.6);cursor:crosshair;touch-action:none;image-rendering:auto}
+.rt-stage{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.rt-stage canvas{position:absolute;inset:0;touch-action:none}
 .rt-msg{color:var(--muted);font-size:14px}
 .rt-tag{position:absolute;bottom:5px;right:5px;z-index:2;padding:0 5px;border-radius:4px;background:#3CC7A0;color:#06140F;font-size:10.5px;font-weight:700;line-height:15px}
 .rt-tag.donor{background:#2A2E36;color:#C9CED6}
@@ -540,6 +540,9 @@ kbd{font-size:10px}
 .rt-donor b{display:block;font-size:12.5px;margin-bottom:6px;word-break:break-all}
 .rt-row{display:flex;align-items:center;gap:8px;padding:3px 12px;cursor:pointer;font-size:12.5px}
 .rt-row:hover{background:rgba(255,255,255,.04)}
+.rt-zoom{display:flex;align-items:center;gap:4px;margin:0 10px}
+.rt-zoom b{min-width:48px;text-align:center;font-size:12px;font-weight:600;color:var(--muted)}
+.rt-zoom .btn{padding:2px 8px}
 </style>
 </head>
 <body>
@@ -3046,6 +3049,8 @@ function bindModuleEvents() {
       else if (a === 'clear') Ret.clearMask(); else if (a === 'undo') Ret.undoMask(); else if (a === 'reset') Ret.resetAlign();
       else if (a === 'to-brush') Ret.setStep('brush'); else if (a === 'donor-prev') Ret.stepDonor(-1); else if (a === 'donor-next') Ret.stepDonor(1);
       else if (a === 'before') { Ret.showBefore = !Ret.showBefore; Ret.draw(); Ret.modbar(); }
+      else if (a === 'zoom-in') Ret.zoomView(1.25); else if (a === 'zoom-out') Ret.zoomView(0.8);
+      else if (a === 'fit') Ret.fitView(); else if (a === 'px') Ret.actualPixels();
       return;
     }
     const rg = t.closest('[data-rt-go]'); if (rg) { const id = +rg.dataset.rtGo; S.active = id; S.selected = new Set([id]); S.anchor = id; refreshSelection(); ensureVisible(); return; }
@@ -3130,6 +3135,7 @@ const Ret = {
   work: new Map(),          // path -> unsaved session state, so stepping away keeps your brushing
   s: null,                  // the session on screen
   busy: false, showBefore: false, match: true,
+  view: { z: 1, px: 0, py: 0 },   // zoom (1 = eye area fits the window) and pan, in screen px
   brush: { size: 0, erase: false },
   isDonor(path) { return !!this.info.donors[path]; },
   isEdited(path) { return !!this.info.edits[path]; },
@@ -3171,6 +3177,7 @@ const Ret = {
       tImg, dImg, mask, undo: [], adj: r.adjust || { dx: 0, dy: 0, s: 1, r: 0 }, step: r.mask ? 'brush' : 'align', dirty: false };
     if (r.mask) { const im = await new Promise(ok => { const i = new Image(); i.onload = () => ok(i); i.src = r.mask; }); mask.getContext('2d').drawImage(im, 0, 0); }
     if (!this.brush.size) this.brush.size = Math.round(r.ed * 0.22);
+    this.view = { z: 1, px: 0, py: 0 };
     this.work.set(p.path, s); this.s = s; this.render();
   },
   stepDonor(dir) {
@@ -3195,14 +3202,29 @@ const Ret = {
   },
   layout() {
     const s = this.s, st = $('#rtStage'), cv = $('#rtCanvas'); if (!s || !s.tImg || !st) return null;
-    const sw = st.clientWidth - 40, sh = st.clientHeight - 40;
-    const k = Math.max(0.05, Math.min(sw / s.w, sh / s.h));
-    const dpr = window.devicePixelRatio || 1;
-    const W = Math.round(s.w * k), H = Math.round(s.h * k);
+    const W = st.clientWidth, H = st.clientHeight, dpr = window.devicePixelRatio || 1;
+    const fit = Math.max(0.05, Math.min((W - 40) / s.w, (H - 40) / s.h));
+    const v = this.view, K = fit * v.z;
+    const ox = (W - s.w * K) / 2 + v.px, oy = (H - s.h * K) / 2 + v.py;
     if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
-    return { k, dpr };
+    return this._L = { k: K, fit, ox, oy, dpr, W, H };
   },
+  // zoom about a screen point (default: the centre)
+  zoomView(f, sx, sy) {
+    const L = this._L || this.layout(); if (!L) return;
+    const z = clamp(this.view.z * f, Math.min(1, 1 / L.fit), 24); if (Math.abs(z - this.view.z) < 1e-6) return;
+    if (sx == null) { sx = L.W / 2; sy = L.H / 2; }
+    const rx = (sx - L.ox) / L.k, ry = (sy - L.oy) / L.k;          // region point under the cursor stays put
+    this.view.z = z;
+    const K = L.fit * z;
+    this.view.px = sx - rx * K - (L.W - this.s.w * K) / 2;
+    this.view.py = sy - ry * K - (L.H - this.s.h * K) / 2;
+    if (z <= 1) { this.view.px = this.view.py = 0; }
+    this.draw(); this.modbar();
+  },
+  fitView() { this.view = { z: 1, px: 0, py: 0 }; this.draw(); this.modbar(); },
+  actualPixels() { const L = this._L || this.layout(); if (L) this.zoomView(1 / L.fit / this.view.z); },
   drawDonor(ctx, s) {
     const a = s.adj, cx = s.w / 2, cy = s.h / 2;
     ctx.save(); ctx.translate(cx + a.dx, cy + a.dy); ctx.rotate(a.r * Math.PI / 180); ctx.scale(a.s, a.s); ctx.translate(-cx, -cy);
@@ -3215,9 +3237,12 @@ const Ret = {
     msg.hidden = !msg.textContent; cv.hidden = !(s && s.tImg);
     if (!s || !s.tImg) return;
     const L = this.layout(); if (!L) return;
-    cv.style.cursor = this.showBefore ? 'default' : s.step === 'brush' ? 'none' : 'move';
-    const ctx = cv.getContext('2d'); ctx.setTransform(L.k * L.dpr, 0, 0, L.k * L.dpr, 0, 0);
-    ctx.clearRect(0, 0, s.w, s.h); ctx.drawImage(s.tImg, 0, 0);
+    cv.style.cursor = this.panning || this.space ? (this.panning ? 'grabbing' : 'grab') : this.showBefore ? 'default' : s.step === 'brush' ? 'none' : 'move';
+    const ctx = cv.getContext('2d');
+    ctx.setTransform(L.dpr, 0, 0, L.dpr, 0, 0); ctx.clearRect(0, 0, L.W, L.H);
+    ctx.setTransform(L.k * L.dpr, 0, 0, L.k * L.dpr, L.ox * L.dpr, L.oy * L.dpr);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(s.tImg, 0, 0);
     if (this.showBefore) return;
     if (s.step === 'align') { ctx.globalAlpha = 0.5; this.drawDonor(ctx, s); ctx.globalAlpha = 1; return; }
     // brush: the clear eyes, through the mask
@@ -3225,13 +3250,13 @@ const Ret = {
     c.width = s.w; c.height = s.h; const cx = c.getContext('2d');
     this.drawDonor(cx, s); cx.globalCompositeOperation = 'destination-in'; cx.drawImage(s.mask, 0, 0); cx.globalCompositeOperation = 'source-over';
     ctx.drawImage(c, 0, 0);
-    if (this.cursor) {
+    if (this.cursor && !this.space && !this.panning) {
       ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2, 0, Math.PI * 2);
       ctx.lineWidth = 1.5 / L.k; ctx.strokeStyle = this.brush.erase ? '#E3A04F' : '#fff'; ctx.stroke();
       ctx.lineWidth = 1 / L.k; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(this.cursor.x, this.cursor.y, this.brush.size / 2 + 1.5 / L.k, 0, Math.PI * 2); ctx.stroke();
     }
   },
-  toRegion(e) { const cv = $('#rtCanvas'), r = cv.getBoundingClientRect(), s = this.s; return { x: (e.clientX - r.left) / r.width * s.w, y: (e.clientY - r.top) / r.height * s.h }; },
+  toRegion(e) { const cv = $('#rtCanvas'), r = cv.getBoundingClientRect(), L = this._L; return { x: (e.clientX - r.left - L.ox) / L.k, y: (e.clientY - r.top - L.oy) / L.k }; },
   stamp(x, y) {
     const s = this.s, m = s.mask.getContext('2d'), rad = this.brush.size / 2;
     const g = m.createRadialGradient(x, y, 0, x, y, rad);
@@ -3243,14 +3268,19 @@ const Ret = {
   undoMask() { const s = this.s; if (!s || !s.undo.length) return toast('Nothing to undo'); s.mask.getContext('2d').putImageData(s.undo.pop(), 0, 0); s.dirty = true; this.draw(); },
   bindCanvas() {
     const cv = $('#rtCanvas'); let last = null, drag = null;
+    let pan = null;
+    cv.addEventListener('contextmenu', e => e.preventDefault());
     cv.addEventListener('pointerdown', e => {
       const s = this.s; if (!s || !s.tImg) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+      if (this.space || e.button === 1 || e.button === 2) { pan = { x: e.clientX, y: e.clientY, px: this.view.px, py: this.view.py }; this.panning = true; this.draw(); return; }
       const pt = this.toRegion(e);
       if (s.step === 'align') { drag = { x: pt.x, y: pt.y, dx: s.adj.dx, dy: s.adj.dy }; return; }
       this.pushUndo(); this.stamp(pt.x, pt.y); last = pt; s.dirty = true; this.draw();
     });
     cv.addEventListener('pointermove', e => {
-      const s = this.s; if (!s || !s.tImg) return; const pt = this.toRegion(e);
+      const s = this.s; if (!s || !s.tImg) return;
+      if (pan) { this.view.px = pan.px + e.clientX - pan.x; this.view.py = pan.py + e.clientY - pan.y; this.draw(); return; }
+      const pt = this.toRegion(e);
       if (s.step === 'align') { if (drag) { s.adj.dx = drag.dx + pt.x - drag.x; s.adj.dy = drag.dy + pt.y - drag.y; s.dirty = true; this.draw(); } return; }
       this.cursor = pt;
       if (last) {  // stamps along the stroke, close enough to look continuous
@@ -3260,10 +3290,17 @@ const Ret = {
       }
       this.draw();
     });
-    const end = () => { last = null; drag = null; };
+    const end = () => { last = null; drag = null; if (pan) { pan = null; this.panning = false; this.draw(); } };
     cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
     cv.addEventListener('pointerleave', () => { this.cursor = null; this.draw(); });
-    cv.addEventListener('wheel', e => { if (this.s && this.s.step === 'brush') { e.preventDefault(); this.setSize(this.brush.size * (e.deltaY < 0 ? 1.1 : 0.9)); } }, { passive: false });
+    cv.addEventListener('wheel', e => {
+      if (!this.s || !this.s.tImg) return; e.preventDefault();
+      const r = cv.getBoundingClientRect();
+      this.zoomView(Math.pow(1.0015, -e.deltaY), e.clientX - r.left, e.clientY - r.top);
+      this.cursor = this.toRegion(e); this.draw();
+    }, { passive: false });
+    // Space held = hand tool
+    window.addEventListener('keyup', e => { if (e.key === ' ' && this.space) { this.space = false; this.draw(); } });
   },
   setSize(v) { this.brush.size = clamp(Math.round(v), 4, 600); this.draw(); const r = $('[data-rt-size]'); if (r) r.value = this.brush.size; const b = $('#rtSizeVal'); if (b) b.textContent = this.brush.size + ' px'; },
   autoMask() {
@@ -3336,7 +3373,7 @@ const Ret = {
         : `<div class="slider-row"><span>Brush</span><input type="range" min="4" max="${Math.max(60, Math.round(s.ed))}" value="${this.brush.size}" data-rt-size><b id="rtSizeVal">${this.brush.size} px</b></div>
           <div class="pad">${segHTML('rtMode', this.brush.erase ? 'erase' : 'reveal', [['reveal', 'Reveal'], ['erase', 'Erase <kbd>X</kbd>']])}</div>
           <div class="btn-row pad-x"><button class="btn sm" data-rt="auto">Paint eyes for me <kbd>M</kbd></button><button class="btn sm" data-rt="clear">Clear</button><button class="btn sm" data-rt="undo">Undo</button></div>
-          <div class="hint tight"><kbd>[</kbd> <kbd>]</kbd> or the mouse wheel size the brush · <kbd>\\</kbd> before/after</div>`}`);
+          <div class="hint tight"><kbd>[</kbd> <kbd>]</kbd> brush size · mouse wheel or <kbd>+</kbd> <kbd>−</kbd> zoom · hold <kbd>Space</kbd> and drag to move around · <kbd>0</kbd> fit · <kbd>\\</kbd> before/after</div>`}`);
       html += sectionHTML('rt-opts', 'Options', `${switchHTML('rtMatch', this.match, 'Match brightness and colour', 'Evens out small exposure and colour differences between the two frames')}`);
       html += `<div class="pad"><button class="btn primary wide" data-rt="save" ${this.busy ? 'disabled' : ''}>${this.busy ? 'Saving…' : s.step === 'align' ? 'Next: brush in  ⏎' : (edited ? 'Save changes  ⏎' : 'Save retouch  ⏎')}</button></div>`;
     }
@@ -3344,14 +3381,19 @@ const Ret = {
   },
   modbar() {
     const s = this.s, mb = $('#modbar'); if (!mb || S.module !== 'retouch') return;
+    const zpct = this._L ? Math.round(this._L.k * 100) : 100;
     mb.innerHTML = `<button class="toggle ${this.showBefore ? 'on' : ''}" data-rt="before" title="Before / after (\\)">Before / after <kbd>\\</kbd></button>
-      <span class="hint-keys">${!s || !s.tImg ? '' : s.step === 'align' ? 'drag or ← ↑ → ↓ nudge · + − size · , . turn · Enter next' : '[ ] brush size · X erase · M paint eyes · Ctrl+Z undo · Enter save · A back to line up'}</span>`;
+      <span class="rt-zoom"><button class="btn sm" data-rt="zoom-out" title="Zoom out">−</button><b>${zpct}%</b><button class="btn sm" data-rt="zoom-in" title="Zoom in (mouse wheel)">+</button><button class="btn sm" data-rt="fit" title="Fit (0)">Fit</button><button class="btn sm" data-rt="px" title="Actual pixels (1)">1:1</button></span>
+      <span class="hint-keys">${!s || !s.tImg ? '' : s.step === 'align' ? 'drag or ← ↑ → ↓ nudge · + − size · , . turn · wheel zoom · Space-drag pan · Enter next' : 'wheel or + − zoom · Space-drag pan · [ ] brush · X erase · M paint eyes · Ctrl+Z undo · Enter save'}</span>`;
   },
   key(e, k) {
     const s = this.s, ready = s && s.tImg;
     if (e.ctrlKey || e.metaKey) { if (k === 'z' && ready) { this.undoMask(); return true; } return false; }
     if (e.key === '\\') { this.showBefore = !this.showBefore; this.draw(); this.modbar(); return true; }
     if (!ready) return false;
+    if (e.key === ' ') { if (!this.space) { this.space = true; this.draw(); } return true; }
+    if (e.key === '0') { this.fitView(); return true; }
+    if (e.key === '1') { this.actualPixels(); return true; }
     if (e.key === 'Enter') { this.save(); return true; }
     if (s.step === 'align') {
       const mv = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
@@ -3363,6 +3405,8 @@ const Ret = {
       if (k === 'm') { this.autoMask(); return true; }
       return false;
     }
+    if (e.key === '+' || e.key === '=') { this.zoomView(1.25); return true; }
+    if (e.key === '-' || e.key === '_') { this.zoomView(0.8); return true; }
     if (e.key === '[') { this.setSize(this.brush.size / 1.15); return true; }
     if (e.key === ']') { this.setSize(this.brush.size * 1.15); return true; }
     if (k === 'x') { this.brush.erase = !this.brush.erase; this.right(); this.draw(); return true; }
