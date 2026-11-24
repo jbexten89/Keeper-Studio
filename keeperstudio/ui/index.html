@@ -3076,9 +3076,9 @@ const Ord = {
   },
   // ---------- envelopes <-> filmstrip ----------
   usedStems() { return new Set((this.d ? this.d.orders : []).flatMap(o => [o.image, o.edited]).filter(Boolean).map(n => stemOf(n).toLowerCase())); },
-  orderForPhoto(p) {
+  ordersForPhoto(p) {
     const st = stemOf(p.name).toLowerCase();
-    return this.d ? this.d.orders.find(o => [o.edited, o.image].some(n => n && stemOf(n).toLowerCase() === st)) : null;
+    return this.d ? this.d.orders.filter(o => [o.edited, o.image].some(n => n && stemOf(n).toLowerCase() === st)) : [];
   },
   // Put a photo in front in the filmstrip without touching the envelope.
   showPhoto(stem) {
@@ -3100,8 +3100,20 @@ const Ord = {
   async photoClicked(id) {
     if (S.module === 'orders' && this.pickingTeam != null) return this.finishTeamPick(id);
     if (S.module !== 'orders' || this.view !== 'orders' || this.multi.size > 1) return;
-    const p = S.byId.get(id), o = p && this.orderForPhoto(p);
-    if (o && o.id !== this.sel) this.select(o.id);
+    const p = S.byId.get(id); if (!p) return;
+    const d = this.draft, st = stemOf(p.name);
+    // An envelope still waiting for its photo (a new one, or one showing the
+    // auto-picked photo) takes the clicked photo, even one another envelope
+    // already uses: the same kid can have two envelopes.
+    if (d && (this.autoPhoto || !(d.image || d.edited)) && !getMeta(p.key).team) {
+      if (stemOf(d.image || '').toLowerCase() !== st.toLowerCase()) { d.image = st; d.edited = ''; this.changed(true); }
+      return;
+    }
+    // Otherwise open the envelope that uses this photo; with two, each click goes to the next.
+    const os = this.ordersForPhoto(p); if (!os.length) return;
+    const i = os.findIndex(o => o.id === this.sel);
+    const o = os[(i + 1) % os.length];
+    if (o.id !== this.sel) this.select(o.id);
   },
   picksOnly() { return S.filter.flag === 'pick'; },
   setPicksOnly(on) { S.filter = { ...S.filter, flag: on ? 'pick' : 'any' }; syncFilterBar(); afterFilter(); this.modbar(); },
@@ -3426,7 +3438,7 @@ const Ord = {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
     return `<div class="photo-row"><div class="thumb ${ph ? '' : 'none'}" ${ph ? `style="background-image:url(&quot;${esc(thumbUrl(ph.path, 200))}&quot;)" title="${esc(ph.name)}"` : ''}>${ph ? '' : stem ? 'not in the<br>open folder' : 'no photo'}</div>
       <div class="col"><label class="fld" style="margin:0"><span>Photo to print</span><input data-of="image" list="ordFrames" value="${esc(d.image)}" placeholder="5371 or IMG_5371" spellcheck="false"></label>
-      ${this.autoPhoto && !d.id ? '<div class="muted small">Next photo in the filmstrip. Not them? Click the right photo, then Use.</div>' : ''}
+      ${this.autoPhoto && !d.id ? '<div class="muted small">Next photo in the filmstrip. Not them? Click the right photo.</div>' : ''}
       <div class="btn-row" style="margin:0">${act && stemOf(act.name) !== stemOf(d.image) ? `<button class="btn sm" data-ord="use-photo" title="Use the photo selected in the filmstrip">Use ${esc(stemOf(act.name))}</button>` : `<span class="muted small">${S.photos.length ? 'Click a photo in the filmstrip to use it' : 'Open the shoot’s folder to pick from the filmstrip'}</span>`}</div></div></div>
       <div class="of-grid"><label class="fld"><span>Frames shot</span><input data-of="frames" value="${esc(d.frames)}" placeholder="5370-5372" spellcheck="false"></label><label class="fld"><span>Retouched file</span><input data-of="edited" value="${esc(d.edited)}" placeholder="if renamed" spellcheck="false"></label></div>
       <div class="pad-x" style="padding-bottom:10px">${switchHTML('glasses', !!d.glasses, 'Glasses — glare to fix')}</div>`;

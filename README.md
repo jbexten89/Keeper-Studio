@@ -72,8 +72,13 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
 * **Envelopes in shooting order:** turn on **Filmstrip: picks only** (one Pick
   per kid, flagged in Library). Each new envelope then gets the next kid's
   photo filled in and highlighted in the filmstrip; if it's the wrong kid,
-  click the right photo and press **Use**. Clicking an envelope highlights its
-  photo, and clicking a photo (or **←** / **→**) opens the envelope using it.
+  just click the right photo. Clicking an envelope highlights its photo, and
+  clicking a photo (or **←** / **→**) opens the envelope using it.
+* **Same kid, two envelopes** (Mom and Grandma each order): on the new
+  envelope, click the kid's photo even though it's used; it's assigned to the
+  new envelope. Afterwards each click on that photo opens the next envelope
+  that uses it. Crop cuts it once; the lab folder adds the prints together; the
+  ROES file keeps one row per envelope so each family gets its own.
 * **Teams:** each team's group photo (▣ on the team) is what team 5x7s, team
   8x10s and Memory Mates print from. Press **T** on team photos in Library
   (a T badge shows); ▣ then switches the filmstrip to just those, and a click
