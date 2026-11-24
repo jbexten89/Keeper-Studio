@@ -97,6 +97,10 @@ def r_save(b):
     return {"order": _decorate(o, catalog())}
 
 
+def r_bulk(b):
+    return {"changed": book.bulk_update(int(b["shoot_id"]), b.get("ids") or [], b.get("fields") or {})}
+
+
 def r_delete(b):
     return {"deleted": book.delete_order(int(b["id"]))}
 
@@ -208,7 +212,7 @@ def r_open_prices(b):
 ROUTES = {
     "/api/orders/catalog": r_catalog, "/api/orders/shoots": r_shoots,
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
-    "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete,
+    "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
     "/api/orders/rename-team": r_rename_team, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,

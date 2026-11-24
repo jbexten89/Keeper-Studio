@@ -318,6 +318,19 @@ class OrderBookTests(unittest.TestCase):
         self.assertEqual(self.book.rename_team(s["id"], "9th grade", "9th Grade Boys"), 1)
         self.assertEqual(self.book.team_photos(s["id"]), {"9th Grade Boys": {"image": "IMG_5373", "coach": ""}})
 
+    def test_bulk_team_and_coach(self):
+        s = self.book.save_shoot({"name": "T"})
+        a = self.book.save_order(s["id"], {"athlete": "A", "coach": "Keep"})
+        b = self.book.save_order(s["id"], {"athlete": "B"})
+        c = self.book.save_order(s["id"], {"athlete": "C"})
+        other = self.book.save_shoot({"name": "Other"})
+        x = self.book.save_order(other["id"], {"athlete": "X"})
+        self.assertEqual(self.book.bulk_update(s["id"], [a["id"], b["id"], x["id"]], {"team": "7th Grade", "coach": ""}), 2)
+        teams = {o["athlete"]: (o["team"], o["coach"]) for o in self.book.orders(s["id"])}
+        self.assertEqual(teams, {"A": ("7th Grade", "Keep"), "B": ("7th Grade", ""), "C": ("", "")})
+        self.assertEqual(self.book.get(x["id"])["team"], "")
+        self.assertEqual(self.book.bulk_update(s["id"], [c["id"]], {}), 0)
+
     def test_needs_a_name(self):
         with self.assertRaises(ValueError):
             self.book.save_shoot({"name": "  "})

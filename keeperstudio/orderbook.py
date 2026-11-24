@@ -181,6 +181,19 @@ class OrderBook:
             raise ValueError("That order no longer exists.")
         return self._row(r)
 
+    def bulk_update(self, sid: int, ids: list[int], fields: dict) -> int:
+        """Set team and/or coach on many envelopes at once. Blank fields are left alone."""
+        clean = {k: str(fields.get(k) or "").strip() for k in ("team", "coach") if str(fields.get(k) or "").strip()}
+        ids = [int(i) for i in ids or []]
+        if not clean or not ids:
+            return 0
+        sets = ", ".join(f"{k}=?" for k in clean)
+        with self._lock:
+            n = self._db.execute(f"UPDATE orders SET {sets}, updated=? WHERE shoot_id=? AND id IN ({','.join('?' * len(ids))})",
+                                 (*clean.values(), time.time(), int(sid), *ids)).rowcount
+            self._db.commit()
+        return n
+
     def delete_order(self, oid: int) -> dict | None:
         """Deletes and returns the order, so the interface can offer Undo."""
         o = self.get(oid)

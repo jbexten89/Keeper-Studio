@@ -540,7 +540,7 @@ kbd{font-size:10px}
 .otbl th.amt,.otbl td.amt{text-align:right}
 .otbl th .arr{color:var(--accent);margin-left:3px}
 .otbl td{padding:6px 10px;border-bottom:1px solid #16191D;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
-.otbl tbody tr{cursor:pointer}
+.otbl tbody tr{cursor:pointer;user-select:none}
 .otbl tbody tr:hover{background:#14171B}
 .otbl tbody tr.sel{background:#1A2330;box-shadow:inset 2px 0 0 var(--accent)}
 .otbl .dim{color:var(--dim)}
@@ -2056,7 +2056,7 @@ function buildHelp() {
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
     ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Orders', 'Ctrl 5'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
-    ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/']])}
+    ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -2186,8 +2186,8 @@ function onKey(e) {
   const mod = e.ctrlKey || e.metaKey; const k = e.key.toLowerCase();
   if (mod && e.shiftKey && k === 'e') { e.preventDefault(); return openExport(); }
   if (mod && k === 'z') { e.preventDefault(); return undo(); }
-  if (mod && k === 'a') { e.preventDefault(); return selectAll(); }
-  if (mod && k === 'd') { e.preventDefault(); return deselect(); }
+  if (mod && k === 'a') { e.preventDefault(); return S.module === 'orders' ? Ord.selectAllRows() : selectAll(); }
+  if (mod && k === 'd') { e.preventDefault(); return S.module === 'orders' ? Ord.clearMulti() : deselect(); }
   if (mod && k === 'o') { e.preventDefault(); return openFolder(); }
   if (mod && k === 'n') { e.preventDefault(); return openCollDialog(); }
   if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
@@ -3037,7 +3037,7 @@ const fmtDay = d => { if (!d) return ''; const t = new Date(d + 'T12:00:00'); re
 const Ord = {
   shoots: [], sid: null, d: null, cat: null, pricesPath: '', team: 'all', q: '', sort: { k: 'env', dir: 1 },
   sel: null, draft: null, view: 'orders', lab: null, crops: '', onePer: true, building: false,
-  saveT: null, state: '', err: false, undo: null, last: {}, stems: null, stemsKey: '',
+  saveT: null, state: '', err: false, undo: null, last: {}, stems: null, stemsKey: '', multi: new Set(), anchor: null,
   async load() {
     await this.loadCatalog();
     try { this.shoots = (await api('/api/orders/shoots', {})).shoots; } catch { this.shoots = []; }
@@ -3121,6 +3121,7 @@ const Ord = {
   async select(id) {
     await this.flush();
     const o = this.d && this.d.orders.find(o => o.id === id); if (!o) return;
+    this.multi = new Set([id]); this.anchor = id;
     this.sel = id; this.draft = JSON.parse(JSON.stringify(o)); this.state = ''; this.err = false;
     this.paintRows(); renderRight();
     const tr = $(`#modView tr[data-oid="${id}"]`); if (tr) tr.scrollIntoView({ block: 'nearest' });
@@ -3129,7 +3130,7 @@ const Ord = {
     if (!this.sid) return this.editShoot(true);
     await this.flush();
     if (this.view !== 'orders') this.setView('orders');
-    this.sel = 'new'; this.state = ''; this.err = false;
+    this.multi = new Set(); this.sel = 'new'; this.state = ''; this.err = false;
     this.draft = { envelope: this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
       lines: [], glasses: false, paid_method: '', paid_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
     if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
@@ -3311,7 +3312,7 @@ const Ord = {
     if (this.view === 'lab') return this.labCenter(v);
     const s = this.shoot() || {};
     v.innerHTML = `<div class="ord-head"><span class="ttl">${esc(s.name)}${this.team !== 'all' ? ' · ' + esc(this.team) : ''}</span><span class="muted small" id="ordCount"></span><div class="tb-spacer"></div>
-      <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
+      <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm" data-ord="select-all" title="Select every envelope shown, to set their team or coach at once (Ctrl+A). Ctrl-click or Shift-click rows to pick some.">Select all</button><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
       <div class="ord-scroll" id="ordRows"></div>`;
     this.paintRows();
   },
@@ -3327,7 +3328,8 @@ const Ord = {
   rowHTML(o) {
     const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
     const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.due_cents < 0 ? `<td class="amt due" title="Paid more than the total">${fmt$(s.due_cents)}</td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
-    return `<tr data-oid="${o.id}" class="${o.id === this.sel ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
+    const on = this.multi.size > 1 ? this.multi.has(o.id) : o.id === this.sel;
+    return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
       <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td><td>${pic ? esc(pic) : o.lines.length ? '<span class="warn">needs photo</span>' : ''}</td><td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td>${due}</tr>`;
   },
   labCenter(v) {
@@ -3361,6 +3363,7 @@ const Ord = {
       <div class="pad-x" style="padding-bottom:10px">${switchHTML('glasses', !!d.glasses, 'Glasses — glare to fix')}</div>`;
   },
   right() {
+    if (this.multi.size > 1) return this.bulkRight();
     const d = this.draft;
     const warn = this.cat && this.cat.warnings.length ? `<div class="hint" style="color:var(--amber)">${this.cat.warnings.map(esc).join('<br>')}</div>` : '';
     if (!d) {
@@ -3387,6 +3390,56 @@ const Ord = {
       <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
       <datalist id="ordFrames">${this.matches(String(d.image || '').replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>`;
   },
+  // ---------- several envelopes at once ----------
+  async clickRow(id, e) {
+    if (!(e.ctrlKey || e.metaKey || e.shiftKey)) return this.select(id);
+    await this.flush();
+    const rows = this.rows().map(o => o.id);
+    if (!this.multi.size && this.sel && this.sel !== 'new') this.multi.add(this.sel);
+    if (e.shiftKey && this.anchor != null && rows.includes(this.anchor)) {
+      const [a, b] = [rows.indexOf(this.anchor), rows.indexOf(id)].sort((x, y) => x - y);
+      if (!(e.ctrlKey || e.metaKey)) this.multi = new Set();
+      rows.slice(a, b + 1).forEach(i => this.multi.add(i));
+    } else {
+      this.multi.has(id) ? this.multi.delete(id) : this.multi.add(id); this.anchor = id;
+    }
+    this.afterMulti();
+  },
+  async selectAllRows() {
+    await this.flush();
+    if (this.view !== 'orders') this.setView('orders');
+    this.multi = new Set(this.rows().map(o => o.id)); this.afterMulti();
+  },
+  clearMulti() { this.multi = new Set(); this.sel = null; this.draft = null; this.paintRows(); renderRight(); },
+  afterMulti() {
+    if (this.multi.size === 1) { const [only] = this.multi; return this.select(only); }
+    this.sel = null; this.draft = null; this.paintRows(); renderRight();
+  },
+  bulkRight() {
+    const sel = this.d ? this.d.orders.filter(o => this.multi.has(o.id)) : [];
+    const teams = [...new Set(sel.map(o => o.team || ''))];
+    const now = teams.length === 1 ? (teams[0] ? `All on <b>${esc(teams[0])}</b>.` : 'None has a team yet.') : `Now on ${plural(teams.length, 'different team')}.`;
+    $('#right').innerHTML = `<div class="scroll">${sectionHTML('o-bulk', `${sel.length} envelopes selected`, `<div class="hint">${now} Type a team and/or coach to give all of them; a box left empty is left alone.</div>
+      <div class="of-grid"><label class="fld wide"><span>Team</span><input id="bulkTeam" list="ordTeams" spellcheck="false" placeholder="e.g. 7th Grade"></label>
+      <label class="fld wide"><span>Coach</span><input id="bulkCoach" list="ordCoaches" spellcheck="false"></label></div>
+      <div class="pad"><div class="btn-row"><button class="btn sm" data-ord="clear-multi">Clear selection</button><div class="tb-spacer"></div><button class="btn primary" data-ord="bulk-apply">Apply to ${sel.length}</button></div></div>
+      <div class="hint">Afterwards, set the team's group photo with ▣ on the team at the left.<br><br>Ctrl-click adds or removes one envelope · Shift-click selects a run · Ctrl+A selects all shown · Esc clears.</div>`)}
+      <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
+      <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>`;
+    const go = () => this.bulkApply();
+    ['#bulkTeam', '#bulkCoach'].forEach(s => $(s).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); go(); } }));
+  },
+  async bulkApply() {
+    const team = ($('#bulkTeam') || {}).value || '', coach = ($('#bulkCoach') || {}).value || '';
+    if (!team.trim() && !coach.trim()) return toast('Type a team or a coach first', 2500);
+    try {
+      const r = await api('/api/orders/bulk', { shoot_id: this.sid, ids: [...this.multi], fields: { team, coach } });
+      if (team.trim()) this.last.team = team.trim();
+      if (coach.trim()) this.last.coach = coach.trim();
+      await this.refresh(); this.render();
+      toast(`${plural(r.changed, 'envelope')} updated${team.trim() ? ` · team ${esc(team.trim())}` : ''}${coach.trim() ? ` · coach ${esc(coach.trim())}` : ''}`, 4000);
+    } catch (e) { toast(esc(e.message), 5000); }
+  },
   paintTotal() { const t = $('#ordTotal'); if (t && this.draft) t.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft); },
   paintState() { const s = $('#right .save-state'); if (s) { s.textContent = this.state; s.classList.toggle('err', this.err); } },
   modbar() {
@@ -3410,6 +3463,7 @@ const Ord = {
     if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
     if (e.key === 'Delete' && this.draft) { this.del(); return true; }
+    if (e.key === 'Escape' && this.multi.size > 1) { this.clearMulti(); return true; }
     if (e.key === 'Escape' && this.draft) { this.flush(); this.sel = null; this.draft = null; this.paintRows(); renderRight(); return true; }
     if (/^[a-z]$/.test(k) && this.draft && this.togglePkg(k, e.shiftKey)) return true;
     return false;
@@ -3559,7 +3613,7 @@ function bindModuleEvents() {
       const pk = t.closest('[data-opkg]'); if (pk) { const q = Ord.qty(pk.dataset.opkg); Ord.setQty(pk.dataset.opkg, e.shiftKey ? q + 1 : q ? 0 : 1); return; }
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; Ord.paintRows(); return; }
-      const tr = t.closest('tr[data-oid]'); if (tr) { Ord.select(+tr.dataset.oid); return; }
+      const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.exportCsv(ex.dataset.oexp); return; }
       const oa = t.closest('[data-ord]');
       if (oa) {
@@ -3570,6 +3624,7 @@ function bindModuleEvents() {
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
         else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab();
+        else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
         return;
       }
       const sh = t.closest('[data-oshoot]'); if (sh) { if (+sh.dataset.oshoot !== Ord.sid) Ord.pickShoot(+sh.dataset.oshoot); return; }
