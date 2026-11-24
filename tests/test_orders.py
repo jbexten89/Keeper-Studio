@@ -180,6 +180,7 @@ class LabTests(unittest.TestCase):
         by = {g["group"]: g["items"] for g in plan["groups"]}
         self.assertEqual(by["Wallet"][0]["qty"], 2)
         self.assertEqual((by["Mini Wallets"][0]["file"], by["Mini Wallets"][0]["qty"]), ("", 2))
+        self.assertIn("no crop size", by["Mini Wallets"][0]["why"])
 
     def test_build_folder_copies_only_what_is_needed(self):
         with tempfile.TemporaryDirectory() as d:

@@ -460,11 +460,12 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
     team_photos = team_photos or {}
     items: dict[tuple, dict] = {}
 
-    def add(group, crop, file, qty, who, label):
+    def add(group, crop, file, qty, who, label, why=""):
         if qty <= 0:
             return
         key = (group, file or f"?{who}")
-        it = items.setdefault(key, {"group": group, "crop": crop, "label": label, "file": file, "qty": 0, "for": []})
+        it = items.setdefault(key, {"group": group, "crop": crop, "label": label, "file": file, "qty": 0, "for": [],
+                                    "why": why or ("" if file else "no photo picked")})
         it["qty"] += qty
         if who not in it["for"]:
             it["for"].append(who)
@@ -489,7 +490,8 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
         for l in normalize(o.get("lines"), catalog):
             p = catalog.get(l["product_id"])
             if p.type == "misc":
-                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label)
+                why = "" if p.crop or not frame else "no crop size set for it (Prices…)"
+                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why)
     groups: dict[str, list] = {}
     for it in items.values():
         groups.setdefault(it["group"], []).append(it)
@@ -554,8 +556,8 @@ def build_lab_folder(plan: dict, crops_dir: Path, out_dir: Path, one_per_print: 
                 copied += len(names)
             else:
                 missing.append({"group": g["group"], "file": it["file"], "for": it["for"], "qty": it["qty"],
-                                "why": "no photo picked" if not it["file"] else "not found in the crops folder"})
-            rows.append([g["group"], it["file"] or "(no photo picked)", str(it["qty"]), "; ".join(it["for"]),
+                                "why": it["why"] if not it["file"] else "not found in the crops folder"})
+            rows.append([g["group"], it["file"] or f"({it['why']})", str(it["qty"]), "; ".join(it["for"]),
                          " ".join(names) if names else "MISSING"])
     (out_dir / "lab-order.csv").write_text(to_csv(rows), encoding="utf-8")
     return {"out_dir": str(out_dir), "copied": copied, "missing": missing, "csv": str(out_dir / "lab-order.csv")}
