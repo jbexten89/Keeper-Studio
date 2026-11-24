@@ -728,7 +728,7 @@ crop_sizes:
 # the lab: each envelope goes over as the individual prints it comes to (Package F
 # = one 5x7 and two 4x6), the same items as the Sports group in Meridian's ROES.
 # name: the ROES item it is. code: the single-item package set up in ROES for
-# it (Jamie's codes: 8x10, 5x7, WAL, MWAL, MAG57, MAG45, MAGW, BADGE, KEY). same_as: the
+# it (Jamie's codes: 8x10, 5x7, 4x6, WAL, MWAL, MAG57, MAG45, MAGW, BADGE, KEY). same_as: the
 # team prints are the same ROES item as the individual size, printed landscape
 # from the group photo's 10x8 / 7x5 crop, so they use that size's code. A guessed code
 # silently orders the wrong product, so a blank code exports the name instead and
@@ -738,7 +738,7 @@ roes:
   items:
     8x10:                  {name: "8 x 10",              code: "8x10"}
     5x7:                   {name: "5 x 7",               code: "5x7"}
-    4x6:                   {name: "4 x 6",               code: ""}      # no code yet
+    4x6:                   {name: "4 x 6",               code: "4x6"}
     wallet:                {name: "8 Wallets",           code: "WAL"}
     8x10-team:             {name: "8 x 10 (team, landscape)", same_as: 8x10}
     5x7-team:              {name: "5 x 7 (team, landscape)",  same_as: 5x7}
