@@ -221,13 +221,21 @@ class RoesTests(unittest.TestCase):
 
     def test_unmapped_lists_lab_items_not_packages(self):
         missing = O.unmapped_roes(CAT)
-        self.assertIn("5 x 7 (team photo)", missing)
-        self.assertFalse(any("Package" in m for m in missing))
-        self.assertEqual(len(missing), 12)
+        self.assertIn("5 x 7", missing)
+        self.assertFalse(any("Package" in m or "team" in m for m in missing))
+        self.assertEqual(len(missing), 10)
+
+    def test_team_prints_use_the_individual_code(self):
+        c = O.load_catalog(ROOT / "prices.yaml")
+        c.roes_items["5x7"]["code"] = "P57"
+        r = rows(O.roes_csv([order(lines=cart(("pkg-g", 1)), image="IMG_1")], c, {"U10": "IMG_9000"}))
+        self.assertEqual(r[1][2:4], ["IMG_9000.jpg", "P57;P57"])
+        self.assertEqual(O.roes_code(c, "8x10-team"), "")
+        self.assertEqual(O.roes_items({"5x7-team": {"code": "T57"}})["5x7-team"]["same_as"], "")
 
     def test_old_prices_file_without_items_still_works(self):
         self.assertEqual(O.roes_items(None)["wallet"]["name"], "8 Wallets")
-        self.assertEqual(O.roes_items({"5x7": {"code": "X"}})["5x7"], {"name": "5 x 7", "code": "X"})
+        self.assertEqual(O.roes_items({"5x7": {"code": "X"}})["5x7"], {"name": "5 x 7", "code": "X", "same_as": ""})
 
 
 class WebImportTests(unittest.TestCase):

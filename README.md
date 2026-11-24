@@ -88,6 +88,8 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
 * **ROES file:** one row per athlete. Packages never go to the lab: each
   envelope is listed as the individual prints it comes to (Package F is one
   5 x 7 and two 4 x 6), matching the items in Meridian's ROES Sports group.
+  Team prints are the same ROES item as that size, printed landscape from the
+  group photo, so they share its code.
 * **Prices…** opens `prices.yaml`: packages, prices, which Crop size each print
   is cut to, and Meridian's ROES code for each print item (still blank: ask
   Meridian for a sample import file; a blank code exports the item's name and

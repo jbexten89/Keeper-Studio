@@ -180,18 +180,33 @@ def load_catalog(path: Path | None) -> Catalog:
 
 
 def roes_items(raw) -> dict:
-    """The lab items ROES orders, from prices.yaml; any item missing keeps its default name."""
+    """The lab items ROES orders, from prices.yaml; any item missing keeps its default.
+
+    An item with same_as (the landscape team prints) has no code of its own: it
+    uses the code of the size it is printed as.
+    """
     out = {k: dict(v) for k, v in DEFAULT_ROES_ITEMS.items()}
     for k, v in (raw or {}).items() if isinstance(raw, dict) else []:
         v = v if isinstance(v, dict) else {"code": v}
-        out[str(k)] = {"name": str(v.get("name") or out.get(str(k), {}).get("name") or k), "code": str(v.get("code") or "").strip()}
+        base = out.get(str(k), {})
+        out[str(k)] = {"name": str(v.get("name") or base.get("name") or k), "code": str(v.get("code") or "").strip(),
+                       "same_as": str(v.get("same_as") or (base.get("same_as") if "code" not in v else "") or "")}
     return out
+
+
+def roes_code(catalog: "Catalog", key: str) -> str:
+    """Meridian's code for a lab item, following same_as; blank when not filled in yet."""
+    it = catalog.roes_items.get(key) or {}
+    if it.get("same_as") and not it.get("code"):
+        return (catalog.roes_items.get(it["same_as"]) or {}).get("code", "")
+    return it.get("code", "")
 
 
 DEFAULT_ROES_ITEMS = {
     "8x10": {"name": "8 x 10", "code": ""}, "5x7": {"name": "5 x 7", "code": ""}, "4x6": {"name": "4 x 6", "code": ""},
-    "wallet": {"name": "8 Wallets", "code": ""}, "8x10-team": {"name": "8 x 10 (team photo)", "code": ""},
-    "5x7-team": {"name": "5 x 7 (team photo)", "code": ""}, "misc-mini-wallets-8": {"name": "8 - Mini Wallets", "code": ""},
+    "wallet": {"name": "8 Wallets", "code": ""},
+    "8x10-team": {"name": "8 x 10 (team, landscape)", "code": "", "same_as": "8x10"},
+    "5x7-team": {"name": "5 x 7 (team, landscape)", "code": "", "same_as": "5x7"}, "misc-mini-wallets-8": {"name": "8 - Mini Wallets", "code": ""},
     "misc-wallet-magnets-4": {"name": "Wallet Magnets", "code": ""}, "misc-magnet-4x5": {"name": "4 x 5 Magnet", "code": ""},
     "misc-magnet-5x7": {"name": "5 x 7 Magnet", "code": ""}, "misc-photo-key-ring": {"name": "Key Chain", "code": ""},
     "misc-photo-badge": {"name": "Photo Badge", "code": ""},
@@ -568,7 +583,7 @@ def unmapped_roes(catalog: Catalog) -> list[str]:
     used = {"8x10", "5x7", "4x6", "wallet"} | {f"{s}-team" for s in catalog.crop_team} | \
            {p.id for p in catalog.products if p.type == "misc"}
     return [catalog.roes_items.get(k, {"name": k})["name"] for k in sorted(used)
-            if not catalog.roes_items.get(k, {}).get("code")]
+            if not (catalog.roes_items.get(k) or {}).get("same_as") and not roes_code(catalog, k)]
 
 
 def with_ext(name: str) -> str:
@@ -590,8 +605,8 @@ def roes_csv(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
     for o in sorted(orders, key=_sort_key):
         codes = []
         for key, qty in lab_items(o, catalog):
-            it = catalog.roes_items.get(key) or {"name": key, "code": ""}
-            codes += [it["code"] or it["name"]] * qty
+            it = catalog.roes_items.get(key) or {"name": key}
+            codes += [roes_code(catalog, key) or it["name"]] * qty
         first, _, last = (o.get("athlete") or "").strip().partition(" ")
         image = with_ext((o.get("edited") or o.get("image") or "").strip())
         group = with_ext((team_photos.get(o.get("team") or "") or "").strip())
@@ -712,7 +727,9 @@ crop_sizes:
 # ROES event import (Orders > Export > ROES file). Packages are never sent to
 # the lab: each envelope goes over as the individual prints it comes to (Package F
 # = one 5x7 and two 4x6), the same items as the Sports group in Meridian's ROES.
-# name: the ROES item it is. code: Meridian's product code for it. A guessed code
+# name: the ROES item it is. code: Meridian's product code for it. same_as: the
+# team prints are the same ROES item as the individual size, printed landscape
+# from the group photo's 10x8 / 7x5 crop, so they use that size's code. A guessed code
 # silently orders the wrong product, so a blank code exports the name instead and
 # the ROES button shows a warning until every code is filled in.
 roes:
@@ -722,8 +739,8 @@ roes:
     5x7:                   {name: "5 x 7",               code: ""}
     4x6:                   {name: "4 x 6",               code: ""}
     wallet:                {name: "8 Wallets",           code: ""}
-    8x10-team:             {name: "8 x 10 (team photo)", code: ""}
-    5x7-team:              {name: "5 x 7 (team photo)",  code: ""}
+    8x10-team:             {name: "8 x 10 (team, landscape)", same_as: 8x10}
+    5x7-team:              {name: "5 x 7 (team, landscape)",  same_as: 5x7}
     misc-mini-wallets-8:   {name: "8 - Mini Wallets",    code: ""}
     misc-wallet-magnets-4: {name: "Wallet Magnets",      code: ""}
     misc-magnet-4x5:       {name: "4 x 5 Magnet",        code: ""}
