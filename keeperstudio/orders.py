@@ -713,11 +713,11 @@ alacarte:
 # config.yaml, e.g. 4x5 or 2_5x3_5). Left blank where it isn't settled yet;
 # the lab folder then lists the keepsake without a file.
 misc:
-  - {id: misc-mini-wallets-8,   label: Mini Wallets,   unit: 8, price: 6.00,  crop: ""}
-  - {id: misc-wallet-magnets-4, label: Wallet Magnets, unit: 4, price: 10.00, pack: 4, crop: ""}
+  - {id: misc-mini-wallets-8,   label: Mini Wallets,   unit: 8, price: 6.00,  crop: 1_7x2_2}
+  - {id: misc-wallet-magnets-4, label: Wallet Magnets, unit: 4, price: 10.00, pack: 4, crop: 2_5x3_5}
   - {id: misc-magnet-4x5,       label: 4x5 Magnet,     unit: 1, price: 7.00,  crop: 4x5}
   - {id: misc-magnet-5x7,       label: 5x7 Magnet,     unit: 1, price: 10.00, crop: 5x7}
-  - {id: misc-photo-key-ring,   label: Photo Key Ring, unit: 1, price: 6.00,  crop: ""}
+  - {id: misc-photo-key-ring,   label: Photo Key Ring, unit: 1, price: 6.00,  crop: 1_8x2_8}
   - {id: misc-photo-badge,      label: Photo Badge,    unit: 1, price: 6.00,  crop: ""}
 
 # Which Crop size each print is cut to. Names match the folders and file
