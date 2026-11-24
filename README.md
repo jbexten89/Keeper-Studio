@@ -75,7 +75,10 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   click the right photo and press **Use**. Clicking an envelope highlights its
   photo, and clicking a photo (or **←** / **→**) opens the envelope using it.
 * **Teams:** each team's group photo (▣ on the team) is what team 5x7s, team
-  8x10s and Memory Mates print from. To put many envelopes on a team at once,
+  8x10s and Memory Mates print from. Press **T** on team photos in Library
+  (a T badge shows); ▣ then switches the filmstrip to just those, and a click
+  sets it. T photos are skipped when a new envelope takes the next photo. The
+  toolbar toggle moved to **Shift+T**. To put many envelopes on a team at once,
   select them (Ctrl-click, Shift-click, or **Select all** / Ctrl+A), type the
   team and/or coach on the right and press **Apply**.
 * **Crop only what was ordered:** *Select ordered photos* selects every picked

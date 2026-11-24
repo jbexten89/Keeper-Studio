@@ -241,6 +241,7 @@ img:not([src]){visibility:hidden}
 .fbadges{position:absolute;left:4px;right:4px;bottom:1px;display:flex;gap:4px;align-items:center;font-size:9px;height:11px}
 .fbadges .flag{opacity:1}
 .fbadges .stars{font-size:8px}
+.tbadge{display:inline-flex;align-items:center;justify-content:center;min-width:12px;height:12px;padding:0 2px;border-radius:2px;background:#C9CED6;color:#07080A;font-size:9px;font-weight:700;line-height:1}
 .fbadges .qcdot{margin-left:auto;width:6px;height:6px;border-radius:50%;background:#C9CED6}
 
 /* ---------- Right panel ---------- */
@@ -590,7 +591,7 @@ textarea:focus{border-color:var(--accent)}
 .photo-row .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .photo-row input{width:100%}
 .btn.on{border-color:var(--accent);color:var(--accent)}
-.save-state{color:var(--dim);font-size:12px;margin-left:auto;font-variant:normal;letter-spacing:0}
+.save-state{color:var(--dim);font-size:12px;margin-left:auto;padding-left:10px;font-variant:normal;letter-spacing:0}
 .save-state.err{color:var(--reject)}
 .tot-grid{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;font-variant-numeric:tabular-nums}
 .tot-grid span{color:var(--muted)}
@@ -769,7 +770,7 @@ function savePrefs() {
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
-const META_DEFAULT = Object.freeze({ flag: 0, rating: 0, label: '' });
+const META_DEFAULT = Object.freeze({ flag: 0, rating: 0, label: '', team: false });
 const metaMap = new Map();
 const dirtyMeta = new Set(); let metaTimer = null;
 const getMeta = key => metaMap.get(key) || META_DEFAULT;
@@ -820,6 +821,7 @@ function matchRules(p, r) {
     case 'rejected': if (m.flag !== -1) return false; break;
     case 'notrejected': if (m.flag === -1) return false; break;
   }
+  if (r.team && !m.team) return false;
   if (r.rating && m.rating < r.rating) return false;
   if (r.label && r.label !== 'any') { if (r.label === 'none' ? !!m.label : m.label !== r.label) return false; }
   if (r.text && !p.name.toLowerCase().includes(r.text.toLowerCase())) return false;
@@ -994,6 +996,7 @@ const autoOn = () => S.autoAdvance || S.caps;
 function describe(f, v) {
   if (f === 'flag') return v === 1 ? `<span style="color:var(--accent)">⚑</span> Flagged as Pick` : v === -1 ? `<span style="color:var(--reject)">⚑</span> Flagged as Rejected` : 'Unflagged';
   if (f === 'rating') return v ? 'Rating ' + '★'.repeat(v) : 'Rating cleared';
+  if (f === 'team') return v ? '<span class="tbadge">T</span> Marked as a team photo' : 'Team photo mark removed';
   return v ? `Label: <span style="color:var(--l-${v})">■</span> ${LABEL_NAMES[v]}` : 'Label cleared';
 }
 function applyMetaTo(ps, field, value, advance) {
@@ -1007,6 +1010,9 @@ function applyMetaTo(ps, field, value, advance) {
   afterChange(advance && ps.length === 1);
 }
 const mark = (field, value, forceAdvance) => applyMetaTo(targets(), field, value, forceAdvance || autoOn());
+// T: team photo on/off (all of the targets on, unless they all already are)
+const markTeam = forceAdvance => { const ps = targets(); applyMetaTo(ps, 'team', !ps.every(p => getMeta(p.key).team), forceAdvance || autoOn()); };
+const teamBadge = m => m.team ? '<span class="tbadge" title="Team photo (T)">T</span>' : '';
 function toggleQuickFor(ps) {
   if (!ps.length) return;
   const q = quickColl(); const allIn = ps.every(p => q.keys.has(p.key)); const added = [], removed = [];
@@ -1364,7 +1370,7 @@ function gridMetrics() {
 function cropDot(p) { const c = Crop.status.get(p.path); if (!c) return ''; const cls = (STATUS_INFO[c.status] || {}).cls; return cls && cls !== 'none' ? `<span class="crop-dot ${cls}" title="${esc((STATUS_INFO[c.status] || {}).label || '')}${c.status === 'review' ? ': ' + esc(c.label || '') : ''}"></span>` : ''; }
 function cellSig(p, i) {
   const m = getMeta(p.key);
-  return `${i}|${p.thumbState}|${m.flag}|${m.rating}|${m.label}|${S.selected.has(p.id) ? 1 : 0}|${S.active === p.id ? 1 : 0}|${inQuick(p) ? 1 : 0}|${cropDot(p)}|${Crop.styleOf(p.path) || ''}`;
+  return `${i}|${p.thumbState}|${m.flag}|${m.team ? 1 : 0}|${m.rating}|${m.label}|${S.selected.has(p.id) ? 1 : 0}|${S.active === p.id ? 1 : 0}|${inQuick(p) ? 1 : 0}|${cropDot(p)}|${Crop.styleOf(p.path) || ''}`;
 }
 function updateCell(el, p, i) {
   const sig = cellSig(p, i); if (el._sig === sig) return; el._sig = sig;
@@ -1373,7 +1379,7 @@ function updateCell(el, p, i) {
   el.title = p.name;
   el.innerHTML = `<div class="cell-in"><span class="num">${i + 1}</span>${cropDot(p)}${styleTag(p)}<button class="qc ${inQuick(p) ? 'on' : ''}" data-act="qc" title="Quick Collection (B)"></button>
     <div class="cell-img">${p.thumbUrl ? `<img src="${p.thumbUrl}" alt="" draggable="false">` : '<div class="ph"></div>'}</div>
-    <div class="cell-foot">${flagHTML(m.flag, true)}${starsHTML(m.rating, true)}<span class="ext">${esc(ext(p.name))}</span></div></div>`;
+    <div class="cell-foot">${flagHTML(m.flag, true)}${teamBadge(m)}${starsHTML(m.rating, true)}<span class="ext">${esc(ext(p.name))}</span></div></div>`;
 }
 function renderGrid() {
   if (S.mode !== 'grid' || !S.photos.length) return;
@@ -1423,7 +1429,7 @@ function renderFilm() {
       el.className = 'fcell' + (S.selected.has(p.id) ? ' sel' : '') + (S.active === p.id ? ' active' : '') + (m.flag === -1 ? ' rejected' : '') + (m.label ? ` has-lbl lbl-${m.label}` : '');
       el.title = `${i + 1}. ${p.name}`;
       el.innerHTML = `<div class="fcell-in">${p.thumbUrl ? `<img src="${p.thumbUrl}" alt="" draggable="false">` : '<div class="ph"></div>'}
-        ${cropDot(p)}${styleTag(p)}<div class="fbadges">${m.flag ? flagHTML(m.flag, false) : ''}${m.rating ? starsHTML(m.rating, false) : ''}${inQuick(p) ? '<span class="qcdot"></span>' : ''}</div></div>`;
+        ${cropDot(p)}${styleTag(p)}<div class="fbadges">${m.flag ? flagHTML(m.flag, false) : ''}${teamBadge(m)}${m.rating ? starsHTML(m.rating, false) : ''}${inQuick(p) ? '<span class="qcdot"></span>' : ''}</div></div>`;
     }
     if (p.thumbState < 2) Thumbs.request(p, true);
   }
@@ -1577,7 +1583,7 @@ function renderLoupe() {
   setPaneImage(box._pane, p); layoutPane(box._pane);
   const m = getMeta(p.key); const i = S.viewIndex.get(p.id);
   box._info.innerHTML = `<b>${esc(p.name)}</b><br>${i != null ? `${i + 1} of ${S.view.length}` : ''}${p.hasCapture ? ' · ' + esc(new Date(p.capture).toLocaleString()) : ''}<br>
-    ${m.flag ? (m.flag === 1 ? 'Picked' : 'Rejected') : 'Unflagged'}${m.rating ? ' · ' + '★'.repeat(m.rating) : ''}${m.label ? ` · <span style="color:var(--l-${m.label})">■</span> ${LABEL_NAMES[m.label]}` : ''}${inQuick(p) ? ' · Quick Collection' : ''}`;
+    ${m.flag ? (m.flag === 1 ? 'Picked' : 'Rejected') : 'Unflagged'}${m.team ? ' · Team photo' : ''}${m.rating ? ' · ' + '★'.repeat(m.rating) : ''}${m.label ? ` · <span style="color:var(--l-${m.label})">■</span> ${LABEL_NAMES[m.label]}` : ''}${inQuick(p) ? ' · Quick Collection' : ''}`;
   if (i != null) { preload(S.view[i + 1]); preload(S.view[i - 1]); }
 }
 function buildCompare() {
@@ -1610,7 +1616,7 @@ function renderCompare() {
     if (p) { setPaneImage(pn._pane, p); layoutPane(pn._pane); }
     const m = p ? getMeta(p.key) : null;
     pn.querySelector('.cmp-foot').innerHTML = `<span class="cmp-tag">${side === 'select' ? 'Select' : 'Candidate'}</span>` +
-      (p ? `<span class="nm">${esc(p.name)}</span>${flagHTML(m.flag, true)}${starsHTML(m.rating, true)}${m.label ? `<span style="color:var(--l-${m.label})">■</span>` : ''}` : '<span class="muted">Use ← → or click the filmstrip to pick a candidate</span>');
+      (p ? `<span class="nm">${esc(p.name)}</span>${flagHTML(m.flag, true)}${teamBadge(m)}${starsHTML(m.rating, true)}${m.label ? `<span style="color:var(--l-${m.label})">■</span>` : ''}` : '<span class="muted">Use ← → or click the filmstrip to pick a candidate</span>');
   });
   const i = S.viewIndex.get(c.cand); if (i != null) { preload(S.view[i + 1]); preload(S.view[i - 1]); }
 }
@@ -2055,8 +2061,8 @@ function buildHelp() {
   const g = (title, rows) => `<div><h4>${title}</h4>${rows.map(([d, k]) => `<div class="hk"><span>${d}</span><span>${k.split(' ').map(x => `<kbd>${x}</kbd>`).join('')}</span></div>`).join('')}</div>`;
   $('#help').innerHTML = `<div class="help-card"><h3>Keyboard Shortcuts <span class="help-ver">Keeper Studio ${esc((S.hello && S.hello.version) || '')}</span></h3><div class="help-grid">
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
-    ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
-    ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
+    ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Team photo on / off', 'T'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
+    ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'Shift T'], ['Filter bar', '\\']])}
     ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Orders', 'Ctrl 5'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
     ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A'], ['Filmstrip photo (opens its envelope)', '← →']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
@@ -2205,7 +2211,7 @@ function onKey(e) {
     if (S.mode !== 'grid') return setMode('grid');
     return;
   }
-  if (k === 't') { S.panels.toolbar = !S.panels.toolbar; savePrefs(); return renderAll(); }
+  if (k === 't' && e.shiftKey) { S.panels.toolbar = !S.panels.toolbar; savePrefs(); return renderAll(); }
   if (e.key === '\\') { S.panels.filterbar = !S.panels.filterbar; savePrefs(); return renderAll(); }
   if (!S.photos.length) return;
   const dg = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
@@ -2227,6 +2233,7 @@ function onKey(e) {
     case 'p': return mark('flag', 1, e.shiftKey);
     case 'x': return mark('flag', -1, e.shiftKey);
     case 'u': return mark('flag', 0, e.shiftKey);
+    case 't': return markTeam(false);
     case 'b': return toggleQuickFor(targets());
     case 'l': return cycleLights();
     case 'f': return toggleFs();
@@ -2252,6 +2259,7 @@ const STATUS_INFO = {
 };
 function setModule(m) {
   if (S.module === m) return;
+  if (S.module === 'orders') Ord.endTeamPick();
   if (S.fs) exitFs();
   if (Crop.adjusting) Crop.cancelAdjust(true);
   Crop.closeTune();
@@ -3085,11 +3093,12 @@ const Ord = {
     if (!S.view.length) return null;
     const used = this.usedStems(), ap = after ? this.photoFor(after) : null;
     const i = ap && S.viewIndex.has(ap.id) ? S.viewIndex.get(ap.id) + 1 : (S.active != null && S.viewIndex.has(S.active) ? S.viewIndex.get(S.active) : 0);
-    const free = p => !used.has(stemOf(p.name).toLowerCase());
+    const free = p => !used.has(stemOf(p.name).toLowerCase()) && !getMeta(p.key).team;
     // after the last kid, wrap round to any earlier photo still without an envelope
     return S.view.slice(i).find(free) || S.view.slice(0, i).find(free) || null;
   },
   async photoClicked(id) {
+    if (S.module === 'orders' && this.pickingTeam != null) return this.finishTeamPick(id);
     if (S.module !== 'orders' || this.view !== 'orders' || this.multi.size > 1) return;
     const p = S.byId.get(id), o = p && this.orderForPhoto(p);
     if (o && o.id !== this.sel) this.select(o.id);
@@ -3255,10 +3264,33 @@ const Ord = {
       $$('[data-close]', card).forEach(b => b.addEventListener('click', () => res(null)));
     }));
   },
+  // ▣: with team photos marked T, the filmstrip switches to just those and a click sets it.
   async teamPhoto(team) {
+    if (S.photos.some(p => getMeta(p.key).team)) return this.startTeamPick(team);
+    return this.askTeamPhoto(team);
+  },
+  startTeamPick(team) {
+    if (this.pickingTeam == null) this.savedFilter = { ...S.filter };
+    this.pickingTeam = team;
+    S.filter = { ...S.filter, flag: 'any', team: true }; syncFilterBar(); afterFilter();
+    this.modbar();
+  },
+  endTeamPick() {
+    if (this.pickingTeam == null) return;
+    this.pickingTeam = null;
+    const f = { ...(this.savedFilter || S.filter) }; delete f.team; S.filter = f; this.savedFilter = null;
+    syncFilterBar(); afterFilter(); this.modbar();
+  },
+  async finishTeamPick(id) {
+    const team = this.pickingTeam, p = S.byId.get(id); if (team == null || !p) return;
+    this.endTeamPick();
+    try { await api('/api/orders/team-photo', { shoot_id: this.sid, team, image: stemOf(p.name) }); await this.refresh(); this.lab = null; this.render(); if (this.view === 'lab') this.loadLab(); toast(`${esc(team)} group photo: ${esc(stemOf(p.name))}`, 3000); }
+    catch (e) { toast(esc(e.message)); }
+  },
+  async askTeamPhoto(team) {
     const t = (this.d.teams.find(x => x.name === team) || {}), act = S.byId.get(S.active);
     const v = await this.ask(`Group photo · ${team}`, 'Group photo file', t.image || (act ? stemOf(act.name) : ''),
-      `The team shot that team 5x7s, team 8x10s and Memory Mates are printed from. Crop names it like ${esc((t.image || 'IMG_5373') + '_7x5')}.${act ? ` Filled in from the photo selected in the filmstrip.` : ''}`);
+      `The team shot that team 5x7s, team 8x10s and Memory Mates are printed from. Crop names it like ${esc((t.image || 'IMG_5373') + '_7x5')}.${act ? ` Filled in from the photo selected in the filmstrip.` : ''} Tip: press T on team photos in Library, and ▣ will show just those to click.`);
     if (v == null) return;
     try { await api('/api/orders/team-photo', { shoot_id: this.sid, team, image: this.normImage(v) }); await this.refresh(); this.lab = null; this.render(); if (this.view === 'lab') this.loadLab(); }
     catch (e) { toast(esc(e.message)); }
@@ -3483,6 +3515,7 @@ const Ord = {
     if (S.module !== 'orders') return;
     const dis = this.sid ? '' : 'disabled';
     const unm = this.cat ? this.cat.unmapped_roes.length : 0;
+    if (this.pickingTeam != null) { $('#modbar').innerHTML = `<span class="banner amber inline" style="margin:0">Click the ${esc(this.pickingTeam)} team photo in the filmstrip</span><div class="tb-spacer"></div><button class="btn sm" data-ord="cancel-team-pick">Cancel (Esc)</button>`; return; }
     $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order']]) : ''}
       ${S.photos.length ? `<button class="btn sm ${this.picksOnly() ? 'on' : ''}" data-ord="picks-only" title="Show only photos flagged Pick in the filmstrip (one per kid), so each new envelope moves on to the next kid">${this.picksOnly() ? '✓ ' : ''}Filmstrip: picks only</button>` : ''}
       ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
@@ -3497,6 +3530,7 @@ const Ord = {
   },
   key(e, k) {
     if (modalOpen()) return false;
+    if (this.pickingTeam != null && e.key === 'Escape') { this.endTeamPick(); return true; }
     if (e.key === '/') { const i = $('#modView [data-oq]'); if (i) { i.focus(); i.select(); return true; } }
     if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
@@ -3664,6 +3698,7 @@ function bindModuleEvents() {
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
         else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
+        else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
         return;
       }
