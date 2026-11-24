@@ -3334,14 +3334,15 @@ const Ord = {
     const L = this.lab;
     if (!L) { v.innerHTML = '<div class="msg">Working out the lab order…</div>'; return; }
     const items = L.groups.flatMap(g => g.items);
-    const need = items.filter(i => i.file).length, found = items.filter(i => i.found).length, nofile = items.filter(i => !i.file);
+    const need = items.filter(i => i.file).length, found = items.filter(i => i.found).length;
+    const noPic = [...new Set(items.filter(i => !i.file).flatMap(i => i.for))];
     const prints = L.groups.reduce((a, g) => a + g.qty, 0);
     v.innerHTML = `<div class="ord-scroll"><div class="lab">
       <div class="lab-ctrl"><div class="pathrow"><span class="path ${L.crops_dir && !L.crops_exists ? 'bad' : ''}" title="${esc(L.crops_dir)}">${esc(L.crops_dir || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-ord="lab-crops">Crops folder…</button></div>
         ${switchHTML('oneper', this.onePer, 'One file per print', 'For the Meridian website: two 4x6s become two files, so a whole size folder uploads with every quantity at 1. Off: one file each, with quantities in lab-order.csv (for ROES).')}
         <button class="btn primary" data-ord="lab-build" ${this.building || !L.crops_exists || !found ? 'disabled' : ''}>${this.building ? 'Building…' : 'Build lab folder…'}</button></div>
       ${L.crops_dir && !L.crops_exists ? `<div class="banner amber inline">That crops folder isn’t there any more — choose where Crop exported this shoot.</div>` : ''}
-      ${nofile.length ? `<div class="banner amber inline">${plural(nofile.length, 'item')} ${nofile.length === 1 ? 'has' : 'have'} no photo picked: ${esc(nofile.map(i => i.for.join(', ')).slice(0, 4).join('; '))}${nofile.length > 4 ? '…' : ''}</div>` : ''}
+      ${noPic.length ? `<div class="banner amber inline">No photo picked yet for ${esc(noPic.slice(0, 5).join(', '))}${noPic.length > 5 ? ` and ${noPic.length - 5} more` : ''}</div>` : ''}
       <div class="lab-sum"><span><b>${prints}</b>to print</span><span><b>${need}</b>files</span>${L.crops_exists ? `<span><b>${found}</b>found</span><span><b>${need - found}</b>not cropped yet</span>` : ''}</div>
       ${L.groups.map(g => `<div class="lab-grp"><header><b>${esc(g.group)}</b><span>${plural(g.qty, /wallet/i.test(g.group) ? 'sheet' : 'print')} · ${plural(g.files, 'file')}</span></header>${g.items.map(it => `<div class="lab-it"><span class="${it.found ? 'ok' : 'bad'}" title="${it.found ? 'Found in the crops folder' : it.file ? 'Not in the crops folder yet' : 'No photo picked'}">${it.found ? '✓' : it.file ? '○' : '!'}</span><span class="f" title="${esc(it.found || it.file)}">${esc(it.file || 'no photo picked')}</span><span class="q">×${it.qty}</span><span class="who" title="${esc(it.for.join(', '))}">${esc(it.for.join(', '))}</span></div>`).join('')}</div>`).join('') || '<div class="ord-empty">Nothing has been ordered yet.</div>'}
     </div></div>`;
