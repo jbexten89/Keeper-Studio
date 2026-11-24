@@ -1,0 +1,228 @@
+"""The order book: shoots, envelopes and team photos, kept on this computer.
+
+Its own SQLite file (orders.sqlite3) beside the catalog in the user's app-data
+folder, so orders survive app updates and never mix with flags and ratings.
+A dated copy is kept in backups/ each day the order book is opened.
+"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import threading
+import time
+from pathlib import Path
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS shoots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  date TEXT NOT NULL DEFAULT '',
+  season TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  archived INTEGER NOT NULL DEFAULT 0,
+  created REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shoot_id INTEGER NOT NULL REFERENCES shoots(id) ON DELETE CASCADE,
+  envelope TEXT NOT NULL DEFAULT '',
+  athlete TEXT NOT NULL DEFAULT '',
+  team TEXT NOT NULL DEFAULT '',
+  coach TEXT NOT NULL DEFAULT '',
+  parent TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  glasses INTEGER NOT NULL DEFAULT 0,
+  frames TEXT NOT NULL DEFAULT '',
+  image TEXT NOT NULL DEFAULT '',
+  edited TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  paid_method TEXT NOT NULL DEFAULT '',
+  paid_cents INTEGER NOT NULL DEFAULT 0,
+  lines TEXT NOT NULL DEFAULT '[]',
+  web_order TEXT NOT NULL DEFAULT '',
+  created REAL NOT NULL,
+  updated REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS orders_shoot ON orders(shoot_id);
+CREATE TABLE IF NOT EXISTS team_photos (
+  shoot_id INTEGER NOT NULL REFERENCES shoots(id) ON DELETE CASCADE,
+  team TEXT NOT NULL,
+  image TEXT NOT NULL DEFAULT '',
+  coach TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (shoot_id, team)
+);
+"""
+
+ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
+                "image", "edited", "notes", "paid_method", "paid_cents", "lines", "web_order")
+PAID_METHODS = ("", "cash", "check", "card", "other")
+
+
+class OrderBook:
+    def __init__(self, path: Path, backups: Path | None = None):
+        self.path = Path(path)
+        if backups and self.path.is_file():
+            self._daily_backup(backups)
+        self._lock = threading.Lock()
+        self._db = sqlite3.connect(str(self.path), check_same_thread=False)
+        self._db.row_factory = sqlite3.Row
+        self._db.execute("PRAGMA foreign_keys=ON")
+        self._db.execute("PRAGMA journal_mode=WAL")
+        self._db.executescript(SCHEMA)
+        self._db.commit()
+
+    def _daily_backup(self, folder: Path) -> None:
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+            dst = folder / f"orders-{time.strftime('%Y-%m-%d')}.sqlite3"
+            if not dst.exists():
+                src = sqlite3.connect(str(self.path))
+                out = sqlite3.connect(str(dst))
+                src.backup(out)
+                out.close()
+                src.close()
+            for old in sorted(folder.glob("orders-*.sqlite3"))[:-30]:  # keep a month
+                old.unlink(missing_ok=True)
+        except Exception:
+            pass  # a failed backup must never stop the app opening
+
+    # ------------------------------------------------------------ shoots --
+    def shoots(self, include_archived: bool = True) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute(
+                "SELECT s.*, (SELECT COUNT(*) FROM orders o WHERE o.shoot_id=s.id) AS n FROM shoots s"
+                + ("" if include_archived else " WHERE archived=0")
+                + " ORDER BY archived, CASE WHEN date='' THEN 1 ELSE 0 END, date DESC, created DESC").fetchall()
+        return [dict(r) for r in rows]
+
+    def save_shoot(self, data: dict) -> dict:
+        name = str(data.get("name") or "").strip()
+        if not name:
+            raise ValueError("Give the shoot a name.")
+        vals = (name, str(data.get("date") or ""), str(data.get("season") or ""), str(data.get("notes") or ""),
+                1 if data.get("archived") else 0)
+        with self._lock:
+            if data.get("id"):
+                self._db.execute("UPDATE shoots SET name=?, date=?, season=?, notes=?, archived=? WHERE id=?",
+                                 (*vals, int(data["id"])))
+                sid = int(data["id"])
+            else:
+                sid = self._db.execute("INSERT INTO shoots (name, date, season, notes, archived, created) VALUES (?,?,?,?,?,?)",
+                                       (*vals, time.time())).lastrowid
+            self._db.commit()
+            return dict(self._db.execute("SELECT * FROM shoots WHERE id=?", (sid,)).fetchone())
+
+    def delete_shoot(self, sid: int) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM shoots WHERE id=?", (int(sid),))
+            self._db.commit()
+
+    # ------------------------------------------------------------ orders --
+    @staticmethod
+    def _row(r) -> dict:
+        d = dict(r)
+        d["lines"] = json.loads(d.get("lines") or "[]")
+        d["glasses"] = bool(d.get("glasses"))
+        return d
+
+    def orders(self, sid: int) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM orders WHERE shoot_id=? ORDER BY id", (int(sid),)).fetchall()
+        return [self._row(r) for r in rows]
+
+    def get(self, oid: int) -> dict | None:
+        with self._lock:
+            r = self._db.execute("SELECT * FROM orders WHERE id=?", (int(oid),)).fetchone()
+        return self._row(r) if r else None
+
+    def next_envelope(self, sid: int) -> str:
+        with self._lock:
+            rows = self._db.execute("SELECT envelope FROM orders WHERE shoot_id=?", (int(sid),)).fetchall()
+        nums = [int(r[0]) for r in rows if str(r[0]).strip().isdigit()]
+        return str(max(nums) + 1) if nums else "1"
+
+    def save_order(self, sid: int, data: dict) -> dict:
+        clean = {}
+        for k in ORDER_FIELDS:
+            if k not in data:
+                continue
+            v = data[k]
+            if k == "glasses":
+                v = 1 if v else 0
+            elif k == "paid_cents":
+                v = max(0, int(v or 0))
+            elif k == "lines":
+                v = json.dumps([{"product_id": str(l.get("product_id")), "qty": int(l.get("qty") or 0)}
+                                for l in (v or []) if int(l.get("qty") or 0) > 0])
+            elif k == "paid_method":
+                v = str(v or "").lower()
+                if v not in PAID_METHODS:
+                    v = "other"
+            else:
+                v = str(v or "").strip()
+            clean[k] = v
+        now = time.time()
+        with self._lock:
+            if data.get("id"):
+                oid = int(data["id"])
+                if clean:
+                    sets = ", ".join(f"{k}=?" for k in clean)
+                    self._db.execute(f"UPDATE orders SET {sets}, updated=? WHERE id=? AND shoot_id=?",
+                                     (*clean.values(), now, oid, int(sid)))
+            else:
+                cols = ["shoot_id", *clean.keys(), "created", "updated"]
+                oid = self._db.execute(f"INSERT INTO orders ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+                                       (int(sid), *clean.values(), now, now)).lastrowid
+            self._db.commit()
+            r = self._db.execute("SELECT * FROM orders WHERE id=?", (oid,)).fetchone()
+        if not r:
+            raise ValueError("That order no longer exists.")
+        return self._row(r)
+
+    def delete_order(self, oid: int) -> dict | None:
+        """Deletes and returns the order, so the interface can offer Undo."""
+        o = self.get(oid)
+        with self._lock:
+            self._db.execute("DELETE FROM orders WHERE id=?", (int(oid),))
+            self._db.commit()
+        return o
+
+    def restore_order(self, o: dict) -> dict:
+        data = {k: o.get(k) for k in ORDER_FIELDS}
+        return self.save_order(int(o["shoot_id"]), data)
+
+    # -------------------------------------------------------- team photos --
+    def team_photos(self, sid: int) -> dict[str, dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT team, image, coach FROM team_photos WHERE shoot_id=?", (int(sid),)).fetchall()
+        return {r["team"]: {"image": r["image"], "coach": r["coach"]} for r in rows}
+
+    def set_team_photo(self, sid: int, team: str, image: str) -> None:
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO team_photos (shoot_id, team, image) VALUES (?,?,?)"
+                " ON CONFLICT(shoot_id, team) DO UPDATE SET image=excluded.image",
+                (int(sid), str(team), str(image or "").strip()))
+            self._db.commit()
+
+    def rename_team(self, sid: int, old: str, new: str) -> int:
+        new = str(new or "").strip()
+        if not new:
+            raise ValueError("A team needs a name.")
+        with self._lock:
+            n = self._db.execute("UPDATE orders SET team=?, updated=? WHERE shoot_id=? AND team=?",
+                                 (new, time.time(), int(sid), old)).rowcount
+            exists = self._db.execute("SELECT 1 FROM team_photos WHERE shoot_id=? AND team=?", (int(sid), new)).fetchone()
+            if exists:
+                self._db.execute("DELETE FROM team_photos WHERE shoot_id=? AND team=?", (int(sid), old))
+            else:
+                self._db.execute("UPDATE team_photos SET team=? WHERE shoot_id=? AND team=?", (new, int(sid), old))
+            self._db.commit()
+        return n
+
+    def close(self) -> None:
+        with self._lock:
+            self._db.close()
+

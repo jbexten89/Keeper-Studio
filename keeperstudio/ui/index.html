@@ -528,6 +528,93 @@ kbd{font-size:10px}
 .help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
 /* Framing card keeps one height, so the size list below never moves while stepping through photos */
 #right .sec[data-sec=c-status]:not(.closed) > .body{height:198px;overflow-y:auto;scrollbar-width:thin}
+/* ---------- Orders ---------- */
+#modView[data-mod=orders]{display:flex;flex-direction:column;overflow:hidden}
+.ord-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel-2)}
+.ord-head input[type=search]{width:240px}
+.ord-head .ttl{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord-scroll{flex:1;overflow:auto;min-height:0}
+.otbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.otbl th{position:sticky;top:0;z-index:1;background:var(--panel);color:var(--muted);font-weight:400;font-variant:all-small-caps;letter-spacing:.06em;font-size:13px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap}
+.otbl th:hover{color:var(--text)}
+.otbl th.amt,.otbl td.amt{text-align:right}
+.otbl th .arr{color:var(--accent);margin-left:3px}
+.otbl td{padding:6px 10px;border-bottom:1px solid #16191D;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+.otbl tbody tr{cursor:pointer}
+.otbl tbody tr:hover{background:#14171B}
+.otbl tbody tr.sel{background:#1A2330;box-shadow:inset 2px 0 0 var(--accent)}
+.otbl .dim{color:var(--dim)}
+.otbl .due{color:var(--amber)}
+.otbl .ok{color:#3CC77F}
+.otbl .warn{color:var(--amber)}
+.otbl .env{color:var(--muted);width:1%}
+.ord-empty{padding:60px 20px;text-align:center;color:var(--dim)}
+.ord-empty h3{color:var(--text);font-weight:600;margin:0 0 8px}
+.of-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;padding:10px 12px}
+.of-grid .fld{margin:0}
+.of-grid .wide{grid-column:1/-1}
+.of-grid input,.of-grid textarea{width:100%}
+textarea{font:inherit;color:var(--text);background:#0C0D10;border:1px solid var(--border-2);border-radius:4px;padding:5px 7px;outline:none;resize:vertical;min-height:48px;user-select:text}
+textarea:focus{border-color:var(--accent)}
+.pkgs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px 4px}
+.pkg{position:relative;background:#0C0D10;border:1px solid var(--border-2);border-radius:6px;padding:6px 4px 5px;text-align:center;cursor:pointer;color:var(--muted);line-height:1.2}
+.pkg:hover{border-color:#3B424D;color:var(--text)}
+.pkg b{display:block;font-size:17px;font-weight:600;color:var(--text)}
+.pkg small{font-size:11px}
+.pkg.on{border-color:var(--accent);background:var(--accent-bg);color:var(--text)}
+.pkg.on b{color:var(--accent)}
+.pkg .q{position:absolute;top:-6px;right:-6px;background:var(--accent);color:#03111E;border-radius:9px;font-size:11px;font-weight:700;min-width:18px;height:18px;line-height:18px;padding:0 4px}
+.pkg-note{padding:2px 12px 8px;color:var(--dim);font-size:12px;min-height:18px}
+.qrow{display:flex;align-items:center;gap:8px;padding:4px 12px;min-height:30px}
+.qrow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qrow .pr{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.qrow .pr s{color:var(--dim);margin-right:4px}
+.qrow.has .nm{color:var(--text)}
+.qrow:not(.has) .nm{color:var(--muted)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--border-2);border-radius:4px;overflow:hidden;flex:none}
+.stepper button{background:var(--raised);border:0;color:var(--muted);width:24px;height:22px;cursor:pointer;font-size:14px;line-height:1}
+.stepper button:hover{color:var(--text);background:#232830}
+.stepper span{min-width:24px;text-align:center;font-variant-numeric:tabular-nums}
+.qrow.has .stepper{border-color:var(--accent)}
+.ord-total{display:flex;align-items:baseline;gap:10px;padding:12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#0E1013}
+.ord-total .big{font-size:26px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.ord-total .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
+.ord-total .sub .due{color:var(--amber)}
+.ord-total .sub .ok{color:#3CC77F}
+.pay-row{display:flex;gap:8px;align-items:center;padding:10px 12px 4px}
+.pay-row .seg{flex:1}
+.pay-row input{width:90px;text-align:right}
+.photo-row{display:flex;gap:10px;align-items:flex-start;padding:10px 12px}
+.photo-row .thumb{width:64px;height:84px;border-radius:4px;background:#0C0D10 center/cover no-repeat;border:1px solid var(--border-2);flex:none}
+.photo-row .thumb.none{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:11px;text-align:center}
+.photo-row .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.photo-row input{width:100%}
+.save-state{color:var(--dim);font-size:12px;margin-left:auto;font-variant:normal;letter-spacing:0}
+.save-state.err{color:var(--reject)}
+.tot-grid{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;font-variant-numeric:tabular-nums}
+.tot-grid span{color:var(--muted)}
+.tot-grid b{font-weight:600;text-align:right}
+.tot-grid b.due{color:var(--amber)}
+.tot-grid .big{font-size:20px;font-weight:600}
+.row .sub{display:block;color:var(--dim);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .two{display:flex;flex-direction:column;min-width:0;flex:1}
+.lab{padding:12px 16px 30px;max-width:980px}
+.lab-ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+.lab-ctrl .pathrow{flex:1;min-width:280px}
+.lab-ctrl .path{direction:ltr}
+.lab-grp{border:1px solid var(--border);border-radius:8px;margin:0 0 12px;overflow:hidden}
+.lab-grp>header{display:flex;gap:12px;align-items:baseline;padding:8px 12px;background:var(--panel-2);border-bottom:1px solid var(--border)}
+.lab-grp>header b{font-size:14px;font-weight:600}
+.lab-grp>header span{color:var(--muted);font-size:12px}
+.lab-it{display:grid;grid-template-columns:22px minmax(160px,1fr) 60px 2fr;gap:10px;padding:5px 12px;border-bottom:1px solid #16191D;align-items:center;font-variant-numeric:tabular-nums}
+.lab-it:last-child{border-bottom:0}
+.lab-it .q{text-align:right;color:var(--text)}
+.lab-it .who{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.lab-it .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lab-it .ok{color:#3CC77F}.lab-it .bad{color:var(--amber)}
+.lab-sum{display:flex;gap:18px;margin:0 0 14px;color:var(--muted)}
+.lab-sum b{color:var(--text);font-weight:600;font-size:18px;margin-right:4px}
+.banner.inline{display:flex;align-items:center;gap:10px;padding:8px 12px;font-weight:600;border-radius:6px;margin:0 0 12px}
 </style>
 </head>
 <body>
@@ -1233,7 +1320,7 @@ function renderView() {
   if (S.module !== 'library') {
     ['#gridScroll', '#loupe', '#compare', '#survey', '#filterbar'].forEach(x => $(x).hidden = true);
     $('#app').classList.remove('multi');
-    const showEmpty = !has && S.module !== 'composite';
+    const showEmpty = !has && !NO_PHOTOS_NEEDED.has(S.module);
     $('#empty').hidden = !showEmpty; $('#modView').hidden = showEmpty;
     if (showEmpty) return renderEmpty();
     const mod = Mods.get(S.module); return mod && mod.center();
@@ -1968,7 +2055,8 @@ function buildHelp() {
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
-    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Orders', 'Ctrl 5'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -2102,7 +2190,7 @@ function onKey(e) {
   if (mod && k === 'd') { e.preventDefault(); return deselect(); }
   if (mod && k === 'o') { e.preventDefault(); return openFolder(); }
   if (mod && k === 'n') { e.preventDefault(); return openCollDialog(); }
-  if (mod && /^[1-4]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
+  if (mod && /^[1-5]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }
   if (mod || e.altKey) return;
   if (e.key === '?') return toggleHelp();
   if (!$('#help').hidden) { if (e.key === 'Escape') toggleHelp(false); return; }
@@ -2146,8 +2234,10 @@ function onKey(e) {
   }
 }
 
-/* ================= Modules: Library · Crop · Composite · Extract ================= */
-const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract']];
+/* ================= Modules: Library · Crop · Composite · Extract · Orders ================= */
+// Modules that work with no folder open.
+const NO_PHOTOS_NEEDED = new Set(['composite', 'orders']);
+const MODULES = [['library', 'Library'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract'], ['orders', 'Orders']];
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
@@ -2169,11 +2259,11 @@ function setModule(m) {
   const mod = Mods.get(m); if (mod && mod.enter) mod.enter();
 }
 const Mods = {
-  get(m) { return { crop: Crop, composite: Comp, cutout: Cut }[m]; },
-  libraryLoaded() { Crop.libraryLoaded(); Cut.libraryLoaded(); Comp.libraryLoaded(); },
+  get(m) { return { crop: Crop, composite: Comp, cutout: Cut, orders: Ord }[m]; },
+  libraryLoaded() { Crop.libraryLoaded(); Cut.libraryLoaded(); Comp.libraryLoaded(); Ord.libraryLoaded(); },
   chrome() {
     const lib = S.module === 'library';
-    $('#modView').hidden = lib || !S.photos.length && S.module !== 'composite';
+    $('#modView').hidden = lib || !S.photos.length && !NO_PHOTOS_NEEDED.has(S.module);
     $('#modbar').hidden = lib;
     $$('#top [data-module]').forEach(b => b.classList.toggle('on', b.dataset.module === S.module));
     document.body.dataset.module = S.module;
@@ -2936,6 +3026,414 @@ const Cut = {
   key() { return false; },
 };
 
+/* ============================================================== Orders ==== */
+// Picture-day envelopes: packages, payments, photo numbers, and the lab order.
+// Prices come from prices.yaml through the server; the total shown while typing
+// uses the same rules (any package unlocks the lower a la carte price).
+const fmt$ = c => (c < 0 ? '-' : '') + '$' + (Math.abs(c || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const parse$ = s => { const v = parseFloat(String(s || '').replace(/[$,\s]/g, '')); return Number.isFinite(v) ? Math.max(0, Math.round(v * 100)) : 0; };
+const stemOf = n => String(n || '').replace(/\.[^.]+$/, '');
+const fmtDay = d => { if (!d) return ''; const t = new Date(d + 'T12:00:00'); return isNaN(t) ? d : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); };
+const Ord = {
+  shoots: [], sid: null, d: null, cat: null, pricesPath: '', team: 'all', q: '', sort: { k: 'env', dir: 1 },
+  sel: null, draft: null, view: 'orders', lab: null, crops: '', onePer: true, building: false,
+  saveT: null, state: '', err: false, undo: null, last: {}, stems: null, stemsKey: '',
+  async load() {
+    await this.loadCatalog();
+    try { this.shoots = (await api('/api/orders/shoots', {})).shoots; } catch { this.shoots = []; }
+    const [last, one] = await Promise.all([DB.get('kv', 'orders|shoot').catch(() => null), DB.get('kv', 'orders|oneper').catch(() => null)]);
+    if (one === false) this.onePer = false;
+    this.sid = this.shoots.some(s => s.id === last) ? last : (this.shoots.find(s => !s.archived) || {}).id || null;
+    if (this.sid) await this.refresh();
+  },
+  async loadCatalog() {
+    try { const r = await api('/api/orders/catalog', {}); this.cat = r.catalog; this.pricesPath = r.prices_path; } catch {}
+  },
+  shoot() { return this.shoots.find(s => s.id === this.sid) || null; },
+  products(type) { return this.cat ? this.cat.products.filter(p => p.type === type) : []; },
+  prod(id) { return this.cat ? this.cat.products.find(p => p.id === id) : null; },
+  async refresh() {
+    if (!this.sid) { this.d = null; return; }
+    try { this.d = await api('/api/orders/list', { shoot_id: this.sid }); } catch (e) { toast(esc(e.message), 5000); return; }
+    const s = this.shoot(); if (s) s.n = this.d.orders.length;
+    if (this.team !== 'all' && !this.d.teams.some(t => t.name === this.team)) this.team = 'all';
+  },
+  libraryLoaded() { this.stems = null; },
+  photoFor(stem) {
+    const key = `${S.gen}:${S.photos.length}`;
+    if (!this.stems || this.stemsKey !== key) { this.stems = new Map(S.photos.map(p => [stemOf(p.name).toLowerCase(), p])); this.stemsKey = key; }
+    return this.stems.get(stemOf(stem).toLowerCase()) || null;
+  },
+  // '5371' -> the photo in the open folder ending in 5371, else the folder's own prefix (IMG_5371)
+  matches(digits) {
+    if (!digits) return [];
+    const re = new RegExp(`(^|\\D)${digits}(\\D|$)`);
+    return [...new Set(S.photos.map(p => stemOf(p.name)).filter(n => re.test(n)))].sort(collator.compare).slice(0, 12);
+  },
+  normImage(v) {
+    v = String(v || '').trim();
+    if (/^\d+$/.test(v)) {
+      const m = this.matches(v); if (m.length === 1) return m[0];
+      const first = S.photos.length ? stemOf(S.photos[0].name) : ''; const pre = (first.match(/^\D+/) || ['IMG_'])[0];
+      return pre + v;
+    }
+    return v.replace(/\.(jpe?g|png|tiff?|heic|hif|cr[23]|dng)$/i, '');
+  },
+  enter() { this.render(); if (this.view === 'lab') this.loadLab(); this.loadCatalog().then(() => { if (S.module === 'orders') renderRight(); }); },
+  render() { renderView(); renderLeft(); renderRight(); this.modbar(); },
+  rows() {
+    if (!this.d) return [];
+    let r = this.d.orders;
+    if (this.team !== 'all') r = r.filter(o => (o.team || '') === this.team);
+    const q = this.q.trim().toLowerCase();
+    if (q) r = r.filter(o => [o.envelope, o.athlete, o.team, o.coach, o.parent, o.phone, o.image, o.edited, o.frames, o.summary.packages, o.notes].join(' ').toLowerCase().includes(q));
+    const { k, dir } = this.sort;
+    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : String(o[k] || '').toLowerCase();
+    return r.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || collator.compare(a.athlete, b.athlete) || a.id - b.id; });
+  },
+  // ---------- pricing while typing (the server prices what is saved) ----------
+  price(lines) {
+    const live = (lines || []).filter(l => l.qty > 0 && this.prod(l.product_id));
+    const hasPkg = live.some(l => this.prod(l.product_id).type === 'package');
+    let total = 0, savings = 0;
+    for (const l of live) { const p = this.prod(l.product_id), u = this.unit(p, hasPkg); total += u * l.qty; savings += (p.price - u) * l.qty; }
+    return { hasPkg, total, savings };
+  },
+  unit(p, hasPkg) { return p.type === 'alacarte' && hasPkg ? p.with_package : p.price; },
+  qty(pid) { const l = ((this.draft && this.draft.lines) || []).find(l => l.product_id === pid); return l ? l.qty : 0; },
+  setQty(pid, q) {
+    const d = this.draft; if (!d) return;
+    const before = this.price(d.lines).total;
+    const order = (this.cat ? this.cat.products : []).map(p => p.id);
+    d.lines = d.lines.filter(l => l.product_id !== pid);
+    q = clamp(q, 0, 20); if (q) d.lines.push({ product_id: pid, qty: q });
+    d.lines.sort((a, b) => order.indexOf(a.product_id) - order.indexOf(b.product_id));
+    // paid in full stays paid in full when the order changes
+    if (d.paid_method && d.paid_cents === before) d.paid_cents = this.price(d.lines).total;
+    this.changed(true);
+  },
+  togglePkg(letter, add) {
+    const p = this.products('package').find(p => p.letter.toLowerCase() === letter.toLowerCase()); if (!p || !this.draft) return false;
+    const q = this.qty(p.id); this.setQty(p.id, add ? q + 1 : q ? 0 : 1); return true;
+  },
+  // ---------- selecting, new, saving, deleting ----------
+  async flush() { while (this.saveT || this._saving) { if (this.saveT) await this.save(); else await this._saving; } },
+  async select(id) {
+    await this.flush();
+    const o = this.d && this.d.orders.find(o => o.id === id); if (!o) return;
+    this.sel = id; this.draft = JSON.parse(JSON.stringify(o)); this.state = ''; this.err = false;
+    this.paintRows(); renderRight();
+    const tr = $(`#modView tr[data-oid="${id}"]`); if (tr) tr.scrollIntoView({ block: 'nearest' });
+  },
+  async newOrder() {
+    if (!this.sid) return this.editShoot(true);
+    await this.flush();
+    if (this.view !== 'orders') this.setView('orders');
+    this.sel = 'new'; this.state = ''; this.err = false;
+    this.draft = { envelope: this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
+      lines: [], glasses: false, paid_method: '', paid_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
+    if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
+    this.paintRows(); renderRight();
+    setTimeout(() => { const i = $('#right [data-of="athlete"]'); if (i) i.focus(); }, 0);
+  },
+  changed(redraw) {
+    this.state = 'Saving…'; this.err = false; clearTimeout(this.saveT);
+    this.saveT = setTimeout(() => this.save(), 450);
+    if (redraw) renderRight(); else { this.paintTotal(); this.paintState(); }
+  },
+  async save() {
+    clearTimeout(this.saveT); this.saveT = null;
+    const d = this.draft; if (!d || !this.sid) return;
+    if (!d.id && !d.athlete.trim() && !d.lines.length) { this.state = ''; this.paintState(); return; }  // nothing typed yet
+    if (this._saving) { this._again = true; return this._saving; }
+    const body = {}; for (const k of ['id', 'envelope', 'athlete', 'team', 'coach', 'parent', 'phone', 'email', 'glasses', 'frames', 'image', 'edited', 'notes', 'paid_method', 'paid_cents', 'lines']) if (k in d) body[k] = d[k];
+    this._saving = (async () => {
+      try {
+        const o = (await api('/api/orders/save', { shoot_id: this.sid, order: body })).order;
+        if (this.draft === d) { d.id = o.id; d.summary = o.summary; if (this.sel === 'new') this.sel = o.id; }
+        this.last = { team: o.team, coach: o.coach };
+        this.state = 'Saved'; this.err = false;
+        await this.refresh();
+      } catch (e) { this.state = 'Not saved: ' + e.message; this.err = true; }
+    })();
+    await this._saving; this._saving = null;
+    if (this._again) { this._again = false; return this.save(); }
+    if (S.module === 'orders') { this.paintRows(); renderLeft(); this.paintState(); }
+  },
+  async del() {
+    const d = this.draft; if (!d) return;
+    clearTimeout(this.saveT); this.saveT = null;
+    if (!d.id) { this.sel = null; this.draft = null; return this.render(); }
+    try { this.undo = (await api('/api/orders/delete', { id: d.id })).deleted; } catch (e) { return toast(esc(e.message)); }
+    this.sel = null; this.draft = null; await this.refresh(); this.render();
+    toast(`Deleted ${esc((this.undo && this.undo.athlete) || 'the envelope')} <button class="toast-link" onclick="KS_ordUndo()">Undo</button>`, 7000);
+  },
+  async undoDelete() {
+    if (!this.undo) return;
+    try { const o = (await api('/api/orders/restore', { order: this.undo })).order; this.undo = null; await this.refresh(); this.render(); this.select(o.id); }
+    catch (e) { toast(esc(e.message)); }
+  },
+  move(dir) {
+    const rows = this.rows(); if (!rows.length) return;
+    const i = rows.findIndex(o => o.id === this.sel);
+    const n = rows[i < 0 ? (dir > 0 ? 0 : rows.length - 1) : clamp(i + dir, 0, rows.length - 1)]; if (n) this.select(n.id);
+  },
+  // ---------- shoots & teams ----------
+  editShoot(isNew, id) {
+    const s = isNew ? { name: '', date: new Date().toISOString().slice(0, 10), season: '', notes: '' } : (this.shoots.find(x => x.id === (id || this.sid)) || {});
+    openModal(`<h3>${isNew ? 'New shoot' : 'Shoot'}</h3>
+      <label class="fld"><span>Name</span><input id="shName" value="${esc(s.name)}" placeholder="e.g. Montpelier Basketball" autofocus spellcheck="false"></label>
+      <div style="display:flex;gap:12px"><label class="fld" style="flex:1"><span>Picture day</span><input id="shDate" type="date" value="${esc(s.date)}"></label>
+      <label class="fld" style="flex:1"><span>Season</span><input id="shSeason" value="${esc(s.season)}" placeholder="Winter 2026"></label></div>
+      <label class="fld"><span>Notes</span><textarea id="shNotes" rows="3">${esc(s.notes)}</textarea></label>
+      <div class="m-actions">${isNew ? '' : `<button class="btn" id="shDel" style="margin-right:auto">Delete…</button><button class="btn" id="shArch">${s.archived ? 'Unarchive' : 'Archive'}</button>`}<button class="btn" data-close>Cancel</button><button class="btn primary" data-ok>${isNew ? 'Create' : 'Save'}</button></div>`, card => {
+      const go = async extra => {
+        const body = { ...(isNew ? {} : { id: s.id, archived: s.archived }), name: $('#shName', card).value, date: $('#shDate', card).value, season: $('#shSeason', card).value, notes: $('#shNotes', card).value, ...extra };
+        try { const r = await api('/api/orders/shoot/save', { shoot: body }); this.shoots = r.shoots; closeModal(); if (isNew) await this.pickShoot(r.shoot.id); else this.render(); }
+        catch (e) { toast(esc(e.message)); }
+      };
+      $('[data-ok]', card).addEventListener('click', () => go({}));
+      $('#shName', card).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go({}); } });
+      const arch = $('#shArch', card); if (arch) arch.addEventListener('click', () => go({ archived: !s.archived }));
+      const del = $('#shDel', card);
+      if (del) del.addEventListener('click', () => { closeModal(); confirmDialog(`Delete ${s.name}?`, `This deletes the shoot and its ${plural(s.n || 0, 'envelope')}. A copy of the order book from earlier today is kept in Keeper Studio's backups folder.`, 'Delete shoot', async () => {
+        try { this.shoots = (await api('/api/orders/shoot/delete', { id: s.id })).shoots; } catch (e) { return toast(esc(e.message)); }
+        if (this.sid === s.id) await this.pickShoot((this.shoots.find(x => !x.archived) || {}).id || null); else this.render();
+      }); });
+    });
+  },
+  async pickShoot(id) {
+    await this.flush();
+    this.sid = id; this.sel = null; this.draft = null; this.team = 'all'; this.q = ''; this.lab = null; this.crops = '';
+    if (id) DB.put('kv', 'orders|shoot', id).catch(() => {});
+    this.d = null; await this.refresh(); this.render();
+    if (this.view === 'lab') this.loadLab();
+  },
+  ask(title, label, value, note = '') {
+    return new Promise(res => openModal(`<h3>${esc(title)}</h3><label class="fld"><span>${esc(label)}</span><input id="askIn" value="${esc(value)}" autofocus spellcheck="false"></label>${note ? `<p class="muted small">${note}</p>` : ''}
+      <div class="m-actions"><button class="btn" data-close>Cancel</button><button class="btn primary" data-ok>OK</button></div>`, card => {
+      const done = v => { closeModal(); res(v); };
+      $('[data-ok]', card).addEventListener('click', () => done($('#askIn', card).value.trim()));
+      $('#askIn', card).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); done(e.target.value.trim()); } });
+      $$('[data-close]', card).forEach(b => b.addEventListener('click', () => res(null)));
+    }));
+  },
+  async teamPhoto(team) {
+    const t = (this.d.teams.find(x => x.name === team) || {}), act = S.byId.get(S.active);
+    const v = await this.ask(`Group photo · ${team}`, 'Group photo file', t.image || (act ? stemOf(act.name) : ''),
+      `The team shot that team 5x7s, team 8x10s and Memory Mates are printed from. Crop names it like ${esc((t.image || 'IMG_5373') + '_7x5')}.${act ? ` Filled in from the photo selected in the filmstrip.` : ''}`);
+    if (v == null) return;
+    try { await api('/api/orders/team-photo', { shoot_id: this.sid, team, image: this.normImage(v) }); await this.refresh(); this.lab = null; this.render(); if (this.view === 'lab') this.loadLab(); }
+    catch (e) { toast(esc(e.message)); }
+  },
+  async renameTeam(team) {
+    const v = await this.ask('Rename team', 'Team name', team, 'Every envelope on this team is renamed.'); if (!v || v === team) return;
+    try { await api('/api/orders/rename-team', { shoot_id: this.sid, old: team, new: v }); if (this.team === team) this.team = v; if (this.draft && this.draft.team === team) this.draft.team = v; await this.refresh(); this.render(); }
+    catch (e) { toast(esc(e.message)); }
+  },
+  setView(v) { this.view = v; this.render(); if (v === 'lab') this.loadLab(); },
+  // ---------- exports, import, lab ----------
+  async exportCsv(kind) {
+    if (!this.sid) return;
+    let name; try { name = (await api('/api/orders/export-name', { shoot_id: this.sid, kind })).filename; } catch (e) { return toast(esc(e.message)); }
+    if (this.team !== 'all') name = name.replace(/\.csv$/, ` - ${sanitize(this.team)}.csv`);
+    const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+    const p = await pickPath('save', { initial: dir, filename: name, types: ['CSV (*.csv)'] }); if (!p) return;
+    try {
+      const r = await api('/api/orders/export', { shoot_id: this.sid, kind, path: p, team: this.team !== 'all' ? this.team : '' });
+      DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
+      toast(`Saved ${esc(baseName(r.path))}${this.team !== 'all' ? ` (${esc(this.team)} only)` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>${r.unmapped.length ? `<br>${r.unmapped.length} products have no ROES code yet — add them under Prices…` : ''}`, 6000);
+    } catch (e) { toast(esc(e.message), 5000); }
+  },
+  async importWeb() {
+    if (!this.sid) return;
+    const p = await pickPath('open', { initial: S.root || '', types: ['CSV (*.csv)'] }); if (!p) return;
+    try {
+      const r = await api('/api/orders/import-web', { shoot_id: this.sid, path: p });
+      await this.refresh(); this.render();
+      toast(`Imported ${plural(r.added, 'order')}${r.skipped ? ` · ${r.skipped} already here` : ''}`, 5000);
+      if (r.problems.length) openModal(`<h3>Some items weren't recognised</h3><p class="muted">They aren't in prices.yaml, so they were left off these orders:</p><div class="hint">${r.problems.map(esc).join('<br>')}</div><div class="m-actions"><button class="btn" data-close>OK</button></div>`);
+    } catch (e) { toast(esc(e.message), 6000); }
+  },
+  async openPrices() {
+    try { const r = await api('/api/orders/open-prices', {}); toast(`Opened ${esc(r.path)} — save it and come back; prices update by themselves.`, 6000); }
+    catch (e) { toast(esc(e.message)); }
+  },
+  selectOrdered() {
+    if (!this.d) return;
+    const want = new Set([...this.d.orders.filter(o => o.lines.length).map(o => o.edited || o.image), ...this.d.teams.map(t => t.image)].filter(Boolean).map(s => stemOf(s).toLowerCase()));
+    const ids = S.photos.filter(p => want.has(stemOf(p.name).toLowerCase())).map(p => p.id);
+    if (!ids.length) return toast('None of the ordered photos are in the open folder', 3000);
+    S.selected = new Set(ids); S.active = ids[0]; S.anchor = ids[0]; Crop.scope = 'selected';
+    setModule('crop'); refreshSelection();
+    const miss = want.size - ids.length;
+    toast(`${plural(ids.length, 'ordered photo')} selected — Crop will export just these${miss ? ` · ${miss} not in this folder` : ''}`, 5000);
+  },
+  async loadLab() {
+    if (!this.sid) return;
+    if (!this.crops) this.crops = (await DB.get('kv', 'orders|crops|' + this.sid).catch(() => null)) || Crop.outDir || '';
+    try { this.lab = await api('/api/orders/lab-plan', { shoot_id: this.sid, crops_dir: this.crops }); } catch (e) { toast(esc(e.message)); }
+    if (S.module === 'orders' && this.view === 'lab') renderView();
+  },
+  async pickCrops() {
+    const p = await pickPath('folder', { initial: this.crops || Crop.outDir || S.root || '' }); if (!p) return;
+    this.crops = p; DB.put('kv', 'orders|crops|' + this.sid, p).catch(() => {}); this.loadLab();
+  },
+  async buildLab() {
+    const s = this.shoot(); if (!s || this.building) return;
+    const parent = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!parent) return;
+    const dest = parent + (parent.includes('\\') ? '\\' : '/') + sanitize(`Lab order - ${s.name}`);
+    this.building = true; renderView();
+    try {
+      const r = await api('/api/orders/lab-build', { shoot_id: this.sid, crops_dir: this.crops, out_dir: dest, one_per_print: this.onePer });
+      toast(`${plural(r.copied, 'file')} copied${r.missing.length ? ` · ${r.missing.length} missing, listed in lab-order.csv` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.out_dir))})">Show</button>`, 8000);
+    } catch (e) { toast(esc(e.message), 6000); }
+    this.building = false; renderView();
+  },
+  // ---------- drawing ----------
+  left() {
+    const sh = this.shoots.map(s => `<div class="row ${s.id === this.sid ? 'on' : ''}" data-oshoot="${s.id}"><span class="two"><span class="lbl">${esc(s.name)}</span><span class="sub">${esc([fmtDay(s.date), s.season, s.archived ? 'archived' : ''].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
+    let html = sectionHTML('o-shoots', 'Shoots', (sh || '<div class="hint">A shoot is one picture day: its envelopes, teams and lab order.</div>') + `<div class="pad"><button class="btn sm" data-ord="new-shoot">New shoot…</button></div>`);
+    if (this.d) {
+      const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
+      html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
+      const T = this.d.totals;
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+    }
+    $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
+  },
+  center() {
+    const v = $('#modView'); v.dataset.mod = 'orders';
+    if (!this.sid) {
+      v.innerHTML = `<div class="ord-scroll"><div class="ord-empty"><h3>Orders</h3><p>Type in picture-day envelopes, track who has paid, and build the lab order<br>from just the photos and sizes families bought.</p><br><button class="btn primary lg" data-ord="new-shoot">New shoot…</button></div></div>`;
+      return;
+    }
+    if (this.view === 'lab') return this.labCenter(v);
+    const s = this.shoot() || {};
+    v.innerHTML = `<div class="ord-head"><span class="ttl">${esc(s.name)}${this.team !== 'all' ? ' · ' + esc(this.team) : ''}</span><span class="muted small" id="ordCount"></span><div class="tb-spacer"></div>
+      <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
+      <div class="ord-scroll" id="ordRows"></div>`;
+    this.paintRows();
+  },
+  paintRows() {
+    const box = $('#ordRows'); if (!box || S.module !== 'orders') return;
+    const rows = this.rows(); const cnt = $('#ordCount'); if (cnt) cnt.textContent = plural(rows.length, 'envelope');
+    const th = (k, l, cls = '') => `<th class="${cls}" data-osort="${k}">${l}${this.sort.k === k ? `<span class="arr">${this.sort.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
+    const y = box.scrollTop;
+    box.innerHTML = rows.length ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}</tbody></table>`
+      : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
+    box.scrollTop = y;
+  },
+  rowHTML(o) {
+    const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
+    const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.due_cents < 0 ? `<td class="amt due" title="Paid more than the total">${fmt$(s.due_cents)}</td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
+    return `<tr data-oid="${o.id}" class="${o.id === this.sel ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
+      <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td><td>${pic ? esc(pic) : o.lines.length ? '<span class="warn">needs photo</span>' : ''}</td><td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td>${due}</tr>`;
+  },
+  labCenter(v) {
+    const L = this.lab;
+    if (!L) { v.innerHTML = '<div class="msg">Working out the lab order…</div>'; return; }
+    const items = L.groups.flatMap(g => g.items);
+    const need = items.filter(i => i.file).length, found = items.filter(i => i.found).length, nofile = items.filter(i => !i.file);
+    const prints = L.groups.reduce((a, g) => a + g.qty, 0);
+    v.innerHTML = `<div class="ord-scroll"><div class="lab">
+      <div class="lab-ctrl"><div class="pathrow"><span class="path ${L.crops_dir && !L.crops_exists ? 'bad' : ''}" title="${esc(L.crops_dir)}">${esc(L.crops_dir || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-ord="lab-crops">Crops folder…</button></div>
+        ${switchHTML('oneper', this.onePer, 'One file per print', 'For the Meridian website: two 4x6s become two files, so a whole size folder uploads with every quantity at 1. Off: one file each, with quantities in lab-order.csv (for ROES).')}
+        <button class="btn primary" data-ord="lab-build" ${this.building || !L.crops_exists || !found ? 'disabled' : ''}>${this.building ? 'Building…' : 'Build lab folder…'}</button></div>
+      ${L.crops_dir && !L.crops_exists ? `<div class="banner amber inline">That crops folder isn’t there any more — choose where Crop exported this shoot.</div>` : ''}
+      ${nofile.length ? `<div class="banner amber inline">${plural(nofile.length, 'item')} ${nofile.length === 1 ? 'has' : 'have'} no photo picked: ${esc(nofile.map(i => i.for.join(', ')).slice(0, 4).join('; '))}${nofile.length > 4 ? '…' : ''}</div>` : ''}
+      <div class="lab-sum"><span><b>${prints}</b>to print</span><span><b>${need}</b>files</span>${L.crops_exists ? `<span><b>${found}</b>found</span><span><b>${need - found}</b>not cropped yet</span>` : ''}</div>
+      ${L.groups.map(g => `<div class="lab-grp"><header><b>${esc(g.group)}</b><span>${plural(g.qty, /wallet/i.test(g.group) ? 'sheet' : 'print')} · ${plural(g.files, 'file')}</span></header>${g.items.map(it => `<div class="lab-it"><span class="${it.found ? 'ok' : 'bad'}" title="${it.found ? 'Found in the crops folder' : it.file ? 'Not in the crops folder yet' : 'No photo picked'}">${it.found ? '✓' : it.file ? '○' : '!'}</span><span class="f" title="${esc(it.found || it.file)}">${esc(it.file || 'no photo picked')}</span><span class="q">×${it.qty}</span><span class="who" title="${esc(it.for.join(', '))}">${esc(it.for.join(', '))}</span></div>`).join('')}</div>`).join('') || '<div class="ord-empty">Nothing has been ordered yet.</div>'}
+    </div></div>`;
+  },
+  totalHTML(pr, d) {
+    const due = pr.total - (d.paid_cents || 0);
+    const st = !pr.total ? '' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
+    return `<span class="big">${fmt$(pr.total)}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)}<br>` : ''}${st}</span>`;
+  },
+  photoHTML(d) {
+    const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
+    return `<div class="photo-row"><div class="thumb ${ph ? '' : 'none'}" ${ph ? `style="background-image:url(&quot;${esc(thumbUrl(ph.path, 200))}&quot;)" title="${esc(ph.name)}"` : ''}>${ph ? '' : stem ? 'not in the<br>open folder' : 'no photo'}</div>
+      <div class="col"><label class="fld" style="margin:0"><span>Photo to print</span><input data-of="image" list="ordFrames" value="${esc(d.image)}" placeholder="5371 or IMG_5371" spellcheck="false"></label>
+      <div class="btn-row" style="margin:0">${act ? `<button class="btn sm" data-ord="use-photo" title="Use the photo selected in the filmstrip">Use ${esc(stemOf(act.name))}</button>` : `<span class="muted small">${S.photos.length ? 'Click a photo in the filmstrip to use it' : 'Open the shoot’s folder to pick from the filmstrip'}</span>`}</div></div></div>
+      <div class="of-grid"><label class="fld"><span>Frames shot</span><input data-of="frames" value="${esc(d.frames)}" placeholder="5370-5372" spellcheck="false"></label><label class="fld"><span>Retouched file</span><input data-of="edited" value="${esc(d.edited)}" placeholder="if renamed" spellcheck="false"></label></div>
+      <div class="pad-x" style="padding-bottom:10px">${switchHTML('glasses', !!d.glasses, 'Glasses — glare to fix')}</div>`;
+  },
+  right() {
+    const d = this.draft;
+    const warn = this.cat && this.cat.warnings.length ? `<div class="hint" style="color:var(--amber)">${this.cat.warnings.map(esc).join('<br>')}</div>` : '';
+    if (!d) {
+      $('#right').innerHTML = `<div class="scroll">${sectionHTML('o-help', 'Envelopes', `<div class="hint">${this.sid ? 'Select an envelope to edit it, or press <b>N</b> to type in a new one.' : 'Create a shoot to start.'}<br><br>While an envelope is open, press <b>A</b>–<b>G</b> to add that package (Shift adds another, for siblings). Everything saves by itself.</div>${warn}`)}</div>`;
+      return;
+    }
+    const pr = this.price(d.lines);
+    const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${fmt$(p.price)}</small></button>`; }).join('');
+    const notes = d.lines.map(l => this.prod(l.product_id)).filter(p => p && p.type === 'package').map(p => `<b>${esc(p.label)}</b> ${esc(p.summary)}`).join('<br>');
+    const qrow = p => { const q = this.qty(p.id); return `<div class="qrow ${q ? 'has' : ''}"><span class="nm" title="${esc(p.unit_label)}">${esc(p.short)}</span><span class="pr">${p.type === 'alacarte' && pr.hasPkg ? `<s>${fmt$(p.price)}</s>` : ''}${fmt$(this.unit(p, pr.hasPkg))}</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${q}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`; };
+    const fld = (k, l, wide, extra = '') => `<label class="fld ${wide ? 'wide' : ''}"><span>${l}</span><input data-of="${k}" value="${esc(d[k])}" spellcheck="false" ${extra}></label>`;
+    $('#right').innerHTML = `<div class="scroll">
+      ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid">${fld('envelope', 'Envelope #')}${fld('team', 'Team', false, 'list="ordTeams"')}${fld('athlete', 'Athlete', true, 'placeholder="First and last name"')}${fld('coach', 'Coach', true, 'list="ordCoaches"')}</div>`)}
+      ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
+      ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
+      ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
+      <div class="ord-total" id="ordTotal">${this.totalHTML(pr, d)}</div>
+      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="0.00"></div><div class="hint tight">How they paid fills in the total. Type a different amount for a part payment.</div>`)}
+      ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
+      ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
+      <div class="pad"><div class="btn-row">${d.id ? '<button class="btn sm" data-ord="delete">Delete envelope</button>' : ''}<div class="tb-spacer"></div><button class="btn sm" data-ord="new">Next envelope (N)</button></div></div>
+      ${warn}
+      <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
+      <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+      <datalist id="ordFrames">${this.matches(String(d.image || '').replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>`;
+  },
+  paintTotal() { const t = $('#ordTotal'); if (t && this.draft) t.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft); },
+  paintState() { const s = $('#right .save-state'); if (s) { s.textContent = this.state; s.classList.toggle('err', this.err); } },
+  modbar() {
+    if (S.module !== 'orders') return;
+    const dis = this.sid ? '' : 'disabled';
+    const unm = this.cat ? this.cat.unmapped_roes.length : 0;
+    $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order']]) : ''}
+      ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
+      <div class="tb-spacer"></div>
+      <button class="btn sm" data-ord="import" ${dis} title="Add the orders from the website’s /admin CSV export">Import website CSV…</button>
+      <span class="muted small">Export</span>
+      <button class="btn sm" data-oexp="pull" ${dis} title="One row per athlete with every print size counted — the sheet to stuff envelopes from">Pull sheet</button>
+      <button class="btn sm" data-oexp="crop" ${dis} title="Exactly which crops to make: only the sizes families bought">Crop list</button>
+      <button class="btn sm" data-oexp="roes" ${dis} title="${unm ? `${unm} products still need Meridian’s ROES code (Prices…)` : 'ROES event import file'}">ROES file${unm ? ' ⚠' : ''}</button>
+      <button class="btn sm" data-oexp="items" ${dis} title="One row per item bought, for the books">Orders CSV</button>
+      <button class="btn sm" data-ord="prices" title="Edit prices.yaml: packages, prices, ROES codes">Prices…</button>`;
+  },
+  key(e, k) {
+    if (modalOpen()) return false;
+    if (e.key === '/') { const i = $('#modView [data-oq]'); if (i) { i.focus(); i.select(); return true; } }
+    if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
+    if (e.key === 'Delete' && this.draft) { this.del(); return true; }
+    if (e.key === 'Escape' && this.draft) { this.flush(); this.sel = null; this.draft = null; this.paintRows(); renderRight(); return true; }
+    if (/^[a-z]$/.test(k) && this.draft && this.togglePkg(k, e.shiftKey)) return true;
+    return false;
+  },
+  // field typing in the editor (no redraw, so the cursor stays put)
+  onInput(el) {
+    const d = this.draft; if (!d) return;
+    const k = el.dataset.of;
+    if (k === 'paid') { d.paid_cents = parse$(el.value); if (d.paid_cents && !d.paid_method) d.paid_method = 'cash'; }
+    else d[k] = el.value;
+    if (k === 'image') { const dl = $('#ordFrames'); if (dl) dl.innerHTML = this.matches(el.value.replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join(''); }
+    this.changed(false);
+  },
+  onChange(el) {
+    const d = this.draft; if (!d) return;
+    if (el.dataset.of === 'image' || el.dataset.of === 'edited') {
+      const v = this.normImage(el.value); if (v !== el.value) { el.value = v; d[el.dataset.of] = v; this.changed(false); }
+      const ph = $('#right .photo-row'); if (ph) keepScroll('#right', () => this.right());
+    }
+    if (el.dataset.of === 'paid' && el.value) el.value = (d.paid_cents / 100).toFixed(2);
+    if (el.dataset.of === 'team' && d.team && !d.coach && this.d) { const o = this.d.orders.find(o => o.team === d.team && o.coach); if (o) { d.coach = o.coach; this.changed(true); } }
+  },
+};
+window.KS_ordUndo = () => Ord.undoDelete();
+
 /* ---------- module UI events ---------- */
 // A newer release on GitHub? Shown once per launch as a blue banner; ✕ means "later".
 async function checkForUpdate() {
@@ -3005,6 +3503,8 @@ function bindModuleEvents() {
       const k = sw.dataset.sw;
       if (S.module === 'crop') { const v = !sw.classList.contains('on'); Crop.saveSettings({ [k]: v }); }
       else if (S.module === 'composite') { Comp.f[k] = !sw.classList.contains('on'); Comp.save(); Comp.render(); }
+      else if (S.module === 'orders' && k === 'glasses' && Ord.draft) { Ord.draft.glasses = !Ord.draft.glasses; Ord.changed(true); }
+      else if (S.module === 'orders' && k === 'oneper') { Ord.onePer = !Ord.onePer; DB.put('kv', 'orders|oneper', Ord.onePer).catch(() => {}); renderView(); }
       return;
     }
     const sg = t.closest('.seg button');
@@ -3016,6 +3516,8 @@ function bindModuleEvents() {
       else if (name === 'enhanceWhen') Crop.saveSettings({ enhance_when: v });
       else if (name === 'cutScope') { Cut.scope = v; renderLeft(); }
       else if (name === 'cutView') { Cut.view = v; renderView(); }
+      else if (name === 'ordView') Ord.setView(v);
+      else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v ? Ord.price(d.lines).total : 0; Ord.changed(true); }
       return;
     }
     const ci = t.closest('[data-circle]'); if (ci) { Crop.toggleCircle(ci.dataset.circle); return; }
@@ -3052,6 +3554,26 @@ function bindModuleEvents() {
       if (p) { Comp.f[key] = kind === 'save' && !/\.jpe?g$/i.test(p) ? p + '.jpg' : p; Comp.save(); Comp.built = key === 'background' ? null : Comp.built; Comp.refreshOrder(); Comp.render(); }
       return;
     }
+    if (S.module === 'orders') {
+      const pk = t.closest('[data-opkg]'); if (pk) { const q = Ord.qty(pk.dataset.opkg); Ord.setQty(pk.dataset.opkg, e.shiftKey ? q + 1 : q ? 0 : 1); return; }
+      const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
+      const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; Ord.paintRows(); return; }
+      const tr = t.closest('tr[data-oid]'); if (tr) { Ord.select(+tr.dataset.oid); return; }
+      const ex = t.closest('[data-oexp]'); if (ex) { Ord.exportCsv(ex.dataset.oexp); return; }
+      const oa = t.closest('[data-ord]');
+      if (oa) {
+        e.stopPropagation();
+        const a = oa.dataset.ord;
+        if (a === 'new') Ord.newOrder(); else if (a === 'new-shoot') Ord.editShoot(true); else if (a === 'edit-shoot') Ord.editShoot(false, +oa.dataset.id);
+        else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
+        else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
+        else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab();
+        return;
+      }
+      const sh = t.closest('[data-oshoot]'); if (sh) { if (+sh.dataset.oshoot !== Ord.sid) Ord.pickShoot(+sh.dataset.oshoot); return; }
+      const tm = t.closest('[data-oteam]'); if (tm) { Ord.team = tm.dataset.oteam; renderLeft(); renderView(); return; }
+    }
     const cu = t.closest('[data-cut]');
     if (cu) {
       const a = cu.dataset.cut;
@@ -3087,6 +3609,12 @@ function bindModuleEvents() {
     clearTimeout(Comp._t); Comp._t = setTimeout(() => { if (['max_per_row', 'row_counts'].includes(i.dataset.cf)) Comp.refreshOrder(); else renderRight(); }, 300);
   });
   $('#left').addEventListener('change', e => { const i = e.target.closest('select[data-cf]'); if (i && S.module === 'composite') { Comp.refreshOrder(); i.blur(); } });
+  // Orders: typing in the envelope editor and the search box
+  $('#right').addEventListener('input', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onInput(i); });
+  $('#right').addEventListener('change', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onChange(i); });
+  $('#modView').addEventListener('input', e => { const i = e.target.closest('[data-oq]'); if (i && S.module === 'orders') { Ord.q = i.value; Ord.paintRows(); } });
+  // prices.yaml edited in another program: pick the new prices up on return
+  window.addEventListener('focus', () => { if (S.module === 'orders') Ord.loadCatalog().then(() => { if (S.module === 'orders') { renderRight(); Ord.modbar(); } }); });
 }
 
 /* ================= Boot ================= */
@@ -3099,13 +3627,13 @@ async function init() {
   try { const h = await api('/api/hello', {}); S.recent = h.recent || []; S.hello = h; } catch (e) { toast('Keeper Studio’s engine is not responding: ' + esc(e.message), 6000); }
   { const hv = $('#help .help-ver'); if (hv && S.hello) hv.textContent = 'Keeper Studio ' + S.hello.version; }
   setTimeout(checkForUpdate, 4000);
-  await Promise.all([loadStore(), Crop.load(), Comp.load()]);
+  await Promise.all([loadStore(), Crop.load(), Comp.load(), Ord.load()]);
   renderAll();
 }
 init();
 
 // Small hook for automated testing / power users
-window.KeeperStudio = { loadFolder, state: S, Crop, Comp, Cut };
+window.KeeperStudio = { loadFolder, state: S, Crop, Comp, Cut, Ord };
 })();
 </script>
 </body>

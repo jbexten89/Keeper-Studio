@@ -74,6 +74,11 @@ def _selftest() -> int:
             import clr  # noqa: F401  (loads pythonnet / .NET, which the window needs)
             lines.append("pythonnet: ok")
         lines.append("sizes: " + ", ".join(s["name"] for s in engine.sizes(cfg)))
+        from . import order_routes
+        cat = order_routes.catalog()
+        lines.append(f"prices: {len(cat.products)} products from {cat.source}")
+        if cat.warnings:
+            raise ValueError("; ".join(cat.warnings))
         lines.append("OK")
         code = 0
     except Exception as exc:

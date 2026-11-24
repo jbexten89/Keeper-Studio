@@ -43,6 +43,9 @@ jobs:
           Get-Content keeperstudio/__init__.py | Write-Host
         shell: pwsh
 
+      - name: Unit tests
+        run: python -m unittest discover tests -v
+
       - name: Build
         run: pyinstaller --noconfirm keeperstudio.spec
 

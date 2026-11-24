@@ -1,0 +1,80 @@
+# Keeper Studio — what Jamie Bexten Photography sells.
+#
+# Transcribed from the printed picture-day packet. The Orders tab reads every
+# price from this file, so a price change each season is an edit here and
+# nowhere else. Your copy lives in %LOCALAPPDATA%\KeeperStudio\prices.yaml
+# (Orders > Prices… opens it) and is kept when you update the app; this file
+# in the repository is the starting copy.
+#
+# Prices are in dollars. Sizes are: 8x10, 5x7, 4x6, wallet, memory-mate.
+# A Memory Mate is assembled here from a team 5x7 and an individual 5x7.
+
+packages:
+  - {id: pkg-a, letter: A, name: Package A, price: 40.00, badge: "Best Value!",
+     contents: {8x10: 1, memory-mate: 1, 5x7: 2, 4x6: 2, wallet: 8}}
+  - {id: pkg-b, letter: B, name: Package B, price: 35.00,
+     contents: {memory-mate: 1, 5x7: 2, 4x6: 2, wallet: 8}}
+  - {id: pkg-c, letter: C, name: Package C, price: 30.00,
+     contents: {memory-mate: 1, 5x7: 1, 4x6: 1, wallet: 8}}
+  - {id: pkg-d, letter: D, name: Package D, price: 25.00,
+     contents: {memory-mate: 1, 5x7: 1, 4x6: 1}}
+  - {id: pkg-e, letter: E, name: Package E, price: 20.00,
+     contents: {5x7: 1, 4x6: 1, wallet: 8}}
+  - {id: pkg-f, letter: F, name: Package F, price: 18.00,
+     contents: {5x7: 1, 4x6: 2}}
+  - {id: pkg-g, letter: G, name: Package G, price: 15.00,
+     contents: {memory-mate: 1}}
+
+# A la carte: the lower price applies only when the order has a package.
+# unit: how many prints one unit is ("3 - 4x6" is 3 prints).
+alacarte:
+  - {id: ac-8x10,      label: 8x10,      size: 8x10,   unit: 1, price: 15.00, with_package: 10.00}
+  - {id: ac-8x10-team, label: 8x10 Team, size: 8x10,   unit: 1, price: 15.00, with_package: 10.00, team: true}
+  - {id: ac-5x7,       label: 5x7,       size: 5x7,    unit: 1, price: 10.00, with_package: 8.00}
+  - {id: ac-5x7-team,  label: 5x7 Team,  size: 5x7,    unit: 1, price: 10.00, with_package: 8.00, team: true}
+  - {id: ac-4x6-3,     label: 4x6,       size: 4x6,    unit: 3, price: 12.00, with_package: 8.00}
+  - {id: ac-wallets-8, label: Wallets,   size: wallet, unit: 8, price: 12.00, with_package: 8.00}
+
+# Keepsakes: one price, never discounted. pack: how many come in one lab pack.
+# crop: the Crop size the keepsake is printed from (a size name from
+# config.yaml, e.g. 4x5 or 2_5x3_5). Left blank where it isn't settled yet;
+# the lab folder then lists the keepsake without a file.
+misc:
+  - {id: misc-mini-wallets-8,   label: Mini Wallets,   unit: 8, price: 6.00,  crop: ""}
+  - {id: misc-wallet-magnets-4, label: Wallet Magnets, unit: 4, price: 10.00, pack: 4, crop: ""}
+  - {id: misc-magnet-4x5,       label: 4x5 Magnet,     unit: 1, price: 7.00,  crop: 4x5}
+  - {id: misc-magnet-5x7,       label: 5x7 Magnet,     unit: 1, price: 10.00, crop: 5x7}
+  - {id: misc-photo-key-ring,   label: Photo Key Ring, unit: 1, price: 6.00,  crop: ""}
+  - {id: misc-photo-badge,      label: Photo Badge,    unit: 1, price: 6.00,  crop: ""}
+
+# Which Crop size each print is cut to. Names match the folders and file
+# suffixes Crop > Export prints writes (IMG_5371_5x7.JPG, IMG_5373_7x5.JPG).
+crop_sizes:
+  individual: {8x10: 8x10, 5x7: 5x7, 4x6: 4x6, wallet: 2_5x3_5}
+  team:       {8x10: 10x8, 5x7: 7x5}
+
+# ROES event import (Orders > Export > ROES import file). Fill in Meridian's
+# own product codes; a guessed code silently orders the wrong product, so a
+# blank code is exported as the product's name and flagged in the app.
+roes:
+  delimiter: ";"
+  codes:
+    pkg-a: ""
+    pkg-b: ""
+    pkg-c: ""
+    pkg-d: ""
+    pkg-e: ""
+    pkg-f: ""
+    pkg-g: ""
+    ac-8x10: ""
+    ac-8x10-team: ""
+    ac-5x7: ""
+    ac-5x7-team: ""
+    ac-4x6-3: ""
+    ac-wallets-8: ""
+    misc-mini-wallets-8: ""
+    misc-wallet-magnets-4: ""
+    misc-magnet-4x5: ""
+    misc-magnet-5x7: ""
+    misc-photo-key-ring: ""
+    misc-photo-badge: ""

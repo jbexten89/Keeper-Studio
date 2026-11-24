@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__, engine, jobs, library, paths
+from . import __version__, engine, jobs, library, order_routes, paths
 from .catalog import Catalog
 
 TOKEN = secrets.token_urlsafe(24)
@@ -360,6 +360,7 @@ ROUTES = {
     "/api/composite/build": r_comp_build,
     "/api/cutout/status": r_cutout_status, "/api/cutout/run": r_cutout_run,
     "/api/cutout/existing": r_cutout_existing,
+    **order_routes.ROUTES,
 }
 
 
@@ -368,6 +369,7 @@ def serve(port: int = 0) -> ThreadingHTTPServer:
     catalog = Catalog(paths.catalog_path())
     engine.plan_store = catalog
     engine.rotations.update({k: float(v) for k, v in catalog.entries("rotate")})
+    order_routes.start()
     httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     httpd.daemon_threads = True
     threading.Thread(target=httpd.serve_forever, name="ks-server", daemon=True).start()
