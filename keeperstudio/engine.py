@@ -66,9 +66,14 @@ def _install_rotation_hook():
     if getattr(_io.load, "_ks_wrapped", False):
         return
     orig = _io.load
+    global raw_load
+    raw_load = orig  # the camera file as it is, for Retouch
 
     def load(path):
-        src = orig(path)
+        # a retouched copy (Retouch tab) stands in for the camera file everywhere
+        from . import retouch
+        src = orig(Path(retouch.source_path(path)))
+        src.path = Path(path)
         deg = rotations.get(str(path))
         if deg:
             src.image = straighten(src.image, deg)
@@ -683,16 +688,20 @@ def _config_sig() -> str | None:
         m = os.stat(p).st_mtime
     except OSError:
         return None
-    if _cfg_sig.get("m") != m:
-        _cfg_sig["m"] = m
-        _cfg_sig["h"] = hashlib.sha1(p.read_bytes()).hexdigest()[:16]
-    return _cfg_sig["h"]
+    cur = _cfg_sig.get("sig")
+    if not cur or cur[0] != m:
+        # one tuple, swapped in whole, so a request running at the same time
+        # never sees the new date without its hash
+        cur = (m, hashlib.sha1(p.read_bytes()).hexdigest()[:16])
+        _cfg_sig["sig"] = cur
+    return cur[1]
 
 
 def _plan_key(path: str, settings: dict, manual: dict | None) -> str | None:
     import hashlib
+    from . import retouch
     try:
-        st = os.stat(path)
+        st = os.stat(retouch.source_path(path))  # a retouch changes the photo
     except OSError:
         return None
     cfg = _config_sig()
@@ -979,6 +988,8 @@ def start_library_export(items: list[dict], dest: str, opts: dict) -> jobs.Job:
             if job.cancelled:
                 break
             src, name = Path(it["path"]), it["name"]
+            if opts.get("retouched", True):
+                src = Path(_src(str(src)))  # the retouched copy (Retouch tab) when there is one
             job.update(current=src.name)
             try:
                 target = out / name
@@ -1018,6 +1029,11 @@ def composite_order(students: list[str], teachers: list[str], max_per_row: int =
     }
 
 
+def _src(p: str) -> str:
+    from . import retouch
+    return retouch.source_path(p)
+
+
 def start_composite(opts: dict) -> jobs.Job:
     from photocropper import composite as comp
 
@@ -1028,8 +1044,8 @@ def start_composite(opts: dict) -> jobs.Job:
         out = comp.build_composite(
             Path(opts["background"]), Path(opts["out_path"]),
             title_lines=[opts.get("school", ""), opts.get("year", "")],
-            teacher_files=[Path(p) for p in opts.get("teachers", [])],
-            student_files=[Path(p) for p in opts.get("students", [])],
+            teacher_files=[Path(_src(p)) for p in opts.get("teachers", [])],
+            student_files=[Path(_src(p)) for p in opts.get("students", [])],
             title_font_path=opts["title_font"], italic_font_path=opts["teacher_font"],
             name_font_path=opts["name_font"], config=cfg,
             max_cols=int(opts.get("max_per_row", 8)), name_uppercase=bool(opts.get("uppercase")),
@@ -1082,7 +1098,7 @@ def start_cutout(photo_paths: list[str], out_dir: str) -> jobs.Job:
                 break
             job.update(current=Path(p).name)
             try:
-                dest = core.extract(session, Path(p), out)
+                dest = core.extract(session, Path(_src(p)), out)  # retouched copy when there is one
                 ok += 1
                 job.add_item({"path": p, "output": str(dest)})
             except Exception as exc:
