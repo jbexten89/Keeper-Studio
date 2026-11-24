@@ -156,7 +156,7 @@ class CropListTests(unittest.TestCase):
     def test_edited_master_wins_and_keepsake_crop(self):
         a = O.crop_list([order(lines=cart(("misc-magnet-4x5", 1), ("misc-photo-badge", 1)), image="IMG_2",
                                edited="Hoffman_final.jpg")], CAT)["athletes"][0]
-        self.assertEqual([j["file"] for j in a["jobs"]], ["Hoffman_final_4x5"])
+        self.assertEqual([j["file"] for j in a["jobs"]], ["Hoffman_final_3_5x3_5", "Hoffman_final_4x5"])
 
     def test_no_photo_picked(self):
         r = rows(O.crop_list_csv([order("Riley", lines=cart(("pkg-f", 1)))], CAT))
