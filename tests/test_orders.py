@@ -204,8 +204,16 @@ class RoesTests(unittest.TestCase):
         r = rows(O.roes_csv([order("Carter Newton", lines=cart(("pkg-f", 1)), image="IMG_5371.JPG", envelope="18")],
                             CAT, {"U10": "IMG_9000"}))
         self.assertEqual(r[0][:4], ["CustID", "IndivImage", "GroupIMG", "Package"])
-        self.assertEqual(r[1][:4], ["E18", "IMG_5371.JPG", "IMG_9000.jpg", "5 x 7;4 x 6;4 x 6"])
+        self.assertEqual(r[1][:4], ["E18", "IMG_5371.JPG", "IMG_9000.jpg", "5x7;4 x 6;4 x 6"])
         self.assertEqual(r[1][4:6], ["Carter", "Newton"])
+
+    def test_jamies_roes_codes(self):
+        o = order(lines=cart(("pkg-a", 1), ("misc-magnet-5x7", 1), ("misc-magnet-4x5", 1), ("misc-wallet-magnets-4", 1),
+                             ("misc-mini-wallets-8", 1), ("misc-photo-badge", 1), ("misc-photo-key-ring", 1)), image="IMG_1")
+        codes = rows(O.roes_csv([o], CAT, {"U10": "IMG_9"}))[1][3].split(";")
+        self.assertEqual(codes, ["8x10", "5x7", "5x7", "5x7", "4 x 6", "4 x 6", "WAL", "5x7",
+                                 "MAG45", "MAG57", "MWAL", "BADGE", "KEY", "MAGW"])
+        self.assertEqual(O.unmapped_roes(CAT), ["4 x 6"])
 
     def test_memory_mates_wallets_extras_and_keepsakes(self):
         o = order(lines=cart(("pkg-a", 1), ("ac-5x7", 1), ("ac-8x10-team", 1), ("misc-magnet-4x5", 2)), image="IMG_1")
@@ -214,13 +222,16 @@ class RoesTests(unittest.TestCase):
 
     def test_codes_replace_names_once_filled_in(self):
         c = O.load_catalog(ROOT / "prices.yaml")
-        c.roes_items["5x7"]["code"] = "P57"
+        c.roes_items["4x6"]["code"] = "P46"
         r = rows(O.roes_csv([order(lines=cart(("pkg-f", 1)), image="IMG_1")], c))
-        self.assertEqual(r[1][3], "P57;4 x 6;4 x 6")
-        self.assertNotIn("5 x 7", O.unmapped_roes(c))
+        self.assertEqual(r[1][3], "5x7;P46;P46")
+        self.assertEqual(O.unmapped_roes(c), [])
 
     def test_unmapped_lists_lab_items_not_packages(self):
-        missing = O.unmapped_roes(CAT)
+        c = O.load_catalog(ROOT / "prices.yaml")
+        for it in c.roes_items.values():
+            it["code"] = ""
+        missing = O.unmapped_roes(c)
         self.assertIn("5 x 7", missing)
         self.assertFalse(any("Package" in m or "team" in m for m in missing))
         self.assertEqual(len(missing), 10)
@@ -230,7 +241,7 @@ class RoesTests(unittest.TestCase):
         c.roes_items["5x7"]["code"] = "P57"
         r = rows(O.roes_csv([order(lines=cart(("pkg-g", 1)), image="IMG_1")], c, {"U10": "IMG_9000"}))
         self.assertEqual(r[1][2:4], ["IMG_9000.jpg", "P57;P57"])
-        self.assertEqual(O.roes_code(c, "8x10-team"), "")
+        self.assertEqual(O.roes_code(c, "8x10-team"), "8x10")
         self.assertEqual(O.roes_items({"5x7-team": {"code": "T57"}})["5x7-team"]["same_as"], "")
 
     def test_old_prices_file_without_items_still_works(self):
