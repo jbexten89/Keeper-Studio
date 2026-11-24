@@ -187,7 +187,11 @@ class LabTests(unittest.TestCase):
         by = {g["group"]: g["items"][0] for g in plan["groups"]}
         self.assertEqual(by["Wallet Magnets"]["file"], "IMG_1_2_5x3_5")
         self.assertEqual(by["Photo Key Ring"]["file"], "IMG_1_1_8x2_8")
-        self.assertIn("no crop size", by["Photo Badge"]["why"])
+        self.assertEqual(by["Photo Badge"]["file"], "IMG_1_3_5x3_5")
+        c = O.load_catalog(ROOT / "prices.yaml")
+        c.get("misc-photo-badge").crop = ""
+        self.assertIn("no crop size", O.lab_plan([order(lines=cart(("misc-photo-badge", 1)), image="IMG_1")], c)
+                      ["groups"][0]["items"][0]["why"])
 
     def test_build_folder_copies_only_what_is_needed(self):
         with tempfile.TemporaryDirectory() as d:
