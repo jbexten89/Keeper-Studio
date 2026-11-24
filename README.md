@@ -69,6 +69,11 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   Check or Card and the amount fills in. For the photo, type the number
   (`5371`) or click the photo in the filmstrip and press **Use IMG_5371**.
   Everything saves by itself; **Del** deletes with Undo.
+* **Envelopes in shooting order:** turn on **Filmstrip: picks only** (one Pick
+  per kid, flagged in Library). Each new envelope then gets the next kid's
+  photo filled in and highlighted in the filmstrip; if it's the wrong kid,
+  click the right photo and press **Use**. Clicking an envelope highlights its
+  photo, and clicking a photo (or **←** / **→**) opens the envelope using it.
 * **Teams:** each team's group photo (▣ on the team) is what team 5x7s, team
   8x10s and Memory Mates print from. To put many envelopes on a team at once,
   select them (Ctrl-click, Shift-click, or **Select all** / Ctrl+A), type the

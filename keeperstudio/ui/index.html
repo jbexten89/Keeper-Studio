@@ -589,6 +589,7 @@ textarea:focus{border-color:var(--accent)}
 .photo-row .thumb.none{display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:11px;text-align:center}
 .photo-row .col{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
 .photo-row input{width:100%}
+.btn.on{border-color:var(--accent);color:var(--accent)}
 .save-state{color:var(--dim);font-size:12px;margin-left:auto;font-variant:normal;letter-spacing:0}
 .save-state.err{color:var(--reject)}
 .tot-grid{display:grid;grid-template-columns:1fr auto;gap:4px 10px;padding:10px 12px;font-variant-numeric:tabular-nums}
@@ -1106,6 +1107,7 @@ function selectByClick(id, e, fromFilm) {
   if (S.mode === 'survey') { S.surveyIds = orderedSelection(); if (!S.surveyIds.length && S.active != null) S.surveyIds = [S.active]; }
   if (S.mode === 'compare') enterCompare();
   refreshSelection();
+  if (fromFilm && S.module === 'orders' && !mod && !e.shiftKey) Ord.photoClicked(id);
 }
 function refreshSelection() {
   $('#app').classList.toggle('multi', S.photos.length > 0 && S.selected.size > 1 && S.mode !== 'grid');
@@ -2056,7 +2058,7 @@ function buildHelp() {
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'T'], ['Filter bar', '\\']])}
     ${g('Modules', [['Library', 'Ctrl 1'], ['Crop', 'Ctrl 2  R'], ['Composite', 'Ctrl 3'], ['Extract', 'Ctrl 4'], ['Orders', 'Ctrl 5'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
-    ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A']])}
+    ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A'], ['Filmstrip photo (opens its envelope)', '← →']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   $('#help').addEventListener('click', () => toggleHelp(false));
@@ -3064,6 +3066,36 @@ const Ord = {
     if (!this.stems || this.stemsKey !== key) { this.stems = new Map(S.photos.map(p => [stemOf(p.name).toLowerCase(), p])); this.stemsKey = key; }
     return this.stems.get(stemOf(stem).toLowerCase()) || null;
   },
+  // ---------- envelopes <-> filmstrip ----------
+  usedStems() { return new Set((this.d ? this.d.orders : []).flatMap(o => [o.image, o.edited]).filter(Boolean).map(n => stemOf(n).toLowerCase())); },
+  orderForPhoto(p) {
+    const st = stemOf(p.name).toLowerCase();
+    return this.d ? this.d.orders.find(o => [o.edited, o.image].some(n => n && stemOf(n).toLowerCase() === st)) : null;
+  },
+  // Put a photo in front in the filmstrip without touching the envelope.
+  showPhoto(stem) {
+    const p = stem ? this.photoFor(stem) : null; if (!p || !S.viewIndex.has(p.id)) return false;
+    S.active = p.id; S.selected = new Set([p.id]); S.anchor = p.id;
+    renderFilm(); renderFilmBar(); ensureVisible(); return true;
+  },
+  // The photo for a new envelope: the next one in the filmstrip after the envelope
+  // just finished that no envelope uses yet. With the filmstrip showing only
+  // picks (one per kid, in shooting order) that is the next kid.
+  nextPhoto(after) {
+    if (!S.view.length) return null;
+    const used = this.usedStems(), ap = after ? this.photoFor(after) : null;
+    const i = ap && S.viewIndex.has(ap.id) ? S.viewIndex.get(ap.id) + 1 : (S.active != null && S.viewIndex.has(S.active) ? S.viewIndex.get(S.active) : 0);
+    const free = p => !used.has(stemOf(p.name).toLowerCase());
+    // after the last kid, wrap round to any earlier photo still without an envelope
+    return S.view.slice(i).find(free) || S.view.slice(0, i).find(free) || null;
+  },
+  async photoClicked(id) {
+    if (S.module !== 'orders' || this.view !== 'orders' || this.multi.size > 1) return;
+    const p = S.byId.get(id), o = p && this.orderForPhoto(p);
+    if (o && o.id !== this.sel) this.select(o.id);
+  },
+  picksOnly() { return S.filter.flag === 'pick'; },
+  setPicksOnly(on) { S.filter = { ...S.filter, flag: on ? 'pick' : 'any' }; syncFilterBar(); afterFilter(); this.modbar(); },
   // '5371' -> the photo in the open folder ending in 5371, else the folder's own prefix (IMG_5371)
   matches(digits) {
     if (!digits) return [];
@@ -3121,19 +3153,23 @@ const Ord = {
   async select(id) {
     await this.flush();
     const o = this.d && this.d.orders.find(o => o.id === id); if (!o) return;
-    this.multi = new Set([id]); this.anchor = id;
+    this.multi = new Set([id]); this.anchor = id; this.autoPhoto = false;
     this.sel = id; this.draft = JSON.parse(JSON.stringify(o)); this.state = ''; this.err = false;
+    this.showPhoto(o.edited || o.image);
     this.paintRows(); renderRight();
     const tr = $(`#modView tr[data-oid="${id}"]`); if (tr) tr.scrollIntoView({ block: 'nearest' });
   },
   async newOrder() {
     if (!this.sid) return this.editShoot(true);
+    const after = (this.draft && (this.draft.edited || this.draft.image)) || this.lastPhoto || '';
     await this.flush();
     if (this.view !== 'orders') this.setView('orders');
     this.multi = new Set(); this.sel = 'new'; this.state = ''; this.err = false;
     this.draft = { envelope: this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
       lines: [], glasses: false, paid_method: '', paid_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
     if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
+    const next = this.nextPhoto(after); this.autoPhoto = !!next;
+    if (next) { this.draft.image = stemOf(next.name); this.showPhoto(this.draft.image); }
     this.paintRows(); renderRight();
     setTimeout(() => { const i = $('#right [data-of="athlete"]'); if (i) i.focus(); }, 0);
   },
@@ -3152,7 +3188,7 @@ const Ord = {
       try {
         const o = (await api('/api/orders/save', { shoot_id: this.sid, order: body })).order;
         if (this.draft === d) { d.id = o.id; d.summary = o.summary; if (this.sel === 'new') this.sel = o.id; }
-        this.last = { team: o.team, coach: o.coach };
+        this.last = { team: o.team, coach: o.coach }; if (o.edited || o.image) this.lastPhoto = o.edited || o.image;
         this.state = 'Saved'; this.err = false;
         await this.refresh();
       } catch (e) { this.state = 'Not saved: ' + e.message; this.err = true; }
@@ -3358,7 +3394,8 @@ const Ord = {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
     return `<div class="photo-row"><div class="thumb ${ph ? '' : 'none'}" ${ph ? `style="background-image:url(&quot;${esc(thumbUrl(ph.path, 200))}&quot;)" title="${esc(ph.name)}"` : ''}>${ph ? '' : stem ? 'not in the<br>open folder' : 'no photo'}</div>
       <div class="col"><label class="fld" style="margin:0"><span>Photo to print</span><input data-of="image" list="ordFrames" value="${esc(d.image)}" placeholder="5371 or IMG_5371" spellcheck="false"></label>
-      <div class="btn-row" style="margin:0">${act ? `<button class="btn sm" data-ord="use-photo" title="Use the photo selected in the filmstrip">Use ${esc(stemOf(act.name))}</button>` : `<span class="muted small">${S.photos.length ? 'Click a photo in the filmstrip to use it' : 'Open the shoot’s folder to pick from the filmstrip'}</span>`}</div></div></div>
+      ${this.autoPhoto && !d.id ? '<div class="muted small">Next photo in the filmstrip. Not them? Click the right photo, then Use.</div>' : ''}
+      <div class="btn-row" style="margin:0">${act && stemOf(act.name) !== stemOf(d.image) ? `<button class="btn sm" data-ord="use-photo" title="Use the photo selected in the filmstrip">Use ${esc(stemOf(act.name))}</button>` : `<span class="muted small">${S.photos.length ? 'Click a photo in the filmstrip to use it' : 'Open the shoot’s folder to pick from the filmstrip'}</span>`}</div></div></div>
       <div class="of-grid"><label class="fld"><span>Frames shot</span><input data-of="frames" value="${esc(d.frames)}" placeholder="5370-5372" spellcheck="false"></label><label class="fld"><span>Retouched file</span><input data-of="edited" value="${esc(d.edited)}" placeholder="if renamed" spellcheck="false"></label></div>
       <div class="pad-x" style="padding-bottom:10px">${switchHTML('glasses', !!d.glasses, 'Glasses — glare to fix')}</div>`;
   },
@@ -3447,6 +3484,7 @@ const Ord = {
     const dis = this.sid ? '' : 'disabled';
     const unm = this.cat ? this.cat.unmapped_roes.length : 0;
     $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order']]) : ''}
+      ${S.photos.length ? `<button class="btn sm ${this.picksOnly() ? 'on' : ''}" data-ord="picks-only" title="Show only photos flagged Pick in the filmstrip (one per kid), so each new envelope moves on to the next kid">${this.picksOnly() ? '✓ ' : ''}Filmstrip: picks only</button>` : ''}
       ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
       <div class="tb-spacer"></div>
       <button class="btn sm" data-ord="import" ${dis} title="Add the orders from the website’s /admin CSV export">Import website CSV…</button>
@@ -3462,6 +3500,7 @@ const Ord = {
     if (e.key === '/') { const i = $('#modView [data-oq]'); if (i) { i.focus(); i.select(); return true; } }
     if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.view.length) { step(e.key === 'ArrowRight' ? 1 : -1); this.photoClicked(S.active); return true; }
     if (e.key === 'Delete' && this.draft) { this.del(); return true; }
     if (e.key === 'Escape' && this.multi.size > 1) { this.clearMulti(); return true; }
     if (e.key === 'Escape' && this.draft) { this.flush(); this.sel = null; this.draft = null; this.paintRows(); renderRight(); return true; }
@@ -3474,7 +3513,7 @@ const Ord = {
     const k = el.dataset.of;
     if (k === 'paid') { d.paid_cents = parse$(el.value); if (d.paid_cents && !d.paid_method) d.paid_method = 'cash'; }
     else d[k] = el.value;
-    if (k === 'image') { const dl = $('#ordFrames'); if (dl) dl.innerHTML = this.matches(el.value.replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join(''); }
+    if (k === 'image') { this.autoPhoto = false; const dl = $('#ordFrames'); if (dl) dl.innerHTML = this.matches(el.value.replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join(''); }
     this.changed(false);
   },
   onChange(el) {
@@ -3624,6 +3663,7 @@ function bindModuleEvents() {
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
         else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab();
+        else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
         return;
       }
