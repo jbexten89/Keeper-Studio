@@ -200,15 +200,34 @@ class LabTests(unittest.TestCase):
 
 
 class RoesTests(unittest.TestCase):
-    def test_one_row_per_athlete_codes_repeated(self):
-        r = rows(O.roes_csv([order("Carter Newton", lines=cart(("pkg-f", 2), ("ac-5x7", 1)), image="IMG_5371.JPG",
-                                   envelope="18")], CAT, {"U10": "IMG_9000"}))
+    def test_packages_go_to_the_lab_as_individual_prints(self):
+        r = rows(O.roes_csv([order("Carter Newton", lines=cart(("pkg-f", 1)), image="IMG_5371.JPG", envelope="18")],
+                            CAT, {"U10": "IMG_9000"}))
         self.assertEqual(r[0][:4], ["CustID", "IndivImage", "GroupIMG", "Package"])
-        self.assertEqual(r[1][:4], ["E18", "IMG_5371.JPG", "IMG_9000.jpg", "Package F;Package F;1 — 5x7"])
+        self.assertEqual(r[1][:4], ["E18", "IMG_5371.JPG", "IMG_9000.jpg", "5 x 7;4 x 6;4 x 6"])
         self.assertEqual(r[1][4:6], ["Carter", "Newton"])
 
-    def test_unmapped_codes_are_listed(self):
-        self.assertEqual(len(O.unmapped_roes(CAT)), len(CAT.products))
+    def test_memory_mates_wallets_extras_and_keepsakes(self):
+        o = order(lines=cart(("pkg-a", 1), ("ac-5x7", 1), ("ac-8x10-team", 1), ("misc-magnet-4x5", 2)), image="IMG_1")
+        self.assertEqual(O.lab_items(o, CAT), [("8x10", 1), ("5x7", 4), ("4x6", 2), ("wallet", 1), ("8x10-team", 1),
+                                               ("5x7-team", 1), ("misc-magnet-4x5", 2)])
+
+    def test_codes_replace_names_once_filled_in(self):
+        c = O.load_catalog(ROOT / "prices.yaml")
+        c.roes_items["5x7"]["code"] = "P57"
+        r = rows(O.roes_csv([order(lines=cart(("pkg-f", 1)), image="IMG_1")], c))
+        self.assertEqual(r[1][3], "P57;4 x 6;4 x 6")
+        self.assertNotIn("5 x 7", O.unmapped_roes(c))
+
+    def test_unmapped_lists_lab_items_not_packages(self):
+        missing = O.unmapped_roes(CAT)
+        self.assertIn("5 x 7 (team photo)", missing)
+        self.assertFalse(any("Package" in m for m in missing))
+        self.assertEqual(len(missing), 12)
+
+    def test_old_prices_file_without_items_still_works(self):
+        self.assertEqual(O.roes_items(None)["wallet"]["name"], "8 Wallets")
+        self.assertEqual(O.roes_items({"5x7": {"code": "X"}})["5x7"], {"name": "5 x 7", "code": "X"})
 
 
 class WebImportTests(unittest.TestCase):

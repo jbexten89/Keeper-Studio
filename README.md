@@ -85,10 +85,13 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
 * **Import website CSV…** brings in orders from the website's /admin export
   (orders already imported are skipped), so online and paper orders end up in
   one place.
+* **ROES file:** one row per athlete. Packages never go to the lab: each
+  envelope is listed as the individual prints it comes to (Package F is one
+  5 x 7 and two 4 x 6), matching the items in Meridian's ROES Sports group.
 * **Prices…** opens `prices.yaml`: packages, prices, which Crop size each print
-  is cut to, and Meridian's ROES product codes (still blank: ask Meridian for a
-  sample import file; a blank code exports as the product's name and the ROES
-  button shows ⚠). Save it and the app picks the change up.
+  is cut to, and Meridian's ROES code for each print item (still blank: ask
+  Meridian for a sample import file; a blank code exports the item's name and
+  the ROES button shows ⚠). Save it and the app picks the change up.
 
 ## Where things live
 

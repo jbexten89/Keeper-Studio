@@ -86,7 +86,7 @@ class Catalog:
     products: list
     crop_individual: dict
     crop_team: dict
-    roes_codes: dict
+    roes_items: dict  # lab item -> {"name", "code"}
     roes_delimiter: str = ";"
     source: str = ""
     warnings: list = field(default_factory=list)
@@ -173,11 +173,29 @@ def load_catalog(path: Path | None) -> Catalog:
         products=products,
         crop_individual={str(k): str(v) for k, v in (crops.get("individual") or DEFAULT_CROPS["individual"]).items()},
         crop_team={str(k): str(v) for k, v in (crops.get("team") or DEFAULT_CROPS["team"]).items()},
-        roes_codes={str(k): str(v or "") for k, v in (roes.get("codes") or {}).items()},
+        roes_items=roes_items(roes.get("items")),
         roes_delimiter=str(roes.get("delimiter") or ";"),
         source=source, warnings=warnings,
     )
 
+
+def roes_items(raw) -> dict:
+    """The lab items ROES orders, from prices.yaml; any item missing keeps its default name."""
+    out = {k: dict(v) for k, v in DEFAULT_ROES_ITEMS.items()}
+    for k, v in (raw or {}).items() if isinstance(raw, dict) else []:
+        v = v if isinstance(v, dict) else {"code": v}
+        out[str(k)] = {"name": str(v.get("name") or out.get(str(k), {}).get("name") or k), "code": str(v.get("code") or "").strip()}
+    return out
+
+
+DEFAULT_ROES_ITEMS = {
+    "8x10": {"name": "8 x 10", "code": ""}, "5x7": {"name": "5 x 7", "code": ""}, "4x6": {"name": "4 x 6", "code": ""},
+    "wallet": {"name": "8 Wallets", "code": ""}, "8x10-team": {"name": "8 x 10 (team photo)", "code": ""},
+    "5x7-team": {"name": "5 x 7 (team photo)", "code": ""}, "misc-mini-wallets-8": {"name": "8 - Mini Wallets", "code": ""},
+    "misc-wallet-magnets-4": {"name": "Wallet Magnets", "code": ""}, "misc-magnet-4x5": {"name": "4 x 5 Magnet", "code": ""},
+    "misc-magnet-5x7": {"name": "5 x 7 Magnet", "code": ""}, "misc-photo-key-ring": {"name": "Key Chain", "code": ""},
+    "misc-photo-badge": {"name": "Photo Badge", "code": ""},
+}
 
 DEFAULT_CROPS = {"individual": {"8x10": "8x10", "5x7": "5x7", "4x6": "4x6", "wallet": "2_5x3_5"},
                  "team": {"8x10": "10x8", "5x7": "7x5"}}
@@ -530,9 +548,27 @@ def build_lab_folder(plan: dict, crops_dir: Path, out_dir: Path, one_per_print: 
 
 # ------------------------------------------------------------------ ROES --
 
+def lab_items(order: dict, catalog: Catalog) -> list[tuple[str, int]]:
+    """What one envelope is at the lab: individual prints, never packages.
+
+    Package F -> [("5x7", 1), ("4x6", 2)]. Wallets are sheets of 8, a Memory Mate
+    is an individual 5x7 plus a team 5x7, keepsakes are the units bought.
+    """
+    e = expand(order, catalog)
+    items = [(k.replace(":team", "-team"), q) for k, q in e["prints"].items() if q]
+    for l in normalize(order.get("lines"), catalog):
+        if catalog.get(l["product_id"]).type == "misc":
+            items.append((l["product_id"], l["qty"]))
+    rank = ["8x10", "5x7", "4x6", "wallet", "8x10-team", "5x7-team"]
+    return sorted(items, key=lambda kv: (rank.index(kv[0]) if kv[0] in rank else len(rank), kv[0]))
+
+
 def unmapped_roes(catalog: Catalog) -> list[str]:
-    return [p.label if p.type == "package" else catalog.label_for(p.id)
-            for p in catalog.products if not catalog.roes_codes.get(p.id, "").strip()]
+    """ROES items (that something in prices.yaml can order) still without Meridian's code."""
+    used = {"8x10", "5x7", "4x6", "wallet"} | {f"{s}-team" for s in catalog.crop_team} | \
+           {p.id for p in catalog.products if p.type == "misc"}
+    return [catalog.roes_items.get(k, {"name": k})["name"] for k in sorted(used)
+            if not catalog.roes_items.get(k, {}).get("code")]
 
 
 def with_ext(name: str) -> str:
@@ -544,17 +580,18 @@ def with_ext(name: str) -> str:
 def roes_csv(orders: list[dict], catalog: Catalog, team_photos: dict | None = None) -> str:
     """A ROES Events import: one row per athlete, so ROES packs each kid's prints in one envelope.
 
-    CustID, IndivImage, GroupIMG, Package is ROES's documented minimum. Several
-    products share one Package cell, separated by the delimiter in prices.yaml;
-    a quantity of two repeats the code, because ROES has no quantity column.
+    CustID, IndivImage, GroupIMG, Package is ROES's documented minimum. The
+    Package cell lists the envelope's individual prints (packages are worked out
+    here, not at the lab), separated by the delimiter in prices.yaml; two of a
+    print repeats it, because ROES has no quantity column.
     """
     team_photos = team_photos or {}
     rows = [["CustID", "IndivImage", "GroupIMG", "Package", "First Name", "Last Name", "Team", "Coach", "Envelope"]]
     for o in sorted(orders, key=_sort_key):
         codes = []
-        for l in normalize(o.get("lines"), catalog):
-            code = catalog.roes_codes.get(l["product_id"], "").strip() or catalog.label_for(l["product_id"])
-            codes += [code] * l["qty"]
+        for key, qty in lab_items(o, catalog):
+            it = catalog.roes_items.get(key) or {"name": key, "code": ""}
+            codes += [it["code"] or it["name"]] * qty
         first, _, last = (o.get("athlete") or "").strip().partition(" ")
         image = with_ext((o.get("edited") or o.get("image") or "").strip())
         group = with_ext((team_photos.get(o.get("team") or "") or "").strip())
@@ -672,29 +709,25 @@ crop_sizes:
   individual: {8x10: 8x10, 5x7: 5x7, 4x6: 4x6, wallet: 2_5x3_5}
   team:       {8x10: 10x8, 5x7: 7x5}
 
-# ROES event import (Orders > Export > ROES import file). Fill in Meridian's
-# own product codes; a guessed code silently orders the wrong product, so a
-# blank code is exported as the product's name and flagged in the app.
+# ROES event import (Orders > Export > ROES file). Packages are never sent to
+# the lab: each envelope goes over as the individual prints it comes to (Package F
+# = one 5x7 and two 4x6), the same items as the Sports group in Meridian's ROES.
+# name: the ROES item it is. code: Meridian's product code for it. A guessed code
+# silently orders the wrong product, so a blank code exports the name instead and
+# the ROES button shows a warning until every code is filled in.
 roes:
   delimiter: ";"
-  codes:
-    pkg-a: ""
-    pkg-b: ""
-    pkg-c: ""
-    pkg-d: ""
-    pkg-e: ""
-    pkg-f: ""
-    pkg-g: ""
-    ac-8x10: ""
-    ac-8x10-team: ""
-    ac-5x7: ""
-    ac-5x7-team: ""
-    ac-4x6-3: ""
-    ac-wallets-8: ""
-    misc-mini-wallets-8: ""
-    misc-wallet-magnets-4: ""
-    misc-magnet-4x5: ""
-    misc-magnet-5x7: ""
-    misc-photo-key-ring: ""
-    misc-photo-badge: ""
+  items:
+    8x10:                  {name: "8 x 10",              code: ""}
+    5x7:                   {name: "5 x 7",               code: ""}
+    4x6:                   {name: "4 x 6",               code: ""}
+    wallet:                {name: "8 Wallets",           code: ""}
+    8x10-team:             {name: "8 x 10 (team photo)", code: ""}
+    5x7-team:              {name: "5 x 7 (team photo)",  code: ""}
+    misc-mini-wallets-8:   {name: "8 - Mini Wallets",    code: ""}
+    misc-wallet-magnets-4: {name: "Wallet Magnets",      code: ""}
+    misc-magnet-4x5:       {name: "4 x 5 Magnet",        code: ""}
+    misc-magnet-5x7:       {name: "5 x 7 Magnet",        code: ""}
+    misc-photo-key-ring:   {name: "Key Chain",           code: ""}
+    misc-photo-badge:      {name: "Photo Badge",         code: ""}
 """

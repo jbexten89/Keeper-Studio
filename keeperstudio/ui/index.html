@@ -3242,7 +3242,7 @@ const Ord = {
     try {
       const r = await api('/api/orders/export', { shoot_id: this.sid, kind, path: p, team: this.team !== 'all' ? this.team : '' });
       DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
-      toast(`Saved ${esc(baseName(r.path))}${this.team !== 'all' ? ` (${esc(this.team)} only)` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>${r.unmapped.length ? `<br>${r.unmapped.length} products have no ROES code yet — add them under Prices…` : ''}`, 6000);
+      toast(`Saved ${esc(baseName(r.path))}${this.team !== 'all' ? ` (${esc(this.team)} only)` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>${r.unmapped.length ? `<br>${r.unmapped.length} print items have no ROES code yet — names were used instead; add the codes under Prices…` : ''}`, 6000);
     } catch (e) { toast(esc(e.message), 5000); }
   },
   async importWeb() {
@@ -3400,7 +3400,7 @@ const Ord = {
       <span class="muted small">Export</span>
       <button class="btn sm" data-oexp="pull" ${dis} title="One row per athlete with every print size counted — the sheet to stuff envelopes from">Pull sheet</button>
       <button class="btn sm" data-oexp="crop" ${dis} title="Exactly which crops to make: only the sizes families bought">Crop list</button>
-      <button class="btn sm" data-oexp="roes" ${dis} title="${unm ? `${unm} products still need Meridian’s ROES code (Prices…)` : 'ROES event import file'}">ROES file${unm ? ' ⚠' : ''}</button>
+      <button class="btn sm" data-oexp="roes" ${dis} title="${unm ? `${unm} print items still need Meridian’s ROES code (Prices…)` : 'ROES event import: each envelope as the individual prints it comes to'}">ROES file${unm ? ' ⚠' : ''}</button>
       <button class="btn sm" data-oexp="items" ${dis} title="One row per item bought, for the books">Orders CSV</button>
       <button class="btn sm" data-ord="prices" title="Edit prices.yaml: packages, prices, ROES codes">Prices…</button>`;
   },
