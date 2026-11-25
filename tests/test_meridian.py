@@ -100,6 +100,19 @@ class MeridianTests(unittest.TestCase):
             self.assertFalse(res["ok"])
             self.assertTrue(any("exact" in e for e in res["errors"]))
 
+    def test_lab_cost(self):
+        # Package F = one 5x7 ($1.09) + two 4x6 ($0.29 each)
+        self.assertEqual(M.order_cost_cents(order(lines=cart(("pkg-f", 1))), CAT), {"cents": 167, "unpriced": []})
+        # 5x7 magnet $4.50 + 8 wallets $1.96
+        got = M.order_cost_cents(order(lines=cart(("misc-magnet-5x7", 1), ("ac-wallets-8", 1))), CAT)
+        self.assertEqual(got["cents"], 646)
+        # Metallic adds Meridian's upcharge to prints that offer it ($0.48 per mini wallet sheet)
+        self.assertEqual(M.order_cost_cents(order(lines=cart(("misc-mini-wallets-8", 1))), CAT, {"finish": "Metallic"})["cents"], 161)
+        # an item with no code is reported, not guessed
+        c = O.load_catalog(None)
+        c.meridian_items["misc-photo-badge"] = {"code": ""}
+        self.assertEqual(M.order_cost_cents(order(lines=cart(("misc-photo-badge", 1))), c)["unpriced"], ["Photo Badge"])
+
     def test_settings_need_an_email(self):
         self.assertTrue(M.settings_problems({"delivery": "ship"}))
         self.assertEqual(M.settings_problems(SETTINGS), [])

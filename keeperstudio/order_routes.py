@@ -48,7 +48,19 @@ def start() -> None:
 def _decorate(o: dict, cat: O.Catalog) -> dict:
     o = dict(o)
     o["summary"] = O.order_summary(o, cat)
+    _add_lab_cost(o["summary"], o, cat)
     return o
+
+
+def _add_lab_cost(summary: dict, order: dict, cat: O.Catalog) -> None:
+    """Meridian's estimated cost of the envelope, and what's left after it."""
+    try:
+        c = M.order_cost_cents(order, cat)
+    except Exception:  # noqa: BLE001 - an estimate must never break the order list
+        c = {"cents": 0, "unpriced": ["?"]}
+    summary["lab_cents"] = c["cents"]
+    summary["lab_unpriced"] = c["unpriced"]
+    summary["keep_cents"] = summary["total_cents"] - c["cents"]
 
 
 def _team_photos(sid: int) -> dict[str, str]:
@@ -78,6 +90,7 @@ def r_list(b):
     rows = [_decorate(o, cat) for o in book.orders(sid)]
     total = sum(o["summary"]["total_cents"] for o in rows)
     paid = sum(o["summary"]["paid_cents"] for o in rows)
+    lab = sum(o["summary"]["lab_cents"] for o in rows)
     photos = book.team_photos(sid)
     teams = sorted({o["team"] for o in rows if o["team"]} | set(photos), key=str.lower)
     return {
@@ -86,6 +99,7 @@ def r_list(b):
                    "count": sum(1 for o in rows if o["team"] == t)} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
         "totals": {"orders": len(rows), "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
+                   "lab_cents": lab, "keep_cents": total - lab,
                    "unpaid": sum(1 for o in rows if o["summary"]["due_cents"] > 0),
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
@@ -121,7 +135,11 @@ def r_rename_team(b):
 
 def r_price(b):
     """Live total for the editor, priced by the same code that prices saved orders."""
-    return {"summary": O.order_summary({"lines": b.get("lines") or [], "paid_cents": b.get("paid_cents") or 0}, catalog())}
+    cat = catalog()
+    o = {"lines": b.get("lines") or [], "paid_cents": b.get("paid_cents") or 0, "team": b.get("team") or ""}
+    summary = O.order_summary(o, cat)
+    _add_lab_cost(summary, o, cat)
+    return {"summary": summary}
 
 
 EXPORTS = {

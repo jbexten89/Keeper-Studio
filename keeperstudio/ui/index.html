@@ -580,6 +580,7 @@ textarea:focus{border-color:var(--accent)}
 .ord-total{display:flex;align-items:baseline;gap:10px;padding:12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#0E1013}
 .ord-total .big{font-size:26px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
 .ord-total .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
+.ord-total .lab{display:block;margin-top:4px}
 .ord-total .sub .due{color:var(--amber)}
 .ord-total .sub .ok{color:#3CC77F}
 .pay-row{display:flex;gap:8px;align-items:center;padding:10px 12px 4px}
@@ -3199,7 +3200,7 @@ const Ord = {
     const q = this.q.trim().toLowerCase();
     if (q) r = r.filter(o => [o.envelope, o.athlete, o.team, o.coach, o.parent, o.phone, o.image, o.edited, o.frames, o.summary.packages, o.notes].join(' ').toLowerCase().includes(q));
     const { k, dir } = this.sort;
-    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : String(o[k] || '').toLowerCase();
+    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : k === 'lab' ? o.summary.lab_cents : String(o[k] || '').toLowerCase();
     return r.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || collator.compare(a.athlete, b.athlete) || a.id - b.id; });
   },
   // ---------- pricing while typing (the server prices what is saved) ----------
@@ -3471,7 +3472,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span>You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
     }
     $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
   },
@@ -3493,7 +3494,7 @@ const Ord = {
     const rows = this.rows(); const cnt = $('#ordCount'); if (cnt) cnt.textContent = plural(rows.length, 'envelope');
     const th = (k, l, cls = '') => `<th class="${cls}" data-osort="${k}">${l}${this.sort.k === k ? `<span class="arr">${this.sort.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
     const y = box.scrollTop;
-    box.innerHTML = rows.length ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}</tbody></table>`
+    box.innerHTML = rows.length ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}</tbody></table>`
       : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
     box.scrollTop = y;
   },
@@ -3502,7 +3503,7 @@ const Ord = {
     const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.due_cents < 0 ? `<td class="amt due" title="Paid more than the total">${fmt$(s.due_cents)}</td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
     const on = this.multi.size > 1 ? this.multi.has(o.id) : o.id === this.sel;
     return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
-      <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td><td>${pic ? esc(pic) : o.lines.length ? '<span class="warn">needs photo</span>' : ''}</td><td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td>${due}</tr>`;
+      <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td><td>${pic ? esc(pic) : o.lines.length ? '<span class="warn">needs photo</span>' : ''}</td><td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td><td class="amt dim" title="Meridian's estimated cost${s.lab_unpriced && s.lab_unpriced.length ? ' (some items not priced)' : ''}">${s.lab_cents ? fmt$(s.lab_cents) : '—'}</td>${due}</tr>`;
   },
   labCenter(v) {
     const L = this.lab;
@@ -3525,7 +3526,27 @@ const Ord = {
   totalHTML(pr, d) {
     const due = pr.total - (d.paid_cents || 0);
     const st = !pr.total ? '' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
-    return `<span class="big">${fmt$(pr.total)}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)}<br>` : ''}${st}</span>`;
+    return `<span class="big">${fmt$(pr.total)}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)}<br>` : ''}${st}${this.labHTML(pr, d)}</span>`;
+  },
+  // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
+  labHTML(pr, d) {
+    if (!(d.lines || []).length) return '';
+    const key = JSON.stringify([d.lines, d.team || '']);
+    if (key !== this.labKey) {
+      this.labKey = key; clearTimeout(this.labT);
+      this.labT = setTimeout(async () => {
+        try {
+          const r = await api('/api/orders/price', { lines: d.lines, team: d.team || '' });
+          if (this.labKey !== key) return;
+          this.labEst = { key, s: r.summary };
+          const t = $('#ordTotal'); if (t && this.draft) t.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft);
+        } catch (e) { /* the estimate is optional */ }
+      }, 200);
+    }
+    const L = this.labEst && this.labEst.key === key ? this.labEst.s : null;
+    if (!L) return '<span class="lab">Lab cost …</span>';
+    const miss = L.lab_unpriced && L.lab_unpriced.length ? ` <span class="warn" title="No Meridian price for: ${esc(L.lab_unpriced.join(', '))}">+ ${L.lab_unpriced.length} not priced</span>` : '';
+    return `<span class="lab" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - L.lab_cents)}</span>`;
   },
   photoHTML(d) {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);

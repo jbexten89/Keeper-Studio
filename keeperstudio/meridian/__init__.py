@@ -73,6 +73,39 @@ def product_name(code: str) -> str:
     return p["product_name"] if p else ""
 
 
+def _upcharge(text: str, choice: str) -> float:
+    import re
+    for p in (text or "").split("|"):
+        name = re.sub(r"\(\+\$[\d.]+\)|\[default\]", "", p).strip()
+        if name.lower() == (choice or "").lower():
+            m = re.search(r"\(\+\$([\d.]+)\)", p)
+            return float(m.group(1)) if m else 0.0
+    return 0.0
+
+
+def order_cost_cents(order: dict, catalog: O.Catalog, settings: dict | None = None) -> dict:
+    """Estimated lab cost of one envelope at Meridian's list prices.
+
+    Counts every print and keepsake the envelope sends to the lab (team prints
+    included), whether or not a photo is picked yet. Shipping, tax and
+    discounts aren't in Meridian's list, so this is an estimate.
+    Returns {"cents": total, "unpriced": [labels with no Meridian code]}.
+    """
+    finish = ((settings or {}).get("finish") or DEFAULT_SETTINGS["finish"])
+    plan = O.lab_plan([order], catalog, {})
+    total, unpriced = 0.0, []
+    for g in plan["groups"]:
+        for it in g["items"]:
+            code, per = O.meridian_code(catalog, it.get("item") or "")
+            p = products().get(code)
+            if not p or not p.get("base_price_usd"):
+                unpriced.append(g["group"])
+                continue
+            unit = float(p["base_price_usd"]) + _upcharge(p["finish_choices"], finish)
+            total += unit * it["qty"] * per
+    return {"cents": int(round(total * 100)), "unpriced": unpriced}
+
+
 def settings_problems(s: dict) -> list[str]:
     out = []
     if "@" not in (s.get("account_email") or ""):
