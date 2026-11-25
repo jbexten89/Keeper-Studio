@@ -39,13 +39,13 @@ def find_images(folder: Path) -> list[Path]:
     )
 
 
-def make_session(model_home: str | None = None):
+def make_session(model_home: str | None = None, model_name: str = MODEL_NAME):
     """Create the rembg session. Offline as long as the model is present in
     model_home (rembg verifies the file and skips downloading)."""
     os.environ["U2NET_HOME"] = model_home or default_model_home()
     from rembg import new_session
 
-    return new_session(MODEL_NAME)
+    return new_session(model_name)
 
 
 def extract(session, in_path: Path, out_dir: Path) -> Path:

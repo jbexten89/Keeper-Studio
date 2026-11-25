@@ -55,7 +55,7 @@ folder, ready to check framing and export.
 | **Retouch** | Fix glasses glare by swapping in the eyes from a frame without glasses: pick that frame, line it up, brush the eyes in (or **Paint eyes for me**) and **Save retouch**. The fixed copy goes in a `_retouched` folder beside the photo under the same name, and Crop, Composite, Extract and exports use it automatically. The camera file is never changed. |
 | **Crop** | PhotoCropper's face-anchored framing for every print size. Each photo shows its crop boxes (hover a size to see just that one) and a status: *Ready*, *Shortened to fit*, *Placed by hand* or *Needs review* with the reason. Press **A** to place the framing by hand. **Check framing** previews a whole shoot; **Export prints** writes the same folders PhotoCropper does: one per size, *Orders*, *review*, and contact sheets. |
 | **Composite** | The class composite builder. Students and teachers come from a collection, the selection or the filmstrip, so you can pick them in Library first. |
-| **Extract** | Background removal to transparent PNGs, using BiRefNet, the same model PhotoExtractor uses. |
+| **Extract** | Background removal to transparent PNGs. **Quality: Best** uses BiRefNet (cleanest hair and pom-pom edges, needs about 7 GB of free memory per photo); **Fast** uses ISNet (a few seconds and about 3 GB per photo). Works on the selected photos when there are any, and asks before a big batch. |
 | **Orders** | The picture-day envelopes, kept on this computer. One shoot per picture day; type each envelope in (athlete, team, package A–G, extras, how they paid, the photo number, glasses), see what's still owed, and build the lab order from only the photos and sizes families bought. |
 
 A typical picture day: open the folder → cull in **Library** (P / X, Quick
@@ -132,10 +132,11 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
 
 ## The extraction model
 
-It's 220 MB, so it isn't in the repository. Setup copies it from
-`..\Photo Cropper\models\rembg\` if it finds it there; otherwise Keeper Studio
-downloads it the first time you use Extract. You can also copy
-`birefnet-general-lite.onnx` into `models\rembg\` yourself.
+The models (Best 224 MB, Fast 179 MB) aren't in the repository or the build.
+Each downloads the first time you use it, with a percentage in the progress card
+(Cancel stops it), into `%LOCALAPPDATA%\KeeperStudio\models\rembg\`, so a new
+build reuses it. A model an older build downloaded beside its exe
+(`models\rembg\`) is picked up and moved over the first time.
 
 ## Structure
 

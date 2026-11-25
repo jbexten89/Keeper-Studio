@@ -54,4 +54,11 @@ def catalog_path() -> Path:
 
 
 def rembg_model_home() -> Path:
+    """Where the extraction models live: in the data folder, so a new build
+    (a new app folder) reuses them instead of downloading 220 MB again."""
+    return data_dir() / "models" / "rembg"
+
+
+def legacy_rembg_model_home() -> Path:
+    """Where older builds downloaded the model: beside the exe."""
     return app_dir() / "models" / "rembg"

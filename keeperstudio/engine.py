@@ -1055,41 +1055,136 @@ def start_composite(opts: dict) -> jobs.Job:
     return jobs.start("composite", work, total=0)
 
 
-def _model_files():
-    from photoextractor import core
-    home = paths.rembg_model_home()
-    flat = home / f"{core.MODEL_NAME}.onnx"                       # PhotoExtractor's layout
-    nested = home / "models" / core.MODEL_NAME / f"{core.MODEL_NAME}.onnx"  # newer rembg's layout
-    return flat, nested
+# Extraction models. Best: BiRefNet, clean edges on hair and pom-poms, but it
+# works at a fixed 1024x1024 and needs about 7 GB of free memory per photo.
+# Fast: ISNet, a few seconds and about 2.5 GB per photo, softer edges.
+CUT_MODELS = {
+    "best": {"name": "birefnet-general-lite", "label": "Best", "mb": 224, "ram_gb": 7.0,
+             "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/BiRefNet-general-bb_swin_v1_tiny-epoch_232.onnx",
+             "md5": "4fab47adc4ff364be1713e97b7e66334"},
+    "fast": {"name": "isnet-general-use", "label": "Fast", "mb": 179, "ram_gb": 3.0,
+             "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx",
+             "md5": "fc16ebd8b0c10d971d3513d564d01e29"},
+}
 
 
-def cutout_model_ready() -> bool:
-    return any(p.is_file() for p in _model_files())
+def _cut_model(quality: str) -> dict:
+    return CUT_MODELS.get(quality) or CUT_MODELS["best"]
 
 
-def _adopt_flat_model() -> None:
-    """A model copied over from PhotoExtractor sits where older rembg looked for
-    it; newer rembg looks one folder deeper. Link (or copy) it there so it is
-    used instead of downloading 220 MB again."""
-    flat, nested = _model_files()
-    if flat.is_file() and not nested.is_file():
-        nested.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            os.link(flat, nested)
-        except OSError:
-            shutil.copy2(flat, nested)
+def _model_path(quality: str, home: Path | None = None) -> Path:
+    """rembg's layout: <home>/models/<name>/<name>.onnx."""
+    name = _cut_model(quality)["name"]
+    return (home or paths.rembg_model_home()) / "models" / name / f"{name}.onnx"
 
 
-def start_cutout(photo_paths: list[str], out_dir: str) -> jobs.Job:
+def _adopt_old_model(quality: str) -> None:
+    """Reuse a model an older build downloaded beside its exe (either layout),
+    linking or copying it into the data folder."""
+    dest = _model_path(quality)
+    if dest.is_file():
+        return
+    name = _cut_model(quality)["name"]
+    old = paths.legacy_rembg_model_home()
+    for src in (old / f"{name}.onnx", old / "models" / name / f"{name}.onnx"):
+        if src.is_file():
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.link(src, dest)
+            except OSError:
+                shutil.copy2(src, dest)
+            return
+
+
+def cutout_model_ready(quality: str = "best") -> bool:
+    try:
+        _adopt_old_model(quality)
+    except OSError:
+        pass
+    return _model_path(quality).is_file()
+
+
+def available_memory_gb() -> float | None:
+    """Free (available) physical memory, or None when it can't be read."""
+    try:
+        if os.name == "nt":
+            import ctypes
+
+            class MS(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            m = MS()
+            m.dwLength = ctypes.sizeof(MS)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m)):
+                return round(m.ullAvailPhys / 1024 ** 3, 1)
+            return None
+        with open("/proc/meminfo") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    return round(int(line.split()[1]) / 1024 ** 2, 1)
+    except Exception:  # noqa: BLE001 - a reading we can live without
+        return None
+    return None
+
+
+def cutout_status() -> dict:
+    return {"ready": {q: cutout_model_ready(q) for q in CUT_MODELS},
+            "models": {q: {k: m[k] for k in ("label", "mb", "ram_gb")} for q, m in CUT_MODELS.items()},
+            "free_gb": available_memory_gb(), "model_dir": str(paths.rembg_model_home())}
+
+
+def _download_model(quality: str, job) -> bool:
+    """Download a model with a percentage in the progress card; Cancel stops it.
+    Returns False when cancelled."""
+    import urllib.request
+
+    m = _cut_model(quality)
+    dest = _model_path(quality)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(".part")
+    md5 = hashlib.md5()
+    try:
+        with urllib.request.urlopen(m["url"], timeout=60) as r, open(part, "wb") as f:
+            total = int(r.headers.get("Content-Length") or 0) or m["mb"] * 1_000_000
+            got = 0
+            while True:
+                if job.cancelled:
+                    return False
+                chunk = r.read(1 << 20)
+                if not chunk:
+                    break
+                f.write(chunk)
+                md5.update(chunk)
+                got += len(chunk)
+                job.update(message=f"Downloading the {m['label']} model (first time only): "
+                                   f"{100 * got // total}% · {got // 1_000_000} of {total // 1_000_000} MB", busy=False)
+        if md5.hexdigest() != m["md5"]:
+            raise RuntimeError("the downloaded model didn't check out; try again")
+        os.replace(part, dest)
+        return True
+    finally:
+        if part.exists():
+            try:
+                part.unlink()
+            except OSError:
+                pass
+
+
+def start_cutout(photo_paths: list[str], out_dir: str, quality: str = "best") -> jobs.Job:
+    quality = quality if quality in CUT_MODELS else "best"
+
     def work(job):
         from photoextractor import core
         home = paths.rembg_model_home()
         home.mkdir(parents=True, exist_ok=True)
-        _adopt_flat_model()
-        first = not cutout_model_ready()
-        job.update(message=("Downloading the extraction model (about 220 MB, first time only)…" if first
-                            else "Loading the extraction model…"), busy=True)
-        session = core.make_session(str(home))
+        if not cutout_model_ready(quality) and not _download_model(quality, job):
+            return {"out_dir": out_dir, "ok": 0, "cancelled": True}
+        m = _cut_model(quality)
+        job.update(message=f"Loading the {m['label']} model…", busy=True)
+        session = core.make_session(str(home), m["name"])
         job.update(message="", busy=False)
         out = Path(out_dir)
         ok = 0
@@ -1101,8 +1196,10 @@ def start_cutout(photo_paths: list[str], out_dir: str) -> jobs.Job:
                 dest = core.extract(session, Path(_src(p)), out)  # retouched copy when there is one
                 ok += 1
                 job.add_item({"path": p, "output": str(dest)})
+            except MemoryError:
+                job.add_item({"path": p, "error": "Ran out of memory. Close other programs or use Fast."})
             except Exception as exc:
                 job.add_item({"path": p, "error": f"{type(exc).__name__}: {exc}"})
             job.update(done=i)
-        return {"out_dir": str(out), "ok": ok, "cancelled": job.cancelled}
+        return {"out_dir": str(out), "ok": ok, "cancelled": job.cancelled, "quality": quality}
     return jobs.start("cutout", work, total=len(photo_paths))

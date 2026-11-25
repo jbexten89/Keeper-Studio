@@ -360,11 +360,11 @@ def r_comp_build(b):
 
 
 def r_cutout_status(b):
-    return {"ready": engine.cutout_model_ready(), "model_dir": str(paths.rembg_model_home())}
+    return engine.cutout_status()
 
 
 def r_cutout_run(b):
-    return {"job": engine.start_cutout(b["paths"], b["out_dir"]).id}
+    return {"job": engine.start_cutout(b["paths"], b["out_dir"], b.get("quality") or "best").id}
 
 
 def r_cutout_existing(b):
