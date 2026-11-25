@@ -290,7 +290,7 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
     return sections
 
 
-def _extra_item_text(it: dict) -> str:
+def _extra_item_text(it: dict, with_qty: bool = True) -> str:
     from .extras import SHORT
     prod = SHORT.get(it.get("product") or "", "Print")
     what = f"{it.get('size', '')} {prod.lower()}"
@@ -299,11 +299,11 @@ def _extra_item_text(it: dict) -> str:
         each = set(c.values())
         if len(each) == 1:
             n = next(iter(each))
-            return f"{what} of each team photo{f' x {n}' if n > 1 else ''} ({', '.join(c)})"
+            return f"{what} of each team photo{f' x {n}' if n > 1 and with_qty else ''} ({', '.join(c)})"
         return f"{what}: " + ", ".join(f"{t} x {n}" for t, n in c.items())
     src = f"{it.get('team')} team photo" if it.get("src") == "team" else (it.get("label") or it.get("image") or "photo")
     q = int(it.get("qty") or 0)
-    return f"{what} of {src}{f' x {q}' if q > 1 else ''}"
+    return f"{what} of {src}{f' x {q}' if q > 1 and with_qty else ''}"
 
 
 def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
@@ -327,7 +327,12 @@ def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
                                                                  alignment=k.get("a", 0),
                                                                  textColor=colors.HexColor(k.get("c", "#111111"))))
     today = dt.date.today().strftime("%B %d, %Y").replace(" 0", " ")
-    shoot_bits = " · ".join(b for b in [shoot.get("name") or "", shoot.get("date") or ""] if b)
+    day = shoot.get("date") or ""
+    try:
+        day = dt.date.fromisoformat(day).strftime("%B %d, %Y").replace(" 0", " ")
+    except ValueError:
+        pass
+    shoot_bits = " · ".join(b for b in [shoot.get("name") or "", day] if b)
     story = [Table([[P("Jamie Bexten Photography", f="Helvetica-Bold", s=15), P("INVOICE", f="Helvetica-Bold", s=18, a=TA_RIGHT)],
                     [P("Bryan, Ohio", c="#555B66"), P(f"No. {shoot.get('id', 0)}-{order['id']}   ·   {today}", a=TA_RIGHT, c="#555B66")]],
                    colWidths=[3.9 * inch, 3.4 * inch]),
@@ -341,7 +346,8 @@ def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
         if q <= 0:
             continue
         price = int(it.get("price_cents") or 0)
-        rows.append([P(_extra_item_text(it)[:1].upper() + _extra_item_text(it)[1:], s=9.5), P(q, s=9.5, a=TA_RIGHT),
+        txt = _extra_item_text(it, with_qty=False)
+        rows.append([P(txt[:1].upper() + txt[1:], s=9.5), P(q, s=9.5, a=TA_RIGHT),
                      P("No charge" if not price else _money(price), s=9.5, a=TA_RIGHT),
                      P("—" if not price else _money(price * q), s=9.5, a=TA_RIGHT)])
     n = len(rows)
@@ -356,11 +362,12 @@ def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
                            ("LINEABOVE", (2, n + 2), (-1, n + 2), 0.6, colors.black),
                            ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
     story += [t, Spacer(1, 20)]
-    if order.get("paid_method") and summary["paid_cents"]:
-        how = order["paid_method"].title() + (f" #{order['check_no']}" if order.get("check_no") else "")
-        story.append(P(f"Received {_money(summary['paid_cents'])} by {how}. Thank you!", c="#333333"))
-    elif summary["due_cents"]:
-        story.append(P("Please make checks payable to Jamie Bexten Photography. Thank you!", c="#333333"))
+    if summary["paid_cents"]:
+        how = (order.get("paid_method") or "").title() + (f" #{order['check_no']}" if order.get("check_no") else "")
+        story.append(P(f"Received {_money(summary['paid_cents'])}{' by ' + how if how else ''}. Thank you!", c="#333333"))
+    if summary["due_cents"]:
+        story.append(P(f"Balance due: {_money(summary['due_cents'])}. Please make checks payable to Jamie Bexten Photography.",
+                       c="#333333"))
     if order.get("notes"):
         story += [Spacer(1, 8), P(order["notes"], c="#333333")]
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
