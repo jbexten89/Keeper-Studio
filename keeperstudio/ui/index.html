@@ -2922,12 +2922,10 @@ const Crop = {
     const nTeam = ids.filter(id => isT(S.byId.get(id))).length;
     S.selected = new Set(ids); S.active = ids[0]; S.anchor = ids[0]; this.scope = 'selected';
     refreshSelection(); renderLeft();
-    // You've chosen what to crop, so start checking any of them not checked yet.
+    // Framing is never checked on its own: Check framing starts it.
     const unchecked = ids.filter(id => !this.status.has(S.byId.get(id).path)).length;
-    const start = unchecked && !this.job;
     const what = which === 'teams' ? plural(nTeam, 'team photo') : which === 'picks' ? plural(ids.length, 'pick') : `${plural(ids.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')}`;
-    toast(`${what} selected.${start ? ` Checking framing on ${plural(unchecked, 'photo')} not checked yet.` : ' Crop will check and export just these.'}`, 5000);
-    if (start) this.analyze();
+    toast(`${what} selected.${unchecked ? ` ${plural(unchecked, 'photo')} not checked yet — press Check framing when you're ready.` : ' Crop will export just these.'}`, 5000);
   },
   async setOut(path, custom) {
     this.outDir = path; this.outCustom = custom;
