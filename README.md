@@ -173,6 +173,8 @@ under `meridian:` in Prices…: 8x10 `R1680A`, 5x7 `RA1657`, 4x6 `R1646`, 8 wall
 `PKG-8-Wallets`, team prints use their size's code, magnets `MAG45` / `MAG57`,
 key ring `R606-2` (plastic keychain, medium), photo badge `R73` (3" pin-back
 button). Memory Mates go as an individual 5x7 and a team 5x7, as before.
-Anything without a code (mini wallets, wallet magnets: Meridian's bulk list has
-no matching product) is left out of the CSV and listed, so you can order it on
-the website.
+mini wallets `R1688` (sheet of 8, printed 1.5 x 2) and wallet magnets `RA78B`
+(set of 4). Those last two came from Meridian by email and aren't in their
+products.csv, so they're in `products-extra.csv`, which the checker reads along
+with Meridian's list. Anything without a code is left out of the CSV and listed,
+so you can order it on the website.

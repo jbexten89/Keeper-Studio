@@ -204,7 +204,7 @@ DEFAULT_MERIDIAN_ITEMS = {
     "wallet": {"code": "PKG-8-Wallets"},
     "8x10-team": {"same_as": "8x10"}, "5x7-team": {"same_as": "5x7"},
     "misc-magnet-4x5": {"code": "MAG45"}, "misc-magnet-5x7": {"code": "MAG57"},
-    "misc-mini-wallets-8": {"code": ""}, "misc-wallet-magnets-4": {"code": ""},
+    "misc-mini-wallets-8": {"code": "R1688"}, "misc-wallet-magnets-4": {"code": "RA78B"},
     "misc-photo-key-ring": {"code": "R606-2"}, "misc-photo-badge": {"code": "R73"},
 }
 
@@ -801,8 +801,8 @@ meridian:
     5x7-team:              {same_as: 5x7}
     misc-magnet-4x5:       {code: MAG45}
     misc-magnet-5x7:       {code: MAG57}
-    misc-mini-wallets-8:   {code: ""}
-    misc-wallet-magnets-4: {code: ""}
+    misc-mini-wallets-8:   {code: R1688}
+    misc-wallet-magnets-4: {code: RA78B}
     misc-photo-key-ring:   {code: R606-2}
     misc-photo-badge:      {code: R73}
 """

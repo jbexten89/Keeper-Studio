@@ -14,7 +14,7 @@ from tests.test_orders import CAT, cart, order
 SETTINGS = {"account_email": "studio@example.com", "delivery": "ship"}
 # Crop's export sizes, at 300 pixels per inch.
 SHAPES = {"5x7": (1500, 2100), "4x6": (1200, 1800), "8x10": (2400, 3000), "2_5x3_5": (750, 1050),
-          "7x5": (2100, 1500), "10x8": (3000, 2400), "4x5": (1200, 1500), "1_7x2_2": (510, 660)}
+          "7x5": (2100, 1500), "10x8": (3000, 2400), "4x5": (1200, 1500), "1_7x2_2": (510, 675)}  # config.yaml: mini wallet is 34:45
 
 
 def crops(folder: Path, *names):
@@ -50,13 +50,29 @@ class MeridianTests(unittest.TestCase):
         self.assertEqual((by["x/IMG_0_2_5x3_5.JPG"]["product_code"], by["x/IMG_0_2_5x3_5.JPG"]["quantity"]), ("PKG-8-Wallets", "1"))
         self.assertEqual((by["x/IMG_9000_7x5.JPG"]["product_code"], by["x/IMG_9000_7x5.JPG"]["quantity"]), ("RA1657", "3"))
 
-    def test_keepsakes_without_a_code_are_left_out(self):
+    def test_keepsake_codes(self):
         p = plan(order(lines=cart(("misc-magnet-4x5", 2), ("misc-photo-key-ring", 1), ("misc-photo-badge", 1),
-                                  ("misc-mini-wallets-8", 1)), image="IMG_1"))
+                                  ("misc-mini-wallets-8", 1), ("misc-wallet-magnets-4", 2)), image="IMG_1"))
         rows, left = M.plan_rows(p, CAT, SETTINGS, "W", lambda it: f"x/{it['file']}.JPG")
         self.assertEqual(sorted((r["product_code"], r["quantity"], r["finish"]) for r in rows),
-                         [("MAG45", "2", ""), ("R606-2", "1", ""), ("R73", "1", "")])
+                         [("MAG45", "2", ""), ("R1688", "1", "Matte"), ("R606-2", "1", ""), ("R73", "1", ""), ("RA78B", "2", "")])
+        self.assertEqual(left, [])
+
+    def test_keepsakes_without_a_code_are_left_out(self):
+        c = O.load_catalog(None)
+        c.meridian_items["misc-mini-wallets-8"] = {"code": ""}
+        p = plan(order(lines=cart(("misc-magnet-4x5", 2), ("misc-mini-wallets-8", 1)), image="IMG_1"))
+        rows, left = M.plan_rows(p, c, SETTINGS, "W", lambda it: f"x/{it['file']}.JPG")
+        self.assertEqual([(r["product_code"], r["quantity"]) for r in rows], [("MAG45", "2")])
         self.assertEqual([(l["file"], "no Meridian product code" in l["why"]) for l in left], [("IMG_1_1_7x2_2", True)])
+
+    def test_extra_products_pass_meridians_checker(self):
+        with tempfile.TemporaryDirectory() as d:
+            crops(Path(d, "crops"), "IMG_1_1_7x2_2", "IMG_1_2_5x3_5")
+            res = M.build(plan(order(lines=cart(("misc-mini-wallets-8", 2), ("misc-wallet-magnets-4", 1)), image="IMG_1")),
+                          CAT, Path(d, "crops"), Path(d, "out"), SETTINGS, "T")
+            self.assertTrue(res["ok"], res["report"])
+            self.assertEqual(res["warnings"], [])
 
     def test_build_passes_meridians_checker(self):
         with tempfile.TemporaryDirectory() as d:

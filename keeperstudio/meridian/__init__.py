@@ -27,6 +27,9 @@ from .. import orders as O
 
 HERE = Path(__file__).resolve().parent
 PRODUCTS = HERE / "products.csv"
+# Products Meridian confirmed by email that aren't in their products.csv yet.
+# The checker reads them together with Meridian's list.
+PRODUCTS_EXTRA = HERE / "products-extra.csv"
 DESIGNS = HERE / "designs.csv"
 CHECKER = HERE / "validate_order.py"
 COLUMNS = ["order_name", "account_email", "color_correction", "delivery", "item_id", "product_code", "design_name",
@@ -40,9 +43,24 @@ _products: dict | None = None
 def products() -> dict[str, dict]:
     global _products
     if _products is None:
-        with open(PRODUCTS, encoding="utf-8-sig", newline="") as f:
-            _products = {r["product_code"].strip(): r for r in csv.DictReader(f)}
+        _products = {}
+        for path in (PRODUCTS, PRODUCTS_EXTRA):
+            if path.is_file():
+                with open(path, encoding="utf-8-sig", newline="") as f:
+                    _products.update({r["product_code"].strip(): r for r in csv.DictReader(f)})
     return _products
+
+
+def _all_products_csv(folder) -> Path:
+    """Meridian's list plus the extra products, as one file for their checker."""
+    out = Path(folder) / "_products.csv"
+    with open(PRODUCTS, encoding="utf-8-sig", newline="") as f:
+        head = next(csv.reader(f))
+    with open(out, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=head)
+        w.writeheader()
+        w.writerows(products().values())
+    return out
 
 
 def _choices(text: str) -> list[str]:
@@ -113,7 +131,9 @@ def write_csv(rows: list[dict], path: Path) -> None:
 
 def check(order_csv: Path, folder: Path | None = None) -> dict:
     """Run Meridian's own validate_order.py; returns its report and whether it passed."""
-    argv = [str(CHECKER), str(order_csv), str(PRODUCTS), str(DESIGNS)] + ([str(folder)] if folder else [])
+    import tempfile
+    tmp = tempfile.TemporaryDirectory()
+    argv = [str(CHECKER), str(order_csv), str(_all_products_csv(tmp.name)), str(DESIGNS)] + ([str(folder)] if folder else [])
     out = io.StringIO()
     old = sys.argv
     code = 0
@@ -130,6 +150,7 @@ def check(order_csv: Path, folder: Path | None = None) -> dict:
             gc.collect()
     finally:
         sys.argv = old
+        tmp.cleanup()
     text = out.getvalue()
     lines = text.splitlines()
     return {"ok": code == 0, "report": text,
