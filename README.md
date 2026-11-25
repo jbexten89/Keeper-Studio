@@ -106,6 +106,16 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   tries new prices on any item at once, with a setting for families who stop
   buying an item when its price goes up, and says how many buyers a raise
   could lose and still make the same profit. Hide it when you don't need it.
+* **School & other orders…** (under Totals) are prints that aren't on any
+  envelope: for the school, the park, teachers or a sponsor. Each item is a
+  size (4x6 to 16x20) and a Meridian product (print, standout, canvas, metal…)
+  of every team's group photo (a count for each team), one team's photo, or
+  one photo, at a price you type; 0 makes it free. School starts as an 8x10
+  of each team, Park and Teachers as a 5x7. They go into the lab order and
+  the Meridian order labeled with who they're for, count in Totals, Analysis
+  and the shoot summary (not in average order), take payments like an
+  envelope, and print an invoice. *Copy from another shoot…* reuses last
+  season's list.
 * **Exports:** pull sheet (prints per athlete with totals), crop list, ROES
   event import file, and an orders CSV for the books. With a team selected on
   the left, an export covers just that team.

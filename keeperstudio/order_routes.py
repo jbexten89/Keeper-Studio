@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from . import analysis as A
+from . import extras as X
 from . import meridian as M
 from . import reports as R
 from . import orders as O
@@ -95,18 +96,24 @@ def r_list(b):
     lab = sum(o["summary"]["lab_cents"] for o in rows)
     shoot = next((x for x in book.shoots() if x["id"] == sid), {})
     ship = int(shoot.get("shipping_cents") or 0)
-    keep = total - lab - ship
     photos = book.team_photos(sid)
+    ex = X.totals(book.extras(sid), _team_photos(sid))
+    fam_total = total
+    total += ex["sales_cents"]
+    paid += ex["paid_cents"]
+    lab += ex["lab_cents"]
+    keep = total - lab - ship
     teams = sorted({o["team"] for o in rows if o["team"]} | set(photos), key=str.lower)
     return {
         "orders": rows, "next_envelope": book.next_envelope(sid),
         "teams": [{"name": t, "image": (photos.get(t) or {}).get("image", ""),
                    "count": sum(1 for o in rows if o["team"] == t)} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
-        "totals": {"orders": len(rows), "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
+        "totals": {"orders": len(rows), "family_cents": fam_total, "extras": ex, "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
                    "lab_cents": lab, "shipping_cents": ship, "keep_cents": keep,
                    "profit_pct": round(100 * keep / total, 1) if total else None,
-                   "unpaid": sum(1 for o in rows if o["summary"]["due_cents"] > 0),
+                   "unpaid": sum(1 for o in rows if o["summary"]["due_cents"] > 0)
+                   + sum(1 for e in book.extras(sid) if X.summary(e, {})["due_cents"] > 0),
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
     }
@@ -199,7 +206,8 @@ def _summary(b) -> dict:
     _, sub = _report_titles({"shoot_id": sid, "kind": "pull"})
     if shoot.get("season"):
         sub += f" · {shoot['season']}"
-    return {"title": "Shoot summary", "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot)}
+    extras = [{**e, "summary": X.summary(e, _team_photos(sid)), "who": X.who(e)} for e in book.extras(sid)]
+    return {"title": "Shoot summary", "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot, extras)}
 
 
 def r_summary(b):
@@ -224,9 +232,97 @@ def r_analysis(b):
         orders = [_decorate(o, cat) for o in book.orders(sid)]
         ship = int(next((s for s in shoots if s["id"] == sid), {}).get("shipping_cents") or 0)
         team = b.get("team")
-    out = A.analyze(orders, cat, A.unit_lab_cents(cat, M.order_cost_cents), ship, team)
+    if b.get("shoot_id") == "all":
+        ex = [X.totals(book.extras(s["id"]), _team_photos(s["id"])) for s in shoots]
+        ex = {k: sum(e[k] for e in ex) for k in ex[0]} if ex else X.totals([], {})
+    else:
+        ex = X.totals(book.extras(sid), _team_photos(sid))
+    out = A.analyze(orders, cat, A.unit_lab_cents(cat, M.order_cost_cents), ship, team, ex)
     out["shoots"] = len(shoots) if b.get("shoot_id") == "all" else 1
     return out
+
+
+# ------------------------------------------------- school & other orders --
+
+def _crop_names() -> set[str] | None:
+    try:
+        from . import engine
+        return {x["name"] for x in engine.sizes()}
+    except Exception:  # noqa: BLE001 - without the crop setup, don't flag sizes
+        return None
+
+
+def _extra_view(e: dict, tp: dict, crop_names, found: dict) -> dict:
+    e = dict(e)
+    e["summary"] = X.summary(e, tp)
+    e["who"] = X.who(e)
+    ls = X.lines(e, tp, crop_names)
+    for l in ls:
+        if not l["why"] and found is not None and l["file"]:
+            l["found"] = l["file"].lower() in found
+            if not l["found"]:
+                l["why"] = f"no {l['size']} crop yet"
+    e["lines"] = ls
+    return e
+
+
+def r_extras(b):
+    sid = int(b["shoot_id"])
+    tp = _team_photos(sid)
+    ex = book.extras(sid)
+    crops = b.get("crops_dir") or ""
+    found = None
+    if crops and Path(crops).is_dir():
+        stems = {l["file"] for e in ex for l in X.lines(e, tp) if l["file"]}
+        found = {k: str(v) for k, v in O.find_crops(Path(crops), stems).items()}
+    cn = _crop_names()
+    return {"extras": [_extra_view(e, tp, cn, found) for e in ex], "totals": X.totals(ex, tp),
+            "choices": X.choices(), "crops_checked": found is not None,
+            "shoots": [{"id": s["id"], "name": s["name"], "count": len(book.extras(s["id"]))}
+                       for s in book.shoots() if s["id"] != sid]}
+
+
+def r_extra_save(b):
+    sid = int(b["shoot_id"])
+    e = book.save_extra(sid, b.get("order") or {})
+    return {"order": _extra_view(e, _team_photos(sid), _crop_names(), None)}
+
+
+def r_extra_delete(b):
+    book.delete_extra(int(b["id"]))
+    return {"ok": True}
+
+
+def r_extras_copy(b):
+    """Copy another shoot's school & other orders here, unpaid; team counts follow the team names."""
+    sid, src = int(b["shoot_id"]), int(b["from_shoot_id"])
+    teams = sorted({o["team"] for o in book.orders(sid) if o["team"]} | set(book.team_photos(sid)), key=str.lower)
+    n = 0
+    for e in book.extras(src):
+        items = []
+        for it in e["items"]:
+            it = dict(it)
+            if it.get("src") == "teams":
+                old = {k: int(v or 0) for k, v in (it.get("counts") or {}).items()}
+                vals = [v for v in old.values() if v > 0]
+                usual = max(set(vals), key=vals.count) if vals else 1
+                it["counts"] = {t: old.get(t, usual) for t in teams}
+            elif it.get("src") == "photo":
+                continue  # one person's photo from another shoot doesn't carry over
+            items.append(it)
+        book.save_extra(sid, {"kind": e["kind"], "customer": e["customer"], "contact": e["contact"], "items": items,
+                              "notes": e["notes"]})
+        n += 1
+    return {"copied": n}
+
+
+def r_invoice_pdf(b):
+    sid = int(b["shoot_id"])
+    e = next((x for x in book.extras(sid) if x["id"] == int(b["id"])), None)
+    if not e:
+        raise ValueError("That order is gone.")
+    shoot = next((x for x in book.shoots() if x["id"] == sid), {})
+    return {"path": str(R.invoice_pdf(e, X.summary(e, _team_photos(sid)), shoot, Path(b["path"])))}
 
 
 def r_report(b):
@@ -268,7 +364,7 @@ def r_crop_list(b):
 def r_lab_plan(b):
     sid = int(b["shoot_id"])
     rows = [o for o in book.orders(sid) if o["lines"]]
-    plan = O.lab_plan(rows, catalog(), _team_photos(sid))
+    plan = O.lab_plan(rows, catalog(), _team_photos(sid), book.extras(sid))
     crops = b.get("crops_dir") or ""
     stems = {it["file"] for g in plan["groups"] for it in g["items"] if it["file"]}
     found = O.find_crops(Path(crops), stems) if crops else {}
@@ -319,7 +415,7 @@ def r_meridian_report(b):
 def r_meridian_build(b):
     sid = int(b["shoot_id"])
     rows = [o for o in book.orders(sid) if o["lines"]]
-    plan = O.lab_plan(rows, catalog(), _team_photos(sid))
+    plan = O.lab_plan(rows, catalog(), _team_photos(sid), book.extras(sid))
     if not Path(b["crops_dir"]).is_dir():
         raise FileNotFoundError(f"Crops folder not found: {b['crops_dir']}")
     s = meridian_settings()
@@ -334,7 +430,7 @@ def r_meridian_build(b):
 def r_lab_build(b):
     sid = int(b["shoot_id"])
     rows = [o for o in book.orders(sid) if o["lines"]]
-    plan = O.lab_plan(rows, catalog(), _team_photos(sid))
+    plan = O.lab_plan(rows, catalog(), _team_photos(sid), book.extras(sid))
     if not Path(b["crops_dir"]).is_dir():
         raise FileNotFoundError(f"Crops folder not found: {b['crops_dir']}")
     return O.build_lab_folder(plan, Path(b["crops_dir"]), Path(b["out_dir"]), bool(b.get("one_per_print")))
@@ -372,5 +468,7 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/report": r_report, "/api/orders/analysis": r_analysis, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
+    "/api/orders/report": r_report, "/api/orders/analysis": r_analysis,
+    "/api/orders/extras": r_extras, "/api/orders/extra/save": r_extra_save, "/api/orders/extra/delete": r_extra_delete,
+    "/api/orders/extras-copy": r_extras_copy, "/api/orders/invoice-pdf": r_invoice_pdf, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
 }

@@ -54,7 +54,23 @@ CREATE TABLE IF NOT EXISTS team_photos (
   coach TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (shoot_id, team)
 );
+CREATE TABLE IF NOT EXISTS extra_orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  shoot_id INTEGER NOT NULL REFERENCES shoots(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT '',
+  customer TEXT NOT NULL DEFAULT '',
+  contact TEXT NOT NULL DEFAULT '',
+  items TEXT NOT NULL DEFAULT '[]',
+  paid_method TEXT NOT NULL DEFAULT '',
+  paid_cents INTEGER NOT NULL DEFAULT 0,
+  check_no TEXT NOT NULL DEFAULT '',
+  notes TEXT NOT NULL DEFAULT '',
+  created REAL NOT NULL,
+  updated REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS extra_orders_shoot ON extra_orders(shoot_id);
 """
+EXTRA_FIELDS = ("kind", "customer", "contact", "items", "paid_method", "paid_cents", "check_no", "notes")
 
 ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
                 "image", "edited", "notes", "paid_method", "paid_cents", "lines", "web_order")
@@ -220,6 +236,56 @@ class OrderBook:
         data = {k: o.get(k) for k in ORDER_FIELDS}
         return self.save_order(int(o["shoot_id"]), data)
 
+    # ------------------------------------------- school & other orders --
+    @staticmethod
+    def _extra(r) -> dict:
+        d = dict(r)
+        d["items"] = json.loads(d.get("items") or "[]")
+        return d
+
+    def extras(self, sid: int) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("SELECT * FROM extra_orders WHERE shoot_id=? ORDER BY id", (int(sid),)).fetchall()
+        return [self._extra(r) for r in rows]
+
+    def save_extra(self, sid: int, data: dict) -> dict:
+        vals = {}
+        for k in EXTRA_FIELDS:
+            if k not in data:
+                continue
+            v = data[k]
+            if k == "items":
+                v = json.dumps(v if isinstance(v, list) else [])
+            elif k == "paid_cents":
+                v = max(0, int(v or 0))
+            elif k == "paid_method":
+                v = str(v or "").lower()
+                if v not in PAID_METHODS:
+                    raise ValueError("Paid by must be cash, check, card or other.")
+            else:
+                v = str(v or "").strip()
+            vals[k] = v
+        now = time.time()
+        with self._lock:
+            oid = data.get("id")
+            if oid:
+                if vals:
+                    self._db.execute(f"UPDATE extra_orders SET {', '.join(f'{k}=?' for k in vals)}, updated=? WHERE id=?",
+                                     (*vals.values(), now, int(oid)))
+            else:
+                cols = ["shoot_id", *vals, "created", "updated"]
+                cur = self._db.execute(f"INSERT INTO extra_orders ({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
+                                       (int(sid), *vals.values(), now, now))
+                oid = cur.lastrowid
+            self._db.commit()
+            r = self._db.execute("SELECT * FROM extra_orders WHERE id=?", (int(oid),)).fetchone()
+        return self._extra(r)
+
+    def delete_extra(self, oid: int) -> None:
+        with self._lock:
+            self._db.execute("DELETE FROM extra_orders WHERE id=?", (int(oid),))
+            self._db.commit()
+
     # -------------------------------------------------------- team photos --
     def team_photos(self, sid: int) -> dict[str, dict]:
         with self._lock:
@@ -242,6 +308,17 @@ class OrderBook:
             n = self._db.execute("UPDATE orders SET team=?, updated=? WHERE shoot_id=? AND team=?",
                                  (new, time.time(), int(sid), old)).rowcount
             exists = self._db.execute("SELECT 1 FROM team_photos WHERE shoot_id=? AND team=?", (int(sid), new)).fetchone()
+            for r in self._db.execute("SELECT id, items FROM extra_orders WHERE shoot_id=?", (int(sid),)).fetchall():
+                items, hit = json.loads(r["items"] or "[]"), False
+                for it in items:
+                    c = it.get("counts") or {}
+                    if old in c:
+                        c[new] = c.pop(old) + (c.get(new) or 0) if new in c else c.pop(old)
+                        hit = True
+                    if it.get("team") == old:
+                        it["team"], hit = new, True
+                if hit:
+                    self._db.execute("UPDATE extra_orders SET items=? WHERE id=?", (json.dumps(items), r["id"]))
             if exists:
                 self._db.execute("DELETE FROM team_photos WHERE shoot_id=? AND team=?", (int(sid), old))
             else:

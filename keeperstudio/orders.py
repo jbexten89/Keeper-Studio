@@ -219,7 +219,11 @@ def meridian_items(raw) -> dict:
 
 
 def meridian_code(catalog: "Catalog", key: str) -> tuple[str, int]:
-    """(product code, Meridian items per one of ours); code is blank when not set."""
+    """(product code, Meridian items per one of ours); code is blank when not set.
+
+    "code:R1616" is a Meridian code picked directly (school & other orders)."""
+    if key.startswith("code:"):
+        return key[5:], 1
     it = catalog.meridian_items.get(key) or {}
     if it.get("same_as") and not it.get("code"):
         base = catalog.meridian_items.get(it["same_as"]) or {}
@@ -484,7 +488,8 @@ def crop_list_csv(orders, catalog, team_photos=None) -> str:
 
 # ----------------------------------------------------------- lab order --
 
-def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = None) -> dict:
+def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = None,
+             extras: list[dict] | None = None) -> dict:
     """Every file the lab prints, with how many of each, grouped by print size.
 
     Quantities are in lab units: one wallet sheet, one 4x6 print. A team 5x7 is
@@ -527,10 +532,13 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
             if p.type == "misc":
                 why = "" if p.crop or not frame else "no crop size set for it (Prices…)"
                 add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why, item=p.id)
+    if extras:  # school & other orders (not on any envelope)
+        from . import extras as X
+        X.add_to_plan(add, extras, team_photos)
     groups: dict[str, list] = {}
     for it in items.values():
         groups.setdefault(it["group"], []).append(it)
-    order = [PRINT_SIZES[k]["label"] for k in ("8x10", "5x7", "4x6", "wallet")]
+    order = ["16x20", "11x14"] + [PRINT_SIZES[k]["label"] for k in ("8x10", "5x7", "4x6", "wallet")]
     out = []
     for g in sorted(groups, key=lambda g: (order.index(g) if g in order else 50 + ("Team" in g), g)):
         rows = sorted(groups[g], key=lambda it: (not it["file"], it["file"].lower()))

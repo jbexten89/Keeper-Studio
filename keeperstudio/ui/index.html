@@ -671,6 +671,34 @@ textarea:focus{border-color:var(--accent)}
 .lab-it .who{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .lab-it .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lab-it .ok{color:#3CC77F}.lab-it .bad{color:var(--amber)}
+.modal-card.exw{width:min(1380px,96vw)}
+.exwin{display:flex;flex-direction:column;min-height:0;flex:1}
+.ex-grid{display:grid;grid-template-columns:230px 1fr;border:1px solid var(--border);border-radius:8px;min-height:380px;overflow:hidden;flex:1}
+.ex-list{border-right:1px solid var(--border);padding:6px 0;overflow:auto}
+.ex-o{padding:8px 12px;border-left:2px solid transparent;cursor:pointer}.ex-o:hover{background:var(--raised)}.ex-o.on{background:var(--accent-bg);border-left-color:var(--accent)}
+.ex-o b{font-weight:600;display:block}.ex-o small{color:var(--muted)}.ex-o .amt{float:right}.free{color:#46C77F}.ex-o .due,.ex-pay .due{color:var(--amber)}
+.ex-new{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px}.ex-copy{margin:0 12px;width:calc(100% - 24px)}
+.ex-detail{padding:12px 16px;overflow:auto;min-width:0}.ex-empty{padding:40px 10px;text-align:center}
+.ex-cust{display:flex;gap:10px;margin-bottom:10px}.ex-cust label{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted)}.ex-cust label.wide{flex:1}
+.exwin input,.exwin select{background:var(--bg);border:1px solid var(--border-2);color:var(--text);border-radius:5px;height:28px;padding:0 8px;font:inherit;font-size:13px;user-select:text}
+.ex-cust input{width:100%}.ex-cust label:first-child input{width:150px}
+.ex-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}.ex-t th{font-weight:400;color:var(--muted);font-size:12px;text-align:left;padding:5px 6px;border-bottom:1px solid var(--border)}
+.ex-t td{padding:7px 6px;border-bottom:1px solid var(--border);vertical-align:middle}.ex-t .r{text-align:right}
+.ex-srccell{min-width:300px}.ex-src{display:flex;align-items:center;gap:10px;margin-bottom:4px}.ex-each{display:inline-flex;align-items:center;gap:4px;color:var(--muted);font-size:12px}.ex-each b{min-width:14px;text-align:center;color:var(--text)}
+.ex-chips{display:flex;flex-wrap:wrap;gap:5px;max-width:560px}
+.ex-chip{display:inline-flex;align-items:center;border:1px solid var(--border-2);border-radius:12px;padding:2px 4px 2px 10px;font-size:12px;color:var(--dim)}
+.ex-chip.on{border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:var(--accent-bg);color:var(--text)}.ex-chip.warn{border-color:var(--amber);color:var(--amber)}
+.ex-chip .q{display:inline-flex;align-items:center;margin-left:6px;border-left:1px solid var(--border-2);padding-left:3px}
+.ex-chip .q button{background:none;border:0;color:var(--muted);cursor:pointer;font:inherit;padding:0 5px}.ex-chip .q button:hover{color:var(--accent)}.ex-chip .q b{font-weight:600;min-width:26px;text-align:center}
+.ex-th{display:inline-block;width:38px;height:28px;border-radius:3px;background:var(--raised);vertical-align:middle;margin-right:6px;overflow:hidden}.ex-th img{width:100%;height:100%;object-fit:cover}
+.ex-img{width:150px}.ex-lbl{width:200px;margin-left:6px}.ex-num{width:54px;text-align:right}.ex-money{width:80px;text-align:right}.ex-money.free{color:#46C77F}
+.ex-why{display:inline-block;margin:4px 6px 0 0;font-size:11.5px;color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 55%,transparent);border-radius:4px;padding:0 6px}
+.ex-del{background:none;border:0;color:var(--dim);cursor:pointer;font-size:14px}.ex-del:hover{color:var(--reject)}
+.ex-add{display:flex;gap:8px;align-items:center;margin:10px 0}
+.ex-pay{display:flex;gap:10px;align-items:center;margin-top:10px;padding:9px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px}.ex-pay .seg{width:auto}
+.ex-foot2{display:flex;gap:10px;margin-top:10px}.ex-foot2 input{flex:1}
+.ex-foot{display:flex;gap:24px;align-items:center;padding:10px 2px 0;color:var(--text)}.ex-foot b{font-weight:600}
+.tot-grid .sub{font-size:12px;color:var(--muted);padding-left:8px}.tot-grid b.sub{font-weight:400}.tot-grid .link{cursor:pointer;color:var(--accent)}.tot-grid .link:hover{text-decoration:underline}
 .ord-scroll.an{padding:12px 14px}
 .an-body{display:flex;flex-direction:column;gap:12px}
 .an-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
@@ -3669,6 +3697,182 @@ const Ord = {
         <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
       ${res}</div>`;
   },
+  // ---------- school & other orders ----------
+  // Prints for the school, the park, teachers or a sponsor: not on any envelope.
+  ex: null, exSel: null, exDel: false,
+  async openExtras(select) {
+    if (!this.sid) return;
+    if (!this.crops) this.crops = (await DB.get('kv', 'orders|crops|' + this.sid).catch(() => null)) || Crop.outDir || '';
+    await this.loadExtras();
+    if (!this.ex) return;
+    if (select != null) this.exSel = select;
+    if (!this.ex.extras.some(e => e.id === this.exSel)) this.exSel = this.ex.extras.length ? this.ex.extras[0].id : null;
+    openModal('<div id="exWin" class="exwin"></div>', card => {
+      card.classList.add('report', 'exw');
+      const w = $('#exWin', card);
+      w.addEventListener('click', e => this.exClick(e));
+      w.addEventListener('change', e => this.exChange(e));
+      w.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches('input')) { e.preventDefault(); e.target.blur(); } });
+      this.exPaint();
+    });
+  },
+  async loadExtras() {
+    try { this.ex = await api('/api/orders/extras', { shoot_id: this.sid, crops_dir: this.crops || '' }); }
+    catch (e) { toast(esc(e.message), 5000); this.ex = null; }
+  },
+  exCur() { return this.ex && this.ex.extras.find(e => e.id === this.exSel) || null; },
+  exTeams() { return ((this.d && this.d.teams) || []).map(t => t.name); },
+  exPhotoFor(stem) { const s = String(stem || '').toLowerCase(); return s ? S.photos.find(p => stemOf(p.name).toLowerCase() === s) : null; },
+  exPaint() {
+    const w = $('#exWin'); if (!w || !this.ex) return;
+    const X = this.ex, cur = this.exCur(), sh = this.shoot() || {}, C = X.choices;
+    const list = X.extras.map(e => { const s = e.summary;
+      return `<div class="ex-o ${e.id === this.exSel ? 'on' : ''}" data-x="pick" data-id="${e.id}"><span class="amt ${s.free ? 'free' : ''}">${s.free ? 'Free' : fmt$(s.sales_cents)}</span><b>${esc(e.kind || 'Other')}</b><small>${esc(e.customer || '')}${e.customer ? ' · ' : ''}${s.due_cents ? `<span class="due">owes ${fmt$(s.due_cents)}</span>` : plural(s.prints, 'print')}</small></div>`; }).join('');
+    const copyOpts = X.shoots.filter(s => s.count).map(s => `<option value="${s.id}">${esc(s.name)} (${s.count})</option>`).join('');
+    let detail = '<div class="ex-empty muted">Add an order on the left: the school, the park, the teachers, or anyone else.</div>';
+    if (cur) {
+      const s = cur.summary, why = {};
+      for (const l of cur.lines) if (l.why) (why[l.item] = why[l.item] || []).push(l);
+      const sizeSel = (i, v) => `<select data-xf="size" data-i="${i}">${C.sizes.map(z => `<option ${z === v ? 'selected' : ''}>${z}</option>`).join('')}</select>`;
+      const prodSel = (i, size, v) => { const ps = C.products[size] || []; return `<select data-xf="product" data-i="${i}">${ps.map(p => `<option value="${esc(p.product)}" ${p.product === v ? 'selected' : ''}>${esc(p.name)}${p.lab_cents != null ? ` · lab ${fmt$(p.lab_cents)}` : ''}</option>`).join('')}${ps.some(p => p.product === v) ? '' : `<option selected value="${esc(v)}">${esc(v)} (not at this size)</option>`}</select>`; };
+      const qtyOf = it => it.src === 'teams' ? Object.values(it.counts || {}).reduce((a, n) => a + Math.max(0, +n || 0), 0) : Math.max(0, +it.qty || 0);
+      const labOf = i => cur.lines.filter(l => l.item === i).reduce((a, l) => a + (l.lab_each || 0) * l.qty, 0);
+      const teams = this.exTeams(), photos = new Map(((this.d && this.d.teams) || []).map(t => [t.name, t.image]));
+      const rows = (cur.items || []).map((it, i) => {
+        let src;
+        if (it.src === 'teams') {
+          const c = it.counts || {}, names = [...new Set([...teams, ...Object.keys(c)])];
+          const vals = names.map(t => +c[t] || 0), same = vals.every(v => v === vals[0]);
+          src = `<div class="ex-src"><span class="muted">Every team photo</span><span class="ex-each" title="Set every team at once">each <button class="btn sm" data-x="each" data-i="${i}" data-d="-1">−</button><b>${same ? vals[0] || 0 : '–'}</b><button class="btn sm" data-x="each" data-i="${i}" data-d="1">+</button></span></div><div class="ex-chips">${names.map(t => {
+            const n = +c[t] || 0, nophoto = n > 0 && !photos.get(t);
+            return `<span class="ex-chip ${n ? 'on' : ''} ${nophoto ? 'warn' : ''}" title="${nophoto ? 'No group photo picked for this team yet' : ''}">${esc(t)}${nophoto ? ' · no photo' : ''}<span class="q"><button data-x="cnt" data-i="${i}" data-t="${esc(t)}" data-d="-1">−</button><b>× ${n}</b><button data-x="cnt" data-i="${i}" data-t="${esc(t)}" data-d="1">+</button></span></span>`; }).join('')}</div>`;
+        } else if (it.src === 'team') {
+          src = `<span class="ex-th">${(() => { const p = this.exPhotoFor(photos.get(it.team)); return p ? `<img src="${thumbUrl(p.path, 120)}" alt="">` : ''; })()}</span><select data-xf="team" data-i="${i}">${[...new Set([...teams, it.team || ''])].map(t => `<option ${t === it.team ? 'selected' : ''} value="${esc(t)}">${esc(t || 'Pick a team')}</option>`).join('')}</select> <span class="muted">team photo${photos.get(it.team) ? ' ' + esc(photos.get(it.team)) : ''}</span>`;
+        } else {
+          const p = this.exPhotoFor(it.image);
+          src = `<span class="ex-th">${p ? `<img src="${thumbUrl(p.path, 120)}" alt="">` : ''}</span><input class="ex-img" data-xf="image" data-i="${i}" value="${esc(it.image || '')}" placeholder="Photo # (e.g. 4412)" spellcheck="false"><input class="ex-lbl" data-xf="label" data-i="${i}" value="${esc(it.label || '')}" placeholder="Name on it" spellcheck="false">`;
+        }
+        const q = qtyOf(it), pr = +it.price_cents || 0;
+        const ws = (why[i] || []).map(l => `<span class="ex-why" title="${esc(l.label)}">${esc(it.src === 'teams' ? l.label.replace(/ team$/, '') + ': ' : '')}${esc(l.why)}</span>`).join('');
+        return `<tr><td class="ex-srccell">${src}${ws ? `<div>${ws}</div>` : ''}</td><td>${sizeSel(i, it.size)}</td><td>${prodSel(i, it.size, it.product)}</td>
+          <td class="r">${it.src === 'teams' ? q : `<input class="ex-num" data-xf="qty" data-i="${i}" value="${q}" inputmode="numeric">`}</td>
+          <td class="r"><input class="ex-money ${pr ? '' : 'free'}" data-xf="price" data-i="${i}" value="${(pr / 100).toFixed(2)}" inputmode="decimal" title="0 = free"></td>
+          <td class="r">${pr ? fmt$(pr * q) : '<span class="free">Free</span>'}</td><td class="r">${fmt$(labOf(i))}</td>
+          <td class="r"><button class="ex-del" data-x="rm" data-i="${i}" title="Remove this item">✕</button></td></tr>`;
+      }).join('');
+      const blockers = cur.lines.filter(l => l.why);
+      const notSetUp = [...new Set(blockers.filter(l => /set up in Crop/.test(l.why)).map(l => l.size))];
+      const banner = blockers.length ? `<div class="banner amber inline">${plural(blockers.reduce((a, l) => a + l.qty, 0), 'print')} can't go to the lab yet${notSetUp.length ? ` — ${notSetUp.join(', ')} isn't set up in Crop (add it under Crop's sizes, then Check framing)` : ''}${blockers.some(l => /group photo/.test(l.why)) ? ' — pick the missing group photos under Teams' : ''}${blockers.some(l => /crop yet/.test(l.why)) ? ' — crop and export the missing sizes' : ''}.</div>` : '';
+      const pm = cur.paid_method || '';
+      detail = `<div class="ex-cust"><label><span>For</span><input data-xf="kind" value="${esc(cur.kind || '')}" placeholder="School" spellcheck="false"></label>
+          <label class="wide"><span>Customer</span><input data-xf="customer" value="${esc(cur.customer || '')}" placeholder="Bryan High School" spellcheck="false"></label>
+          <label class="wide"><span>Contact</span><input data-xf="contact" value="${esc(cur.contact || '')}" placeholder="Name, email or phone" spellcheck="false"></label></div>
+        <table class="ex-t"><thead><tr><th>Photo</th><th>Size</th><th>Product</th><th class="r">Qty</th><th class="r">Price each</th><th class="r">Total</th><th class="r">Lab cost</th><th></th></tr></thead>
+          <tbody>${rows || `<tr><td colspan="8" class="muted">No items yet. Add team photos or one photo below.</td></tr>`}</tbody></table>
+        <div class="ex-add"><span class="muted">Add:</span><button class="btn sm" data-x="add" data-src="teams">+ Every team photo</button><button class="btn sm" data-x="add" data-src="team">+ One team's photo</button><button class="btn sm" data-x="add" data-src="photo">+ One photo…</button>${X.crops_checked ? '' : `<span class="muted small" style="margin-left:auto">Crops aren't checked: choose the crops folder under Lab order.</span>`}</div>
+        ${banner}
+        <div class="ex-pay"><span>Paid</span><input class="ex-money" data-xf="paid" value="${((cur.paid_cents || 0) / 100).toFixed(2)}" inputmode="decimal">
+          ${segHTML('exPaid', pm, [['cash', 'Cash'], ['check', 'Check'], ['card', 'Card'], ['other', 'Other']])}
+          ${pm === 'check' ? `<input data-xf="check_no" value="${esc(cur.check_no || '')}" placeholder="Check #" style="width:110px" spellcheck="false">` : ''}
+          <span class="${s.due_cents ? 'due' : 'muted'}" style="margin-left:auto">${s.free ? 'Free' : s.due_cents ? `Still owed ${fmt$(s.due_cents)}` : 'Paid in full'}</span>
+          <button class="btn sm" data-x="invoice" ${s.free ? 'disabled title="Nothing to bill"' : ''}>Invoice PDF…</button></div>
+        <div class="ex-foot2"><input data-xf="notes" value="${esc(cur.notes || '')}" placeholder="Notes (shown on the invoice)" spellcheck="false"><button class="btn sm ${this.exDel ? 'danger' : ''}" data-x="delorder">${this.exDel ? 'Click again to delete' : 'Delete order'}</button></div>`;
+    }
+    const T = X.totals, s = cur && cur.summary;
+    w.innerHTML = `<div class="rep-head"><div><h3>School &amp; other orders · ${esc(sh.name || '')}</h3><div class="muted small">Prints that aren't on any envelope. A price of 0 makes it free; its lab cost still comes off profit.</div></div>
+        <div class="m-actions" style="margin:0"><button class="btn primary" data-x="done">Done</button></div></div>
+      <div class="ex-grid"><div class="ex-list">${list}
+          <div class="ex-new"><button class="btn sm" data-x="new" data-k="School">+ School</button><button class="btn sm" data-x="new" data-k="Park">+ Park</button><button class="btn sm" data-x="new" data-k="Teachers">+ Teachers</button><button class="btn sm" data-x="new" data-k="">+ Other…</button></div>
+          ${copyOpts ? `<select class="ex-copy" data-xf="copy"><option value="">Copy from another shoot…</option>${copyOpts}</select>` : ''}</div>
+        <div class="ex-detail">${detail}</div></div>
+      <div class="ex-foot">${s ? `<span><b>${esc(cur.kind || 'Order')}</b> · sales <b>${fmt$(s.sales_cents)}</b> · lab cost <b>${fmt$(s.lab_cents)}</b> · profit <b>${fmt$(s.profit_cents)}</b>${s.sales_cents ? ` (${(100 * s.profit_cents / s.sales_cents).toFixed(1)}%)` : ''}</span>` : ''}
+        <span class="muted">${T.count ? `All ${plural(T.count, 'order')}: ${plural(T.prints, 'print')} · sales ${fmt$(T.sales_cents)} · lab ${fmt$(T.lab_cents)}${T.due_cents ? ` · owed ${fmt$(T.due_cents)}` : ''}` : ''}</span></div>`;
+  },
+  async exSave(patch) {
+    const cur = this.exCur(); if (!cur) return;
+    try {
+      const r = await api('/api/orders/extra/save', { shoot_id: this.sid, order: { id: cur.id, ...patch } });
+      Object.assign(cur, patch);
+      await this.loadExtras();
+    } catch (e) { toast(esc(e.message), 5000); }
+    this.exDel = false; this.exPaint();
+  },
+  exItems() { return JSON.parse(JSON.stringify((this.exCur() || {}).items || [])); },
+  async exClick(e) {
+    const b = e.target.closest('[data-x],[data-seg] button'); if (!b) return;
+    if (b.closest('[data-seg="exPaid"]')) { const v = b.dataset.v, cur = this.exCur(); return this.exSave({ paid_method: cur && cur.paid_method === v ? '' : v }); }
+    const a = b.dataset.x, i = +b.dataset.i;
+    if (a === 'done') { closeModal(); await this.refresh(); this.render(); return; }
+    if (a === 'pick') { this.exSel = +b.dataset.id; this.exDel = false; return this.exPaint(); }
+    if (a === 'new') {
+      const k = b.dataset.k, size = ((this.ex.choices.kinds || {})[k] || {}).size || '5x7';
+      const counts = Object.fromEntries(this.exTeams().map(t => [t, 1]));
+      const items = k ? [{ src: 'teams', size, product: 'Professional Prints', counts, price_cents: 0 }] : [];
+      try { const r = await api('/api/orders/extra/save', { shoot_id: this.sid, order: { kind: k || 'Other', customer: '', items } }); this.exSel = r.order.id; }
+      catch (err) { return toast(esc(err.message), 5000); }
+      await this.loadExtras(); this.exPaint();
+      if (!k) { const f = $('#exWin [data-xf="kind"]'); if (f) { f.focus(); f.select(); } }
+      return;
+    }
+    const items = this.exItems();
+    if (a === 'add') {
+      const src = b.dataset.src, base = { size: '8x10', product: 'Professional Prints', price_cents: 0 };
+      if (src === 'teams') items.push({ ...base, src, counts: Object.fromEntries(this.exTeams().map(t => [t, 1])) });
+      else if (src === 'team') items.push({ ...base, src, team: this.exTeams()[0] || '', qty: 1 });
+      else items.push({ ...base, size: '11x14', src, image: '', label: '', qty: 1 });
+      await this.exSave({ items });
+      if (src === 'photo') { const f = $$('#exWin [data-xf="image"]').pop(); if (f) f.focus(); }
+      return;
+    }
+    if (a === 'rm') { items.splice(i, 1); return this.exSave({ items }); }
+    if (a === 'cnt') { const it = items[i], t = b.dataset.t; it.counts = it.counts || {}; it.counts[t] = Math.max(0, (+it.counts[t] || 0) + +b.dataset.d); return this.exSave({ items }); }
+    if (a === 'each') { const it = items[i], c = it.counts || {}; const names = [...new Set([...this.exTeams(), ...Object.keys(c)])];
+      const vals = names.map(t => +c[t] || 0), base = vals.every(v => v === vals[0]) ? vals[0] || 0 : Math.max(...vals);
+      it.counts = Object.fromEntries(names.map(t => [t, Math.max(0, base + +b.dataset.d)])); return this.exSave({ items }); }
+    if (a === 'delorder') {
+      if (!this.exDel) { this.exDel = true; return this.exPaint(); }
+      try { await api('/api/orders/extra/delete', { id: this.exSel }); } catch (err) { return toast(esc(err.message)); }
+      this.exDel = false; this.exSel = null; await this.loadExtras();
+      if (this.ex.extras.length) this.exSel = this.ex.extras[0].id;
+      return this.exPaint();
+    }
+    if (a === 'invoice') {
+      const cur = this.exCur(), sh = this.shoot() || {};
+      const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+      const p = await pickPath('save', { initial: dir, filename: `${sanitize(sh.name || 'Shoot')} - invoice - ${sanitize(cur.customer || cur.kind || 'order')}.pdf`, types: ['PDF (*.pdf)'] }); if (!p) return;
+      try { const r = await api('/api/orders/invoice-pdf', { shoot_id: this.sid, id: cur.id, path: p }); DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
+        toast(`Saved ${esc(baseName(r.path))} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 6000); }
+      catch (err) { toast(esc(err.message), 5000); }
+    }
+  },
+  async exChange(e) {
+    const f = e.target.closest('[data-xf]'); if (!f) return;
+    const k = f.dataset.xf, i = +f.dataset.i, v = f.value;
+    if (k === 'copy') {
+      if (!v) return;
+      try { const r = await api('/api/orders/extras-copy', { shoot_id: this.sid, from_shoot_id: +v }); toast(`Copied ${plural(r.copied, 'order')} — one person's photos don't carry over`, 5000); }
+      catch (err) { return toast(esc(err.message), 5000); }
+      await this.loadExtras(); if (!this.exCur() && this.ex.extras.length) this.exSel = this.ex.extras[this.ex.extras.length - 1].id;
+      return this.exPaint();
+    }
+    if (['kind', 'customer', 'contact', 'check_no', 'notes'].includes(k)) return this.exSave({ [k]: v });
+    if (k === 'paid') { const c = Math.round(parseFloat(v.replace(/[$,\s]/g, '')) * 100); if (!isFinite(c) || c < 0) { toast('Type the amount paid, like 85.00'); return this.exPaint(); } return this.exSave({ paid_cents: c }); }
+    const items = this.exItems(), it = items[i]; if (!it) return;
+    if (k === 'price') { const c = Math.round(parseFloat(v.replace(/[$,\s]/g, '') || '0') * 100); if (!isFinite(c) || c < 0) { toast('Type a price, like 25.00 (0 for free)'); return this.exPaint(); } it.price_cents = c; }
+    else if (k === 'qty') it.qty = Math.max(0, parseInt(v, 10) || 0);
+    else if (k === 'size') { it.size = v; const ps = this.ex.choices.products[v] || []; if (!ps.some(p => p.product === it.product)) it.product = (ps[0] || {}).product || 'Professional Prints'; }
+    else if (k === 'product') it.product = v;
+    else if (k === 'team') it.team = v;
+    else if (k === 'label') it.label = v.trim();
+    else if (k === 'image') {
+      let st = v.trim();
+      if (/^\d+$/.test(st)) { const m = this.matches(st); if (m.length) st = m[0]; }
+      it.image = st;
+      if (!it.label && this.d) { const o = this.d.orders.find(o => stemOf(o.edited || o.image || '').toLowerCase() === st.toLowerCase());
+        if (o) it.label = [o.athlete, o.team].filter(Boolean).join(' · '); }
+    }
+    return this.exSave({ items });
+  },
   // ---------- analysis ----------
   // Sales analysis for the shoot (or one team, or every shoot), with a What if for prices.
   an: null, anScope: 'shoot', anBusy: false, anKey: '', wi: {}, wiDrop: 10,
@@ -3698,7 +3902,7 @@ const Ord = {
     $('#anSub').textContent = all ? `${plural(A.shoots, 'shoot')} · ${plural(s.n, 'envelope')} with an order` : plural(s.n, 'envelope') + ' with an order';
     if (!s.n) { box.innerHTML = `<div class="ord-empty"><h3>Nothing sold yet</h3><p>Analysis fills in as envelopes are typed in.</p></div>`; return; }
     const kp = [
-      ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : plural(s.n, 'envelope')],
+      ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : s.extra && s.extra.count ? `incl. ${fmt$(s.extra.sales_cents)} school & other` : plural(s.n, 'envelope')],
       ['Average order', fmt$(s.avg), one ? `shoot ${fmt$(w.avg)}` : 'per envelope'],
       ['Lab cost (est.)', fmt$(s.lab), `${pct(s.lab, s.sales)} of sales`],
       ['Shipping', one ? '—' : fmt$(s.shipping), one ? 'one charge for the shoot' : all ? 'all shoots' : 'from Totals'],
@@ -3809,7 +4013,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad" style="padding-top:2px"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad" style="padding-top:2px"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button> <button class="btn sm" data-ord="extras" title="Prints for the school, the park, teachers or a sponsor — free or paid — that aren't on any envelope">School &amp; other orders…</button></div>`);
     }
     $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
   },
@@ -4202,7 +4406,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

@@ -66,16 +66,30 @@ def _packages_bought(o: dict, catalog: Catalog) -> list[str]:
     return [l["product_id"] for l in o["summary"]["lines"] if l["type"] == "package"]
 
 
+def _add_extras(t: dict, ex: dict | None) -> dict:
+    """Fold school & other orders into a whole-shoot total; average order stays families only."""
+    ex = ex or {}
+    t["extra"] = {k: ex.get(k, 0) for k in ("count", "sales_cents", "lab_cents", "paid_cents", "due_cents", "prints")}
+    t["family_sales"] = t["sales"]
+    t["sales"] += t["extra"]["sales_cents"]
+    t["lab"] += t["extra"]["lab_cents"]
+    t["paid"] += t["extra"]["paid_cents"]
+    t["due"] = t["sales"] - t["paid"]
+    t["profit_before"] = t["sales"] - t["lab"]
+    t["profit"] = t["profit_before"] - t["shipping"]
+    return t
+
+
 def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents: int = 0,
-            team: str | None = None) -> dict:
+            team: str | None = None, extras: dict | None = None) -> dict:
     """The Analysis view for a shoot (or several), optionally narrowed to one team.
 
     Shipping is one charge for the shoot, so a team's profit is before shipping.
     """
     pick = [o for o in orders if (o.get("team") or "") == team] if team is not None else orders
     one = team is not None
-    whole = _totals(orders, shipping_cents)
-    sel = _totals(pick, 0 if one else shipping_cents)
+    whole = _add_extras(_totals(orders, shipping_cents), extras)
+    sel = _totals(pick, 0 if one else shipping_cents) if one else _add_extras(_totals(pick, shipping_cents), extras)
     sold_sel, sold_all = _sold(pick, catalog), _sold(orders, catalog)
 
     # Which packages each selection's envelopes bought (A-C-style "big" = the three priciest)

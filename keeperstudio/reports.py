@@ -161,7 +161,7 @@ def _pct(part: int, whole: int) -> str:
     return f"{100 * part / whole:.1f}%" if whole else "—"
 
 
-def shoot_summary(orders: list[dict], catalog, shoot: dict) -> list[dict]:
+def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] | None = None) -> list[dict]:
     """The whole shoot on a few pages: totals, teams, payments, what sold, prints, who owes.
 
     `orders` carry their `summary` (order_routes adds the lab estimate to it).
@@ -173,18 +173,40 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict) -> list[dict]:
     S = lambda o, k: int(o["summary"].get(k) or 0)
     sales, paid = sum(S(o, "total_cents") for o in orders), sum(S(o, "paid_cents") for o in orders)
     lab, ship = sum(S(o, "lab_cents") for o in orders), int(shoot.get("shipping_cents") or 0)
+    extras = extras or []
+    X = lambda k: sum(int(e["summary"].get(k) or 0) for e in extras)
+    fam_sales = sales
+    sales, paid, lab = sales + X("sales_cents"), paid + X("paid_cents"), lab + X("lab_cents")
     keep = sales - lab - ship
     row = lambda *c: {"kind": "row", "cells": [str(x) for x in c]}
     tot = lambda *c: {"kind": "total", "cells": [str(x) for x in c]}
     sections = []
 
     owed = [o for o in orders if S(o, "due_cents") > 0]
+    ex_owed = [e for e in extras if e["summary"]["due_cents"] > 0]
+    owe_n = len(owed) + len(ex_owed)
+    sales_rows = [row("Sales", _money(sales))]
+    if extras:
+        sales_rows += [row("    Families", _money(fam_sales)), row(f"    School & other orders ({len(extras)})", _money(X("sales_cents")))]
     sections.append({"heading": "Totals", "head": ["", "Amount"], "align": ["text", "money"], "rows": [
-        row("Envelopes", len(orders)), row("Sales", _money(sales)), row("Collected", _money(paid)),
-        row(f"Still due ({len(owed)} envelope{'s' if len(owed) != 1 else ''})", _money(sales - paid)),
+        row("Envelopes", len(orders)), *sales_rows, row("Collected", _money(paid)),
+        row(f"Still due ({owe_n} {'order' if extras else 'envelope'}{'s' if owe_n != 1 else ''})", _money(sales - paid)),
         row("Lab cost (Meridian list prices, estimated)", _money(lab)), row("Shipping", _money(ship)),
         tot("You keep", _money(keep)), row("Profit", _pct(keep, sales)),
-        row("Average sale per envelope", _money(sales // len(live)) if live else "—")]})
+        row("Average sale per envelope", _money(fam_sales // len(live)) if live else "—")]})
+
+    if extras:
+        erows = []
+        for e in extras:
+            su = e["summary"]
+            what = "; ".join(_extra_item_text(it) for it in e.get("items") or [])
+            erows.append(row(e["who"], what, su["prints"], "Free" if su["free"] else _money(su["sales_cents"]),
+                             _money(su["paid_cents"]), _money(su["due_cents"]) if su["due_cents"] else "",
+                             _money(su["lab_cents"])))
+        erows.append(tot("TOTAL", "", X("prints"), _money(X("sales_cents")), _money(X("paid_cents")),
+                         _money(X("due_cents")), _money(X("lab_cents"))))
+        sections.append({"heading": "School & other orders", "head": ["For", "What", "Prints", "Sales", "Paid", "Due", "Lab"],
+                         "align": ["text", "text", "num", "money", "money", "money", "money"], "rows": erows})
 
     teams: dict[str, list[dict]] = {}
     for o in orders:
@@ -266,6 +288,85 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict) -> list[dict]:
                          "align": ["num", "text", "text"],
                          "rows": [row(o.get("envelope") or "", o.get("athlete") or "(no name)", o.get("team") or "") for o in nophoto]})
     return sections
+
+
+def _extra_item_text(it: dict) -> str:
+    from .extras import SHORT
+    prod = SHORT.get(it.get("product") or "", "Print")
+    what = f"{it.get('size', '')} {prod.lower()}"
+    if it.get("src") == "teams":
+        c = {t: int(n or 0) for t, n in (it.get("counts") or {}).items() if int(n or 0) > 0}
+        each = set(c.values())
+        if len(each) == 1:
+            n = next(iter(each))
+            return f"{what} of each team photo{f' x {n}' if n > 1 else ''} ({', '.join(c)})"
+        return f"{what}: " + ", ".join(f"{t} x {n}" for t, n in c.items())
+    src = f"{it.get('team')} team photo" if it.get("src") == "team" else (it.get("label") or it.get("image") or "photo")
+    q = int(it.get("qty") or 0)
+    return f"{what} of {src}{f' x {q}' if q > 1 else ''}"
+
+
+def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
+    """A one-page invoice for a school or other order."""
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_RIGHT
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape
+
+    from .extras import item_qty
+
+    path = Path(path)
+    if path.suffix.lower() != ".pdf":
+        path = path.with_suffix(".pdf")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    P = lambda t, **k: Paragraph(escape(str(t)), ParagraphStyle("x", fontName=k.get("f", "Helvetica"),
+                                                                 fontSize=k.get("s", 10), leading=k.get("s", 10) * 1.3,
+                                                                 alignment=k.get("a", 0),
+                                                                 textColor=colors.HexColor(k.get("c", "#111111"))))
+    today = dt.date.today().strftime("%B %d, %Y").replace(" 0", " ")
+    shoot_bits = " · ".join(b for b in [shoot.get("name") or "", shoot.get("date") or ""] if b)
+    story = [Table([[P("Jamie Bexten Photography", f="Helvetica-Bold", s=15), P("INVOICE", f="Helvetica-Bold", s=18, a=TA_RIGHT)],
+                    [P("Bryan, Ohio", c="#555B66"), P(f"No. {shoot.get('id', 0)}-{order['id']}   ·   {today}", a=TA_RIGHT, c="#555B66")]],
+                   colWidths=[3.9 * inch, 3.4 * inch]),
+             Spacer(1, 18), P("Bill to", f="Helvetica-Bold", s=9, c="#555B66"),
+             P(order.get("customer") or order.get("kind") or ""),
+             *([P(order["contact"], c="#333333")] if order.get("contact") else []),
+             Spacer(1, 6), P(f"Picture day: {shoot_bits}", c="#333333"), Spacer(1, 14)]
+    rows = [[P(h, f="Helvetica-Bold", s=9.5, a=TA_RIGHT if i else 0) for i, h in enumerate(["Item", "Qty", "Each", "Amount"])]]
+    for it in order.get("items") or []:
+        q = item_qty(it)
+        if q <= 0:
+            continue
+        price = int(it.get("price_cents") or 0)
+        rows.append([P(_extra_item_text(it)[:1].upper() + _extra_item_text(it)[1:], s=9.5), P(q, s=9.5, a=TA_RIGHT),
+                     P("No charge" if not price else _money(price), s=9.5, a=TA_RIGHT),
+                     P("—" if not price else _money(price * q), s=9.5, a=TA_RIGHT)])
+    n = len(rows)
+    rows += [["", "", P("Total", f="Helvetica-Bold", a=TA_RIGHT), P(_money(summary["sales_cents"]), f="Helvetica-Bold", a=TA_RIGHT)],
+             ["", "", P("Paid", a=TA_RIGHT), P(_money(summary["paid_cents"]), a=TA_RIGHT)],
+             ["", "", P("Balance due", f="Helvetica-Bold", a=TA_RIGHT), P(_money(summary["due_cents"]), f="Helvetica-Bold", a=TA_RIGHT)]]
+    t = Table(rows, colWidths=[4.4 * inch, 0.6 * inch, 1.1 * inch, 1.2 * inch], repeatRows=1)
+    t.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.HexColor("#555B66")),
+                           ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E6E8EC")),
+                           ("LINEBELOW", (0, 1), (-1, n - 1), 0.25, colors.HexColor("#D5D8DE")),
+                           ("LINEABOVE", (2, n), (-1, n), 1, colors.black),
+                           ("LINEABOVE", (2, n + 2), (-1, n + 2), 0.6, colors.black),
+                           ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    story += [t, Spacer(1, 20)]
+    if order.get("paid_method") and summary["paid_cents"]:
+        how = order["paid_method"].title() + (f" #{order['check_no']}" if order.get("check_no") else "")
+        story.append(P(f"Received {_money(summary['paid_cents'])} by {how}. Thank you!", c="#333333"))
+    elif summary["due_cents"]:
+        story.append(P("Please make checks payable to Jamie Bexten Photography. Thank you!", c="#333333"))
+    if order.get("notes"):
+        story += [Spacer(1, 8), P(order["notes"], c="#333333")]
+    doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.6 * inch, rightMargin=0.6 * inch,
+                            topMargin=0.6 * inch, bottomMargin=0.6 * inch, title="Invoice", author="Jamie Bexten Photography")
+    doc.build(story)
+    return path
 
 
 def pdf_sections(sections: list[dict], path: Path, title: str, subtitle: str) -> Path:
