@@ -270,6 +270,13 @@ def r_meridian_settings(b):
     return {"settings": s, "problems": M.settings_problems(s)}
 
 
+def r_meridian_report(b):
+    path = Path(str(b.get("csv") or ""))
+    if not path.is_file():
+        raise FileNotFoundError("Build the Meridian order first.")
+    return M.report(path)
+
+
 def r_meridian_build(b):
     sid = int(b["shoot_id"])
     rows = [o for o in book.orders(sid) if o["lines"]]
@@ -326,5 +333,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/report": r_report, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
+    "/api/orders/report": r_report, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
 }

@@ -89,6 +89,15 @@ class MeridianTests(unittest.TestCase):
             for r in got:
                 self.assertTrue(Path(d, "out", r["file_name"]).is_file(), r["file_name"])
             self.assertEqual(Path(res["csv"]).name, "Winter Sports-meridian-order.csv")
+            # a printable PDF beside the CSV, and a report whose totals match the rows
+            self.assertEqual(Path(res["pdf"]).read_bytes()[:5], b"%PDF-")
+            rep = M.report(res["csv"])
+            items = [r for r in rep["rows"] if r["kind"] == "row"]
+            self.assertEqual(len(items), len(got))
+            total = rep["rows"][-1]["cells"]
+            self.assertEqual(int(total[3]), sum(int(r["quantity"]) for r in got))
+            self.assertEqual(total[7], "$" + res["total"])  # same estimate as Meridian's checker
+            self.assertIn("studio@example.com", rep["subtitle"])
             self.assertTrue(any("no photo" in l["why"] for l in res["left_out"]))  # Riley has no photo
 
     def test_checker_catches_a_wrong_shape(self):

@@ -3430,16 +3430,21 @@ const Ord = {
     if (!this.sid) return;
     const team = this.team !== 'all' ? this.team : '';
     let R; try { R = await api('/api/orders/report', { shoot_id: this.sid, kind, team }); } catch (e) { return toast(esc(e.message)); }
+    this.reportModal(R, `<button class="btn" data-close>Close</button><button class="btn" data-rep="csv">Save CSV…</button><button class="btn primary" data-rep="pdf">Save PDF…</button>`,
+      kind === 'pull' ? 'empty columns hidden' : '', b => this.exportCsv(kind, b.dataset.rep));
+  },
+  // The formatted table in a wide modal; buttons with data-rep call onAction.
+  reportModal(R, buttons, note, onAction) {
     const cls = a => a === 'money' ? 'r' : a === 'num' ? 'c' : '';
     const body = R.rows.map(r => r.kind === 'group' ? `<tr class="grp"><td colspan="${R.head.length}">${esc(r.label)}</td></tr>`
       : `<tr class="${r.kind === 'total' ? 'tot' : ''}">${r.cells.map((c, i) => `<td class="${cls(R.align[i])}">${esc(c)}</td>`).join('')}</tr>`).join('');
     const n = R.rows.filter(r => r.kind === 'row').length;
-    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)} · ${plural(n, 'row')}${kind === 'pull' ? ' · empty columns hidden' : ''}</div></div>
-        <div class="m-actions" style="margin:0"><button class="btn" data-close>Close</button><button class="btn" data-rep="csv">Save CSV…</button><button class="btn primary" data-rep="pdf">Save PDF…</button></div></div>
+    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)} · ${plural(n, 'row')}${note ? ' · ' + note : ''}</div></div>
+        <div class="m-actions" style="margin:0">${buttons}</div></div>
       <div class="rep-paper">${n ? `<table class="rep"><thead><tr>${R.head.map((h, i) => `<th class="${cls(R.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>` : '<p class="muted">Nothing to show yet.</p>'}</div>`,
       card => {
         card.classList.add('report');
-        card.addEventListener('click', e => { const b = e.target.closest('[data-rep]'); if (b) this.exportCsv(kind, b.dataset.rep); });
+        card.addEventListener('click', e => { const b = e.target.closest('[data-rep]'); if (b) onAction(b); });
       });
   },
   async exportCsv(kind, fmt = 'csv') {
@@ -3504,6 +3509,14 @@ const Ord = {
     try { const r = await api('/api/orders/meridian-settings', { [k]: v }); if (this.lab) this.lab.meridian = r.settings; } catch (e) { toast(esc(e.message)); }
     if (k !== 'account_email') renderView();
   },
+  async previewMeridian() {
+    const M = this.mer; if (!M || !M.csv) return;
+    let R; try { R = await api('/api/orders/meridian-report', { csv: M.csv }); } catch (e) { return toast(esc(e.message)); }
+    const pdf = M.pdf ? `<button class="btn" data-rep="pdf">Show PDF</button>` : '';
+    this.reportModal(R, `<button class="btn" data-close>Close</button>${pdf}<button class="btn primary" data-rep="csv">Show order folder</button>`,
+      M.ok ? 'checked by Meridian’s checker' : 'Meridian’s checker found problems',
+      b => reveal(b.dataset.rep === 'pdf' ? M.pdf : M.csv));
+  },
   async buildMeridian() {
     const s = this.shoot(); if (!s || this.merBusy) return;
     const em = $('#modView [data-mer=account_email]');
@@ -3521,6 +3534,7 @@ const Ord = {
     const li = (a, f) => a.map(x => `<li>${f(x)}</li>`).join('');
     const res = !R ? '' : `<div class="mer-res ${R.ok && !R.left_out.length ? 'ok' : 'bad'}">
         <div class="mer-top"><b>${!R.ok ? '✗ Not ready' : R.left_out.length ? `✓ CSV ready · ${plural(R.left_out.length, 'print line')} not in it` : '✓ Ready to send'}</b><span>${plural(R.items, 'item')} · ${plural(R.files, 'file')}${R.total ? ` · about $${esc(R.total)} before shipping` : ''}</span>
+          <span class="tb-spacer"></span>${R.csv ? '<button class="btn sm" data-ord="mer-preview">Preview</button>' : ''}${R.pdf ? `<button class="btn sm" onclick="reveal(${esc(JSON.stringify(R.pdf))})" title="${esc(R.pdf)}">PDF</button>` : ''}
           <button class="btn sm" onclick="reveal(${esc(JSON.stringify(R.csv || R.out_dir))})">Show</button></div>
         <div class="muted small">Meridian’s checker ${R.ok ? 'passed' : 'found problems'}: ${plural(R.errors.length, 'error')}, ${plural(R.warnings.length, 'warning')}.</div>
         ${R.errors.length ? `<ul class="mer-err">${li(R.errors, esc)}</ul>` : ''}
@@ -3922,7 +3936,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'mer-build') Ord.buildMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

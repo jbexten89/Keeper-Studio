@@ -211,15 +211,54 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
     rows, left_out = plan_rows(plan, catalog, settings, order_name, file_for)
     name = O.safe_name(order_name) + "-meridian-order.csv"
     path = out_dir / name
+    pdf_path = ""
     if rows:
         write_csv(rows, path)
         result = check(path, out_dir)
+        try:  # a printable copy beside the CSV; the order itself is the CSV
+            from .. import reports
+            t = report(path)
+            pdf_path = str(reports.pdf(t, path.with_suffix(".pdf"), t["title"], t["subtitle"]))
+        except Exception:  # noqa: BLE001 - never lose the order over its printout
+            pdf_path = ""
     else:
         result = {"ok": False, "report": "Nothing to order.", "errors": ["Nothing in this shoot can go in the CSV."],
                   "warnings": [], "total": ""}
     files = len({r["file_name"] for r in rows})
-    return {"out_dir": str(out_dir), "csv": str(path) if rows else "", "items": len(rows), "files": files,
+    return {"out_dir": str(out_dir), "csv": str(path) if rows else "", "pdf": pdf_path, "items": len(rows), "files": files,
             "left_out": left_out, **result}
+
+
+def report(order_csv) -> dict:
+    """The order CSV as a readable table: one row per file, grouped by print size, with
+    Meridian's product name and list price, and the order settings in the subtitle."""
+    with open(order_csv, encoding="utf-8-sig", newline="") as f:
+        rows = list(csv.DictReader(f))
+    head = ["Item", "Code", "Product", "Qty", "File", "Finish", "Each", "Est. cost", "For"]
+    out, total_qty, total = [], 0, 0.0
+    groups = {}
+    for r in rows:
+        groups.setdefault(r["file_name"].split("/")[0] if "/" in r["file_name"] else "", []).append(r)
+    for g, rs in groups.items():
+        out.append({"kind": "group", "label": f"{g or 'Files'}  ·  {len(rs)} {'file' if len(rs) == 1 else 'files'}"})
+        for r in rs:
+            p = products().get(r["product_code"]) or {}
+            each = float(p.get("base_price_usd") or 0) + _upcharge(p.get("finish_choices", ""), r.get("finish", ""))
+            qty = int(r.get("quantity") or 0)
+            total_qty += qty
+            total += each * qty
+            out.append({"kind": "row", "cells": [r["item_id"], r["product_code"], p.get("product_name", ""), str(qty),
+                                                 r["file_name"].split("/")[-1], r.get("finish", ""),
+                                                 O.money(round(each * 100)), O.money(round(each * qty * 100)),
+                                                 (r.get("notes") or "").removeprefix("For ")]})
+    first = rows[0] if rows else {}
+    out.append({"kind": "total", "cells": ["TOTAL", "", f"{len(rows)} items", str(total_qty), "", "", "",
+                                            O.money(round(total * 100)), "before shipping and tax"]})
+    sub = " · ".join(x for x in [first.get("order_name", ""), first.get("account_email", ""),
+                                  "Ship" if first.get("delivery") == "ship" else "Pickup" if first.get("delivery") else "",
+                                  "Color correction: " + (first.get("color_correction") or "no")] if x)
+    return {"title": "Meridian order", "subtitle": sub, "head": head, "rows": out,
+            "align": ["num", "text", "text", "num", "text", "text", "money", "money", "text"]}
 
 
 def _group_of(plan: dict, item: dict) -> str:
