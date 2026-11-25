@@ -43,8 +43,11 @@ extract it, then:
 
 ## The six modules
 
-Switch with the tabs at the top or **Ctrl+1…6**: Library, Retouch, Crop,
-Composite, Extract, Orders.
+Switch with the tabs at the top or **Ctrl+1…6**: Library, Retouch, Crop, Orders
+(the picture-day tabs, in workflow order), then Composite and Extract after a
+divider (used once a year: preschool composites and fall sports banners).
+In Crop, **Picks + team photos** selects every Pick (P) and team photo (T) in the
+folder, ready to check framing and export.
 
 | Module | What it does |
 | --- | --- |

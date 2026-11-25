@@ -324,6 +324,8 @@ kbd{display:inline-block;min-width:22px;padding:1px 6px;border:1px solid var(--b
 .logo-big .logo-sub{font-size:.7em}
 .modules button{background:none;border:0;color:var(--dim);font:inherit;font-size:15px;cursor:pointer;padding:2px 6px;border-radius:4px}
 .modules button:hover{color:var(--text)}
+.modules button.occ{font-size:13px;opacity:.75}.modules button.occ:hover,.modules button.occ.on{opacity:1}
+.modules .mod-div{display:inline-block;width:1px;height:18px;padding:0;background:var(--border-strong, #3a3f47);margin:0 10px 0 12px}
 .modules button.on{color:var(--text);font-weight:600}
 #modView{position:absolute;inset:0;overflow:hidden}
 #modbar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-top:1px solid var(--border);background:var(--panel-2);min-height:40px;overflow:hidden;white-space:nowrap}
@@ -1330,7 +1332,7 @@ function renderBanners() {
 function renderTop() {
   if ($('#top')._built) return; $('#top')._built = true;
   $('#top').innerHTML = `<div class="logo">Keeper<b>.</b><span class="logo-sub">Studio</span></div>
-    <div class="modules">${MODULES.map(([k, l], i) => `${i ? '<span class="bar">|</span>' : ''}<button data-module="${k}" title="${k === 'cutout' ? 'Extract the subject from the background' : l} (Ctrl+${i + 1})">${l}</button>`).join('')}</div>
+    <div class="modules">${MODULES.map(([k, l], i) => `${!i ? '' : OCCASIONAL.has(k) && !OCCASIONAL.has(MODULES[i - 1][0]) ? '<span class="mod-div"></span>' : `<span class="bar">${OCCASIONAL.has(k) ? '·' : '|'}</span>`}<button data-module="${k}" class="${OCCASIONAL.has(k) ? 'occ' : ''}" title="${k === 'cutout' ? 'Extract the subject from the background' : l} (Ctrl+${i + 1})">${l}</button>`).join('')}</div>
     <div class="top-actions"><button class="btn sm" data-act="open" title="Open folder (Ctrl+O)">Open Folder…</button><button class="btn sm" data-act="export" title="Export (Ctrl+Shift+E)">Export…</button><button class="btn sm" data-act="help" title="Keyboard shortcuts (?)">?</button></div>`;
 }
 function sectionHTML(id, title, body, extra = '') {
@@ -2154,7 +2156,7 @@ function buildHelp() {
     ${g('Views', [['Grid', 'G'], ['Loupe', 'E'], ['Compare', 'C'], ['Survey', 'N'], ['Toggle Loupe / Grid', 'Space'], ['Zoom Fit ↔ 1:1', 'Z'], ['Zoom in / out (also mouse wheel)', '+ −'], ['Full-screen preview', 'F'], ['Lights out (cycle)', 'L'], ['Back to Grid / close', 'Esc']])}
     ${g('Marking', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Team photo on / off', 'T'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Save Quick Collection as…', 'Ctrl Alt B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'Shift T'], ['Filter bar', '\\']])}
-    ${g('Modules', [['Library', 'Ctrl 1'], ['Retouch (eye swap)', 'Ctrl 2  Q'], ['Crop', 'Ctrl 3  R'], ['Composite', 'Ctrl 4'], ['Extract', 'Ctrl 5'], ['Orders', 'Ctrl 6'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
+    ${g('Modules', [['Library', 'Ctrl 1'], ['Retouch (eye swap)', 'Ctrl 2  Q'], ['Crop', 'Ctrl 3  R'], ['Orders', 'Ctrl 4'], ['Composite', 'Ctrl 5'], ['Extract', 'Ctrl 6'], ['Adjust framing (Crop)', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O']])}
     ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A'], ['Filmstrip photo (opens its envelope)', '← →']])}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
@@ -2340,7 +2342,9 @@ function onKey(e) {
 /* ================= Modules: Library · Retouch · Crop · Composite · Extract · Orders ================= */
 // Modules that work with no folder open.
 const NO_PHOTOS_NEEDED = new Set(['composite', 'orders']);
-const MODULES = [['library', 'Library'], ['retouch', 'Retouch'], ['crop', 'Crop'], ['composite', 'Composite'], ['cutout', 'Extract'], ['orders', 'Orders']];
+// Picture-day tabs in workflow order, then the once-a-year ones (preschool composites, fall banners) after a divider.
+const MODULES = [['library', 'Library'], ['retouch', 'Retouch'], ['crop', 'Crop'], ['orders', 'Orders'], ['composite', 'Composite'], ['cutout', 'Extract']];
+const OCCASIONAL = new Set(['composite', 'cutout']);
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
@@ -2824,7 +2828,7 @@ const Crop = {
   },
   modbar() {
     const p = this.active(); const m = p && this.manual.has(p.path);
-    $('#modbar').innerHTML = `<div class="tb-group"><button class="btn sm" data-crop="adjust" ${p ? '' : 'disabled'}>Adjust framing <kbd>A</kbd></button>
+    $('#modbar').innerHTML = `<button class="btn sm" data-crop="picks-team" title="Select every Pick (P) and team photo (T) in the folder, to crop and export them">Picks + team photos</button><div class="tb-sep"></div><div class="tb-group"><button class="btn sm" data-crop="adjust" ${p ? '' : 'disabled'}>Adjust framing <kbd>A</kbd></button>
       ${m ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div><div class="tb-sep"></div>
       <button class="toggle ${this.overlay ? 'on' : ''}" data-crop="overlay" title="Show crop boxes (O)">Crop boxes</button>
       <button class="toggle ${this.compare ? 'on' : ''}" data-crop="compare" title="Original and color preset side by side (C)">Color side by side <kbd>C</kbd></button>
@@ -2832,6 +2836,15 @@ const Crop = {
   },
 
   /* ---------- actions ---------- */
+  // Everything that gets printed: one Pick per kid plus the team photos.
+  selectPicksTeam() {
+    const ids = S.photos.filter(p => { const m = getMeta(p.key); return m.flag === 1 || m.team; }).map(p => p.id);
+    if (!ids.length) return toast('No Picks (P) or team photos (T) in this folder yet', 3500);
+    const nTeam = S.photos.filter(p => getMeta(p.key).team).length;
+    S.selected = new Set(ids); S.active = ids[0]; S.anchor = ids[0]; this.scope = 'selected';
+    refreshSelection(); renderLeft();
+    toast(`${plural(ids.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')} selected. Crop will check and export just these.`, 5000);
+  },
   async setOut(path, custom) {
     this.outDir = path; this.outCustom = custom;
     if (S.root) { if (custom) DB.put('kv', 'cropout|' + S.root, path).catch(() => {}); else DB.del('kv', 'cropout|' + S.root).catch(() => {}); }
@@ -3923,7 +3936,7 @@ function bindModuleEvents() {
     const c = t.closest('[data-crop]');
     if (c) {
       const a = c.dataset.crop;
-      if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze();
+      if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze(); else if (a === 'picks-team') Crop.selectPicksTeam();
       else if (a === 'compare') Crop.toggleCompare(); else if (a === 'clear-styles') Crop.clearStyles();
       else if (a === 'adjust') Crop.startAdjust(); else if (a === 'square') Crop.startSquare(); else if (a === 'reset') Crop.resetManual();
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
