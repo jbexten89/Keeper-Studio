@@ -564,6 +564,10 @@ kbd{font-size:10px}
 .of-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 10px;padding:10px 12px}
 .of-grid .fld{margin:0}
 .of-grid .wide{grid-column:1/-1}
+/* Envelope # is short; Team gets the room. Athlete and Coach share the next line. */
+.of-grid.who{grid-template-columns:repeat(10,minmax(0,1fr));align-items:end}.of-grid.who>.fld>span{white-space:nowrap}
+.of-grid.who>.fld:nth-child(1){grid-column:span 2}.of-grid.who>.fld:nth-child(2){grid-column:span 8}
+.of-grid.who>.fld:nth-child(3),.of-grid.who>.fld:nth-child(4){grid-column:span 5}
 .of-grid input,.of-grid textarea{width:100%}
 textarea{font:inherit;color:var(--text);background:#0C0D10;border:1px solid var(--border-2);border-radius:4px;padding:5px 7px;outline:none;resize:vertical;min-height:48px;user-select:text}
 textarea:focus{border-color:var(--accent)}
@@ -3621,7 +3625,7 @@ const Ord = {
     const qrow = p => { const q = this.qty(p.id); return `<div class="qrow ${q ? 'has' : ''}"><span class="nm" title="${esc(p.unit_label)}">${esc(p.short)}</span><span class="pr">${p.type === 'alacarte' && pr.hasPkg ? `<s>${fmt$(p.price)}</s>` : ''}${fmt$(this.unit(p, pr.hasPkg))}</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${q}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`; };
     const fld = (k, l, wide, extra = '') => `<label class="fld ${wide ? 'wide' : ''}"><span>${l}</span><input data-of="${k}" value="${esc(d[k])}" spellcheck="false" ${extra}></label>`;
     $('#right').innerHTML = `<div class="scroll">
-      ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid">${fld('envelope', 'Envelope #')}${fld('team', 'Team', false, 'list="ordTeams"')}${fld('athlete', 'Athlete', true, 'placeholder="First and last name"')}${fld('coach', 'Coach', true, 'list="ordCoaches"')}</div>`)}
+      ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid who">${fld('envelope', 'Env #', false, 'title="Envelope number"')}${fld('team', 'Team', false, 'list="ordTeams"')}${fld('athlete', 'Athlete', false, 'placeholder="First and last name"')}${fld('coach', 'Coach', false, 'list="ordCoaches"')}</div>`)}
       ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
