@@ -99,6 +99,13 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   copies just those files into one folder per size plus `lab-order.csv`.
   With *One file per print* on, two 4x6s become two files, so a whole size
   folder uploads to the Meridian website with every quantity at 1.
+* **Analysis:** sales, average order, lab cost, shipping and profit for the
+  shoot, or for the team picked on the left (compared with the whole shoot),
+  or for every shoot together. Shows the package mix, payments, and what each
+  a la carte print and keepsake sold and kept after lab cost. **What if**
+  tries new prices on any item at once, with a setting for families who stop
+  buying an item when its price goes up, and says how many buyers a raise
+  could lose and still make the same profit. Hide it when you don't need it.
 * **Exports:** pull sheet (prints per athlete with totals), crop list, ROES
   event import file, and an orders CSV for the books. With a team selected on
   the left, an export covers just that team.

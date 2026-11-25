@@ -671,6 +671,35 @@ textarea:focus{border-color:var(--accent)}
 .lab-it .who{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .lab-it .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lab-it .ok{color:#3CC77F}.lab-it .bad{color:var(--amber)}
+.ord-scroll.an{padding:12px 14px}
+.an-body{display:flex;flex-direction:column;gap:12px}
+.an-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.an-k{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
+.an-k i{font-style:normal;color:var(--muted);font-size:12px;display:block}.an-k b{font-weight:500;font-size:22px;display:block;margin:2px 0;white-space:nowrap}.an-k s{text-decoration:none;color:var(--muted);font-size:12px}
+.an-row{display:grid;gap:12px}.an-row.r3{grid-template-columns:1fr 1.25fr 1fr}.an-row.r2{grid-template-columns:1fr 1fr}
+.an-card{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;min-width:0}
+.an-card h4{margin:0 0 9px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:400}
+.an-bars{display:grid;grid-template-columns:max-content minmax(40px,1fr) max-content;align-items:center;gap:8px 10px}.an-hb{display:contents}
+.an-hb .tr{height:12px;background:var(--raised);border-radius:3px;overflow:hidden}.an-hb .tr div{height:100%;background:var(--accent);border-radius:3px}.an-hb .tr div.amb{background:var(--amber)}
+.an-hb em{font-style:normal;text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+.an-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;margin-bottom:6px}
+.an-t td,.an-t th{padding:5px 6px;text-align:right;border-bottom:1px solid var(--border)}.an-t th{color:var(--muted);font-weight:400;font-size:12px}
+.an-t td:first-child,.an-t th:first-child{text-align:left}.an-t tr.tot td{border-top:1px solid var(--border-2);font-weight:600}.an-t tr.none td{color:var(--dim)}
+.an-t tr.click{cursor:pointer}.an-t tr.click:hover td{background:var(--accent-bg)}
+.an-lo{color:var(--amber)}.an-t td.nw{white-space:nowrap}.an-up{color:#46C77F}.an-dn{color:var(--amber)}
+.an-card .tag{display:inline-block;border:1px solid var(--border-2);border-radius:4px;padding:1px 6px;font-size:11px;margin-left:6px}
+.an-card.wi .wh{display:flex;align-items:center;gap:6px;cursor:pointer;margin:0 0 9px}.an-card.wi .chev{font-size:12px;width:12px;transition:transform .15s}
+.an-card.wi .wclose{margin-left:auto;text-transform:none;letter-spacing:0}
+.an-card.wi .wmini{text-transform:none;letter-spacing:0;font-size:12.5px;color:var(--text);margin-left:10px;display:none}.an-card.wi .wmini b{font-weight:500;color:var(--accent)}
+.an-card.wi.closed .wif{display:none}.an-card.wi.closed .wh{margin:0}.an-card.wi.closed .chev{transform:rotate(-90deg)}.an-card.wi.closed .wmini{display:inline}
+.wif{display:flex;flex-direction:column;gap:14px}.wl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}.wl td{padding:3px 5px}
+.wl input{width:64px;background:var(--bg);border:1px solid var(--border-2);color:var(--text);border-radius:4px;height:24px;padding:0 6px;font:inherit;text-align:right;user-select:text}
+.wl input.ch{border-color:var(--accent);color:var(--accent)}
+.wr{display:grid;grid-template-columns:1fr 1.2fr 1.2fr;gap:16px;align-items:start;border-top:1px solid var(--border);padding-top:12px}
+.wr .drop{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px}
+.wr .dr{display:flex;align-items:center;gap:10px;margin:6px 0}.wr .dr input{flex:1;accent-color:var(--accent)}.wr .dr b{font-weight:500;width:44px;text-align:right}
+.wr .be div{margin:5px 0}.wr .be b{font-weight:500;color:var(--accent)}.wr .wbtn{margin-top:10px}
+@media (max-width:1500px){.an-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.an-row.r3{grid-template-columns:1fr 1fr}.wl{grid-template-columns:1fr 1fr}}
 .lab-sum{display:flex;gap:18px;margin:0 0 14px;color:var(--muted)}
 .lab-sum b{color:var(--text);font-weight:600;font-size:18px;margin-right:4px}
 .banner.inline{display:flex;align-items:center;gap:10px;padding:8px 12px;font-weight:600;border-radius:6px;margin:0 0 12px}
@@ -844,7 +873,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived, ordWhatIfClosed: !!prefs.ordWhatIfClosed })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
@@ -3640,6 +3669,135 @@ const Ord = {
         <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
       ${res}</div>`;
   },
+  // ---------- analysis ----------
+  // Sales analysis for the shoot (or one team, or every shoot), with a What if for prices.
+  an: null, anScope: 'shoot', anBusy: false, anKey: '', wi: {}, wiDrop: 10,
+  async loadAn() {
+    const all = this.anScope === 'all';
+    const key = all ? 'all' : `${this.sid}|${this.team}`;
+    this.anKey = key; this.anBusy = true;
+    try {
+      const r = await api('/api/orders/analysis', all ? { shoot_id: 'all' } : { shoot_id: this.sid, team: this.team === 'all' ? null : this.team });
+      if (this.anKey === key) this.an = r;
+    } catch (e) { toast(esc(e.message), 5000); }
+    this.anBusy = false;
+    if (S.module === 'orders' && this.view === 'an' && this.anKey === key) this.anPaint();
+  },
+  anCenter(v) {
+    v.innerHTML = `<div class="ord-head"><span class="ttl" id="anTtl"></span><span class="muted small" id="anSub"></span><div class="tb-spacer"></div>
+      <span class="muted small">Compare</span>${segHTML('anScope', this.anScope, [['shoot', 'This shoot'], ['all', 'All shoots']])}</div>
+      <div class="ord-scroll an" id="anBody"><div class="ord-empty">Adding it up…</div></div>`;
+    if (this.an && this.anKey === (this.anScope === 'all' ? 'all' : `${this.sid}|${this.team}`)) this.anPaint();
+    this.loadAn();
+  },
+  anPaint() {
+    const A = this.an, box = $('#anBody'); if (!A || !box) return;
+    const all = this.anScope === 'all', one = !all && A.team != null, s = A.selection, w = A.shoot, sh = this.shoot() || {};
+    const pct = (a, b, d = 0) => b ? (100 * a / b).toFixed(d) + '%' : '—';
+    $('#anTtl').textContent = all ? 'All shoots' : `${sh.name || ''} · ${one ? A.team : 'All teams'}`;
+    $('#anSub').textContent = all ? `${plural(A.shoots, 'shoot')} · ${plural(s.n, 'envelope')} with an order` : plural(s.n, 'envelope') + ' with an order';
+    if (!s.n) { box.innerHTML = `<div class="ord-empty"><h3>Nothing sold yet</h3><p>Analysis fills in as envelopes are typed in.</p></div>`; return; }
+    const kp = [
+      ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : plural(s.n, 'envelope')],
+      ['Average order', fmt$(s.avg), one ? `shoot ${fmt$(w.avg)}` : 'per envelope'],
+      ['Lab cost (est.)', fmt$(s.lab), `${pct(s.lab, s.sales)} of sales`],
+      ['Shipping', one ? '—' : fmt$(s.shipping), one ? 'one charge for the shoot' : all ? 'all shoots' : 'from Totals'],
+      ['Profit', fmt$(s.profit), one ? 'before shipping' : 'after shipping'],
+      ['Profit %', pct(s.profit, s.sales, 1), one ? `shoot ${pct(w.profit_before, w.sales, 1)} before shipping` : 'of sales']];
+    const P = A.products, pk = P.filter(p => p.kind === 'package'), ac = P.filter(p => p.kind === 'alacarte'), ks = P.filter(p => p.kind === 'keepsake');
+    const pkN = pk.reduce((t, p) => t + p.sold, 0), mx = Math.max(1, ...pk.map(p => p.sold));
+    const bar = (l, v, max, r, cls = '') => `<div class="an-hb"><span>${l}</span><div class="tr"><div class="${cls}" style="width:${max ? 100 * v / max : 0}%"></div></div><em>${r}</em></div>`;
+    const mix = '<div class="an-bars">' + pk.map(p => bar(`${esc(p.label)} <span class="dim">${fmt$(p.price)}</span>`, p.sold, mx, `${p.sold} · ${pct(p.sold, pkN)}`)).join('') + '</div>';
+    let cmp;
+    if (one) {
+      const f = (k, v) => v == null ? '—' : k === 'money' ? fmt$(v) : k === 'pct1' ? v.toFixed(1) + '%' : Math.round(v) + '%';
+      cmp = `<h4>${esc(A.team)} vs the whole shoot</h4><table class="an-t"><tr><th></th><th>${esc(A.team)}</th><th>Whole shoot</th><th></th></tr>${A.compare.map(c => {
+        const na = c.team == null || c.shoot == null, same = !na && f(c.kind, c.team) === f(c.kind, c.shoot), up = !na && c.team > c.shoot;
+        return `<tr><td>${esc(c.label)}</td><td>${f(c.kind, c.team)}</td><td>${f(c.kind, c.shoot)}</td><td class="nw ${na || same ? 'dim' : up ? 'an-up' : 'an-dn'}">${na ? '' : same ? '= same' : up ? '▲ above' : '▼ below'}</td></tr>`; }).join('')}</table>`;
+    } else {
+      const tp = A.teams.reduce((t, x) => t + x.profit, 0);
+      cmp = `<h4>By team</h4><table class="an-t"><tr><th>Team</th><th>Env</th><th>Sales</th><th>Avg order</th><th>Profit</th><th>Profit %</th></tr>${A.teams.map(t => `<tr class="${all ? '' : 'click'}" ${all ? '' : `data-oteam="${esc(t.team === 'No team' ? '' : t.team)}"`}><td>${esc(t.team)}</td><td>${t.n}</td><td>${fmt$(t.sales)}</td><td>${fmt$(t.avg)}</td><td>${fmt$(t.profit)}</td><td>${t.profit_pct == null ? '—' : t.profit_pct.toFixed(1) + '%'}</td></tr>`).join('')}<tr class="tot"><td>All teams</td><td>${s.n}</td><td>${fmt$(s.sales)}</td><td>${fmt$(s.avg)}</td><td>${fmt$(tp)}</td><td>${pct(tp, s.sales, 1)}</td></tr></table><div class="dim small">Team profit is before shipping.${all ? '' : ' Click a team to see it on its own.'}</div>`;
+    }
+    const pays = A.payments, pmax = Math.max(1, s.n);
+    const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : '')).join('') + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed</div>`;
+    const lab = p => p.lab_each == null ? null : p.lab_each;
+    const each = p => { const l = lab(p); if (l == null || !p.sold) return l == null ? '<span class="dim" title="No Meridian price for it">not priced</span>' : ''; const avg = p.sales / p.sold, m = (avg - l) / avg; return `<span class="${m < .5 ? 'an-lo' : ''}">${fmt$(avg - l)} · ${Math.round(100 * m)}%</span>`; };
+    const items = (list, envs, sales, what) => {
+      let tq = 0, ts = 0, tp = 0, tsh = 0;
+      const rows = list.map(p => { const l = lab(p) || 0, pr = p.sales - l * p.sold; tq += p.sold; ts += p.sales; tp += pr; tsh += p.sold_shoot;
+        const price = p.with_package != null ? `${fmt$(p.price)}<span class="dim"> · ${fmt$(p.with_package)} w/ pkg</span>` : fmt$(p.price);
+        return `<tr class="${p.sold ? '' : 'none'}"><td>${esc(p.label)}</td><td>${price}</td><td>${p.sold}</td>${one ? `<td class="dim">${p.sold_shoot}</td>` : ''}<td>${fmt$(p.sales)}</td><td>${p.sold ? each(p) : ''}</td><td>${p.sold ? fmt$(pr) : ''}</td></tr>`; }).join('');
+      return `<table class="an-t"><tr><th>Item</th><th>Price</th><th>Sold</th>${one ? '<th title="Sold across the whole shoot">Shoot</th>' : ''}<th>Sales</th><th>Profit each</th><th>Profit</th></tr>${rows}<tr class="tot"><td>Total</td><td></td><td>${tq}</td>${one ? `<td class="dim">${tsh}</td>` : ''}<td>${fmt$(ts)}</td><td>${ts ? Math.round(100 * tp / ts) + '%' : ''}</td><td>${fmt$(tp)}</td></tr></table>
+        <div class="dim small">${envs} of ${s.n} envelopes ${what} (${pct(envs, s.n)})${envs ? ` · average ${fmt$(Math.round(sales / envs))} each when they did` : ''}</div>`;
+    };
+    const pkRows = pk.filter(p => p.sold).map(p => { const l = lab(p); return `<tr><td>${esc(p.label)}</td><td>${p.sold}</td><td>${fmt$(p.price)}</td><td>${l == null ? '<span class="dim">not priced</span>' : fmt$(l)}</td><td>${each(p)}</td><td>${l == null ? '' : fmt$(p.sales - l * p.sold)}</td></tr>`; }).join('');
+    const unp = A.lab_unpriced.length ? `<div class="banner amber inline" style="margin:0">Lab cost leaves out ${esc(A.lab_unpriced.join(', '))}: no Meridian price for ${A.lab_unpriced.length > 1 ? 'them' : 'it'} yet (Prices…).</div>` : '';
+    box.innerHTML = `<div class="an-body">${unp}
+      <div class="an-kpis">${kp.map(k => `<div class="an-k"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
+      <div class="an-row r3"><div class="an-card"><h4>Package mix</h4>${mix}</div><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
+      <div class="an-row r2"><div class="an-card"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
+      <div class="an-card"><h4>Profit by package</h4>${pkRows ? `<table class="an-t"><tr><th>Package</th><th>Sold</th><th>Price</th><th>Lab cost</th><th>Profit each</th><th>Profit total</th></tr>${pkRows}</table>` : '<div class="dim">No packages sold.</div>'}<div class="dim small">Amber: keeps less than half its price after lab cost.</div></div>
+      <div class="an-card wi ${prefs.ordWhatIfClosed ? 'closed' : ''}" id="anWi"><h4 class="wh" data-ord="wi-toggle"><span class="chev">▾</span>What if <span class="tag">try new prices</span><span class="wmini" id="wiMini"></span><button class="btn sm wclose">${prefs.ordWhatIfClosed ? 'Show' : 'Hide'}</button></h4>
+        <div class="wif"><div class="wl" id="wiT"></div>
+          <div class="wr"><div class="drop"><div>Families who stop buying an item when its price goes up</div><div class="dr"><input type="range" data-wi-drop min="0" max="50" step="5" value="${this.wiDrop}"><b id="wiDropV">${this.wiDrop}%</b></div><div class="dim small">Only applies to prices you raise. Lowered prices assume the same buyers.</div></div>
+            <table class="an-t wsum" id="wiSum"></table>
+            <div><div id="wiBe" class="be"></div><div class="wbtn"><button class="btn sm" data-ord="wi-reset">Reset prices</button></div></div></div></div></div>
+    </div>`;
+    this.wiPaint();
+  },
+  // What if: parts are {key, label, now, sold, lab}; a la carte has an alone part and a with-package part.
+  wiParts() {
+    const A = this.an; if (!A) return [];
+    const out = [];
+    for (const p of A.products) {
+      const l = p.lab_each || 0;
+      if (p.kind === 'alacarte') {
+        out.push({ key: p.id, p, label: p.label, now: p.price, sold: p.sold_alone, lab: l });
+        out.push({ key: p.id + ':pkg', p, label: p.label + ' (with a package)', now: p.with_package, sold: p.sold_with_pkg, lab: l });
+      } else out.push({ key: p.id, p, label: p.label, now: p.price, sold: p.sold, lab: l });
+    }
+    return out;
+  },
+  wiPaint() {
+    const A = this.an; if (!A || !$('#wiT')) return;
+    const s = A.selection, one = this.anScope !== 'all' && A.team != null, d = this.wiDrop / 100;
+    const parts = this.wiParts(), by = new Map(parts.map(x => [x.key, x]));
+    let dS = 0, dL = 0; const be = [];
+    for (const x of parts) {
+      const np = this.wi[x.key]; if (np == null || np === x.now) continue;
+      const keep = np > x.now ? x.sold * (1 - d) : x.sold;
+      dS += keep * np - x.sold * x.now; dL -= (x.sold - keep) * x.lab;
+      if (!x.sold) continue;
+      const m0 = x.now - x.lab, m1 = np - x.lab;
+      if (np > x.now && m1 > 0) { const f = Math.max(0, 1 - m0 / m1), lose = Math.floor(x.sold * f + 1e-9);
+        be.push(`<div>${esc(x.label)} at ${fmt$(np)}: you could lose up to <b>${Math.round(100 * f)}% of its buyers</b> (${lose >= 1 ? `${lose} of ${x.sold}` : `under 1 of ${x.sold}`} here) and still make the same profit.</div>`); }
+      else if (np < x.now) be.push(m1 > 0 ? `<div>${esc(x.label)} at ${fmt$(np)}: needs <b>${Math.ceil(x.sold * m0 / m1 - 1e-9)} buyers</b> instead of ${x.sold} to make the same profit.</div>` : `<div>${esc(x.label)} at ${fmt$(np)}: <b>loses money</b> on every one after lab cost.</div>`);
+    }
+    const inp = x => `<input class="${this.wi[x.key] != null && this.wi[x.key] !== x.now ? 'ch' : ''}" data-wi="${esc(x.key)}" value="${((this.wi[x.key] ?? x.now) / 100).toFixed(2)}" inputmode="decimal" spellcheck="false">`;
+    const chg = (...xs) => { let t = 0, any = false; for (const x of xs) { const np = this.wi[x.key]; if (np == null || np === x.now || !x.sold) continue; any = true; const keep = np > x.now ? x.sold * (1 - d) : x.sold; t += keep * np - x.sold * x.now; }
+      return any ? `<span class="${t > .5 ? 'an-up' : t < -.5 ? 'an-dn' : 'dim'}">${Math.abs(t) < .5 ? '$0.00' : (t > 0 ? '+' : '') + fmt$(Math.round(t))}</span>` : '<span class="dim">—</span>'; };
+    const grp = (title, kind) => {
+      const ps = A.products.filter(p => p.kind === kind); if (!ps.length) return '';
+      if (kind === 'alacarte') return `<table class="an-t"><tr><th>${title}</th><th title="Price bought on its own">Alone</th><th title="Price with a package in the envelope">With pkg</th><th>Sold</th><th>Change</th></tr>${ps.map(p => { const a = by.get(p.id), b = by.get(p.id + ':pkg'); return `<tr><td>${esc(p.label)}</td><td>${inp(a)}</td><td>${inp(b)}</td><td title="${a.sold} alone · ${b.sold} with a package">${p.sold}</td><td>${chg(a, b)}</td></tr>`; }).join('')}</table>`;
+      return `<table class="an-t"><tr><th>${title}</th><th>Now</th><th>New</th><th>Sold</th><th>Change</th></tr>${ps.map(p => { const x = by.get(p.id); return `<tr><td>${esc(p.label)}</td><td>${fmt$(x.now)}</td><td>${inp(x)}</td><td>${x.sold}</td><td>${chg(x)}</td></tr>`; }).join('')}</table>`;
+    };
+    $('#wiT').innerHTML = grp('Packages', 'package') + grp('A la carte', 'alacarte') + grp('Keepsakes', 'keepsake');
+    const os = s.sales, ol = s.lab, ship = s.shipping, op = os - ol - ship, ns = os + dS, nl = ol + dL, np = ns - nl - ship;
+    const row = (k, o, n, inv) => { const dd = n - o; return `<tr><td>${k}</td><td>${fmt$(Math.round(o))}</td><td><b>${fmt$(Math.round(n))}</b></td><td class="${Math.abs(dd) < .5 ? 'dim' : (dd > 0) !== !!inv ? 'an-up' : 'an-dn'}">${Math.abs(dd) < .5 ? '—' : (dd > 0 ? '+' : '') + fmt$(Math.round(dd))}</td></tr>`; };
+    const p0 = os ? 100 * op / os : 0, p1 = ns ? 100 * np / ns : 0;
+    $('#wiSum').innerHTML = `<tr><th></th><th>Now</th><th>New prices</th><th>Change</th></tr>${row('Sales', os, ns)}${row('Lab cost', ol, nl, 1)}${one ? '' : row('Shipping', ship, ship)}${row(one ? 'Profit (before shipping)' : 'Profit', op, np)}<tr><td>Profit %</td><td>${p0.toFixed(1)}%</td><td><b>${p1.toFixed(1)}%</b></td><td class="${Math.abs(p1 - p0) < .05 ? 'dim' : p1 > p0 ? 'an-up' : 'an-dn'}">${Math.abs(p1 - p0) < .05 ? '—' : (p1 > p0 ? '+' : '') + (p1 - p0).toFixed(1) + ' pts'}</td></tr>`;
+    $('#wiBe').innerHTML = be.length ? `<div class="dim small" style="margin-bottom:4px">BREAK-EVEN</div>${be.join('')}` : '<div class="dim">Type a new price to see what it does to this shoot’s sales and profit.</div>';
+    const n = Object.keys(this.wi).filter(k => by.has(k) && this.wi[k] !== by.get(k).now).length;
+    $('#wiMini').innerHTML = n ? `${plural(n, 'price')} changed · profit <b>${np - op >= 0 ? '+' : ''}${fmt$(Math.round(np - op))}</b>` : 'No price changes';
+    $('#wiDropV').textContent = this.wiDrop + '%';
+  },
+  wiSet(key, v) {
+    const x = this.wiParts().find(p => p.key === key); if (!x) return;
+    const c = Math.round(parseFloat(String(v).replace(/[$,\s]/g, '')) * 100);
+    if (!isFinite(c) || c < 0 || c === x.now) delete this.wi[key]; else this.wi[key] = c;
+    this.wiPaint();
+  },
+  wiToggle() { prefs.ordWhatIfClosed = !prefs.ordWhatIfClosed; savePrefs(); const c = $('#anWi'); if (c) { c.classList.toggle('closed', prefs.ordWhatIfClosed); c.querySelector('.wclose').textContent = prefs.ordWhatIfClosed ? 'Show' : 'Hide'; } },
   // ---------- drawing ----------
   left() {
     // Archived shoots stay hidden unless the switch is on; the open shoot always shows.
@@ -3662,6 +3820,7 @@ const Ord = {
       return;
     }
     if (this.view === 'lab') return this.labCenter(v);
+    if (this.view === 'an') return this.anCenter(v);
     const s = this.shoot() || {};
     v.innerHTML = `<div class="ord-head"><span class="ttl">${esc(s.name)}${this.team !== 'all' ? ' · ' + esc(this.team) : ''}</span><span class="muted small" id="ordCount"></span><div class="tb-spacer"></div>
       <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm" data-ord="select-all" title="Select every envelope shown, to set their team or coach at once (Ctrl+A). Ctrl-click or Shift-click rows to pick some.">Select all</button><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
@@ -3844,7 +4003,7 @@ const Ord = {
     const dis = this.sid ? '' : 'disabled';
     const unm = this.cat ? this.cat.unmapped_roes.length : 0;
     if (this.pickingTeam != null) { $('#modbar').innerHTML = `<span class="banner amber inline" style="margin:0">Click the ${esc(this.pickingTeam)} team photo in the filmstrip</span><div class="tb-spacer"></div><button class="btn sm" data-ord="cancel-team-pick">Cancel (Esc)</button>`; return; }
-    $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order']]) : ''}
+    $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order'], ['an', 'Analysis']]) : ''}
       ${S.photos.length ? `<button class="btn sm ${this.picksOnly() ? 'on' : ''}" data-ord="picks-only" title="Show only photos flagged Pick in the filmstrip (one per kid), so each new envelope moves on to the next kid">${this.picksOnly() ? '✓ ' : ''}Filmstrip: picks only</button>` : ''}
       ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
       <div class="tb-spacer"></div>
@@ -3976,6 +4135,7 @@ function bindModuleEvents() {
       else if (name === 'cutQuality') Cut.setQuality(v);
       else if (name === 'cutView') { Cut.view = v; renderView(); }
       else if (name === 'ordView') Ord.setView(v);
+      else if (name === 'anScope') { Ord.anScope = v; renderView(); }
       else if (name === 'merDelivery') Ord.merSet('delivery', v);
       else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v ? Ord.price(d.lines).total : 0; Ord.changed(true); }
       else if (name === 'rtStep') Ret.setStep(v);
@@ -4042,7 +4202,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
@@ -4098,6 +4258,9 @@ function bindModuleEvents() {
     catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 3500); renderLeft(); }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-oship]')) e.target.blur(); }, true);
+  document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-wi]')) Ord.wiSet(e.target.dataset.wi, e.target.value); });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-wi]')) { e.preventDefault(); e.target.blur(); } }, true);
+  document.addEventListener('input', e => { if (e.target.matches && e.target.matches('[data-wi-drop]')) { Ord.wiDrop = +e.target.value; Ord.wiPaint(); } });
   document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-ord-arch]')) { prefs.ordShowArchived = e.target.checked; savePrefs(); renderLeft(); } });
   $('#modView').addEventListener('change', e => { const i = e.target.closest('[data-mer]'); if (i && S.module === 'orders') Ord.merSet(i.dataset.mer, i.value.trim()); });
   // prices.yaml edited in another program: pick the new prices up on return

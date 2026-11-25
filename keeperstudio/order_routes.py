@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import analysis as A
 from . import meridian as M
 from . import reports as R
 from . import orders as O
@@ -210,6 +211,24 @@ def r_summary_pdf(b):
     return {"path": str(R.pdf_sections(s["sections"], Path(b["path"]), s["title"], s["subtitle"]))}
 
 
+def r_analysis(b):
+    """Sales analysis for one shoot (optionally one team), or every shoot together."""
+    cat = catalog()
+    shoots = book.shoots()
+    if b.get("shoot_id") == "all":
+        orders = [_decorate(o, cat) for s in shoots for o in book.orders(s["id"])]
+        ship = sum(int(s.get("shipping_cents") or 0) for s in shoots)
+        team = None
+    else:
+        sid = int(b["shoot_id"])
+        orders = [_decorate(o, cat) for o in book.orders(sid)]
+        ship = int(next((s for s in shoots if s["id"] == sid), {}).get("shipping_cents") or 0)
+        team = b.get("team")
+    out = A.analyze(orders, cat, A.unit_lab_cents(cat, M.order_cost_cents), ship, team)
+    out["shoots"] = len(shoots) if b.get("shoot_id") == "all" else 1
+    return out
+
+
 def r_report(b):
     """The export as a formatted table, for the preview."""
     title, subtitle = _report_titles(b)
@@ -353,5 +372,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/report": r_report, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
+    "/api/orders/report": r_report, "/api/orders/analysis": r_analysis, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
 }
