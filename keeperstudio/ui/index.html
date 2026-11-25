@@ -583,6 +583,9 @@ textarea:focus{border-color:var(--accent)}
 .ord-total .lab{display:block;margin-top:4px}
 .row.arch .lbl,.row.arch .sub,.row.arch .cnt{opacity:.5}.row.arch:hover .lbl,.row.arch:hover .sub,.row.arch.on .lbl,.row.arch.on .sub{opacity:.85}
 .arch-tag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--border);border-radius:3px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);vertical-align:1px}
+.otbl tr.new-row td{border-top:1px dashed var(--accent);border-bottom:1px dashed var(--accent)}
+.new-tag{display:inline-block;margin-right:10px;padding:1px 6px;border-radius:3px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;letter-spacing:.03em}
+@keyframes newflash{from{background:rgba(47,155,255,.35)}to{background:transparent}}.otbl tr.new-row.flash td{animation:newflash .9s ease-out}
 .shoot-foot{display:flex;align-items:center;gap:12px}.arch-sw{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;margin-left:auto}.arch-sw input{margin:0}
 .ord-total .sub .due{color:var(--amber)}
 .ord-total .sub .ok{color:#3CC77F}
@@ -3244,6 +3247,14 @@ const Ord = {
   },
   async newOrder() {
     if (!this.sid) return this.editShoot(true);
+    // A new envelope with nothing typed is already open: point at it instead of starting another.
+    const d0 = this.draft;
+    if (this.sel === 'new' && d0 && !d0.id && !d0.athlete.trim() && !d0.lines.length) {
+      if (this.view !== 'orders') this.setView('orders');
+      this._flashNew = true; this.paintRows();
+      setTimeout(() => { const i = $('#right [data-of="athlete"]'); if (i) i.focus(); }, 0);
+      return;
+    }
     const after = (this.draft && (this.draft.edited || this.draft.image)) || this.lastPhoto || '';
     await this.flush();
     if (this.view !== 'orders') this.setView('orders');
@@ -3253,7 +3264,7 @@ const Ord = {
     if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
     const next = this.nextPhoto(after); this.autoPhoto = !!next;
     if (next) { this.draft.image = stemOf(next.name); this.showPhoto(this.draft.image); }
-    this.paintRows(); renderRight();
+    this._flashNew = true; this.paintRows(); renderRight();
     setTimeout(() => { const i = $('#right [data-of="athlete"]'); if (i) i.focus(); }, 0);
   },
   changed(redraw) {
@@ -3500,9 +3511,14 @@ const Ord = {
     const rows = this.rows(); const cnt = $('#ordCount'); if (cnt) cnt.textContent = plural(rows.length, 'envelope');
     const th = (k, l, cls = '') => `<th class="${cls}" data-osort="${k}">${l}${this.sort.k === k ? `<span class="arr">${this.sort.dir > 0 ? '▲' : '▼'}</span>` : ''}</th>`;
     const y = box.scrollTop;
-    box.innerHTML = rows.length ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}</tbody></table>`
+    // An envelope that's open but not saved yet (nothing typed) still gets a row, so N visibly does something.
+    const d = this.draft, fresh = this.sel === 'new' && d && !d.id;
+    const newRow = !fresh ? '' : `<tr class="sel new-row" data-onew><td class="env">${esc(d.envelope)}</td><td colspan="8">${d.athlete.trim() ? esc(d.athlete) : '<span class="new-tag">New</span><span class="dim">Type the athlete’s name or press a package letter. It saves as soon as you do.</span>'}</td></tr>`;
+    box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody></table>`
       : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
     box.scrollTop = y;
+    const nr = fresh && $('tr[data-onew]', box);
+    if (nr && this._flashNew) { this._flashNew = false; nr.scrollIntoView({ block: 'nearest' }); nr.classList.add('flash'); }
   },
   rowHTML(o) {
     const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
