@@ -582,6 +582,7 @@ kbd{font-size:10px}
 .ord-total.pinned{flex:none;display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:10px;row-gap:2px;padding:8px 12px;border-bottom:0}
 .ord-total.pinned .st{font-size:12px}.ord-total.pinned .sub{grid-column:1/-1;margin:0;text-align:left}
 .ord-total.pinned .labline{display:inline;margin:0;padding:0}
+.ord-total .tot-acts{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:6px}
 .of-grid input,.of-grid textarea{width:100%}
 textarea{font:inherit;color:var(--text);background:#0C0D10;border:1px solid var(--border-2);border-radius:4px;padding:5px 7px;outline:none;resize:vertical;min-height:48px;user-select:text}
 textarea:focus{border-color:var(--accent)}
@@ -3594,7 +3595,7 @@ const Ord = {
   totalHTML(pr, d) {
     const due = pr.total - (d.paid_cents || 0);
     const st = !pr.total ? '' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
-    return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`;
+    return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span><div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
   labHTML(pr, d) {
@@ -3646,7 +3647,6 @@ const Ord = {
       ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="0.00" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
       ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
-      <div class="pad"><div class="btn-row">${d.id ? '<button class="btn sm" data-ord="delete">Delete envelope</button>' : ''}<div class="tb-spacer"></div><button class="btn sm" data-ord="new">Next envelope (N)</button></div></div>
       ${warn}
       <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
       <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
