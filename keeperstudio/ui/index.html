@@ -565,9 +565,23 @@ kbd{font-size:10px}
 .of-grid .fld{margin:0}
 .of-grid .wide{grid-column:1/-1}
 /* Envelope # is short; Team gets the room. Athlete and Coach share the next line. */
-.of-grid.who{grid-template-columns:repeat(10,minmax(0,1fr));align-items:end}.of-grid.who>.fld>span{white-space:nowrap}
-.of-grid.who>.fld:nth-child(1){grid-column:span 2}.of-grid.who>.fld:nth-child(2){grid-column:span 8}
-.of-grid.who>.fld:nth-child(3),.of-grid.who>.fld:nth-child(4){grid-column:span 5}
+.of-grid.who{grid-template-columns:repeat(12,minmax(0,1fr));align-items:end}.of-grid.who>.fld>span{white-space:nowrap}
+.of-grid.who>.fld:nth-child(1){grid-column:span 3}.of-grid.who>.fld:nth-child(2){grid-column:span 9}
+.of-grid.who>.fld:nth-child(3),.of-grid.who>.fld:nth-child(4){grid-column:span 6}
+/* Orders editor, compact so Packages through Payment fit with the Total pinned below */
+.ord-ed .sec>header{padding:4px 10px;font-size:13px}
+.ord-ed .of-grid.who{gap:7px 10px;padding:6px 12px 8px}
+.ord-ed .of-grid.who .fld{gap:3px}.ord-ed .of-grid.who .fld>span{font-size:12.5px}
+.ord-ed .of-grid.who input{height:26px;padding-top:0;padding-bottom:0}
+.ord-ed .pkgs{grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;padding:8px 12px 3px}
+.ord-ed .pkg{padding:4px 0 3px}.ord-ed .pkg b{font-size:15px}
+.ord-ed .pkg-note{padding:2px 12px 6px}
+.ord-ed .qrow{min-height:24px;padding:2px 12px}
+.ord-ed .stepper button{height:20px;width:22px}
+.ord-ed .pay-row{padding:6px 12px 2px}.ord-ed .sec[data-sec=o-pay] .body{padding-bottom:6px}
+.ord-total.pinned{flex:none;display:grid;grid-template-columns:auto 1fr;align-items:baseline;column-gap:10px;row-gap:2px;padding:8px 12px;border-bottom:0}
+.ord-total.pinned .st{font-size:12px}.ord-total.pinned .sub{grid-column:1/-1;margin:0;text-align:left}
+.ord-total.pinned .labline{display:inline;margin:0;padding:0}
 .of-grid input,.of-grid textarea{width:100%}
 textarea{font:inherit;color:var(--text);background:#0C0D10;border:1px solid var(--border-2);border-radius:4px;padding:5px 7px;outline:none;resize:vertical;min-height:48px;user-select:text}
 textarea:focus{border-color:var(--accent)}
@@ -594,7 +608,7 @@ textarea:focus{border-color:var(--accent)}
 .ord-total{display:flex;align-items:baseline;gap:10px;padding:12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:#0E1013}
 .ord-total .big{font-size:26px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
 .ord-total .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
-.ord-total .lab{display:block;margin-top:4px}
+.ord-total .labline{display:block;margin-top:4px}
 .row.arch .lbl,.row.arch .sub,.row.arch .cnt{opacity:.5}.row.arch:hover .lbl,.row.arch:hover .sub,.row.arch.on .lbl,.row.arch.on .sub{opacity:.85}
 .arch-tag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--border);border-radius:3px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);vertical-align:1px}
 .otbl tr.new-row td{border-top:1px dashed var(--accent);border-bottom:1px dashed var(--accent)}
@@ -3580,7 +3594,7 @@ const Ord = {
   totalHTML(pr, d) {
     const due = pr.total - (d.paid_cents || 0);
     const st = !pr.total ? '' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
-    return `<span class="big">${fmt$(pr.total)}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)}<br>` : ''}${st}${this.labHTML(pr, d)}</span>`;
+    return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`;
   },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
   labHTML(pr, d) {
@@ -3598,9 +3612,9 @@ const Ord = {
       }, 200);
     }
     const L = this.labEst && this.labEst.key === key ? this.labEst.s : null;
-    if (!L) return '<span class="lab">Lab cost …</span>';
+    if (!L) return '<span class="labline">Lab cost …</span>';
     const miss = L.lab_unpriced && L.lab_unpriced.length ? ` <span class="warn" title="No Meridian price for: ${esc(L.lab_unpriced.join(', '))}">+ ${L.lab_unpriced.length} not priced</span>` : '';
-    return `<span class="lab" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - L.lab_cents)}</span>`;
+    return `<span class="labline" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - L.lab_cents)}</span>`;
   },
   photoHTML(d) {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
@@ -3620,24 +3634,24 @@ const Ord = {
       return;
     }
     const pr = this.price(d.lines);
-    const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${fmt$(p.price)}</small></button>`; }).join('');
+    const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${p.price % 100 ? fmt$(p.price) : '$' + (p.price / 100)}</small></button>`; }).join('');
     const notes = d.lines.map(l => this.prod(l.product_id)).filter(p => p && p.type === 'package').map(p => `<b>${esc(p.label)}</b> ${esc(p.summary)}`).join('<br>');
     const qrow = p => { const q = this.qty(p.id); return `<div class="qrow ${q ? 'has' : ''}"><span class="nm" title="${esc(p.unit_label)}">${esc(p.short)}</span><span class="pr">${p.type === 'alacarte' && pr.hasPkg ? `<s>${fmt$(p.price)}</s>` : ''}${fmt$(this.unit(p, pr.hasPkg))}</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${q}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`; };
     const fld = (k, l, wide, extra = '') => `<label class="fld ${wide ? 'wide' : ''}"><span>${l}</span><input data-of="${k}" value="${esc(d[k])}" spellcheck="false" ${extra}></label>`;
-    $('#right').innerHTML = `<div class="scroll">
+    $('#right').innerHTML = `<div class="scroll ord-ed">
       ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid who">${fld('envelope', 'Env #', false, 'title="Envelope number"')}${fld('team', 'Team', false, 'list="ordTeams"')}${fld('athlete', 'Athlete', false, 'placeholder="First and last name"')}${fld('coach', 'Coach', false, 'list="ordCoaches"')}</div>`)}
       ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
-      <div class="ord-total" id="ordTotal">${this.totalHTML(pr, d)}</div>
-      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="0.00"></div><div class="hint tight">How they paid fills in the total. Type a different amount for a part payment.</div>`)}
+      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="0.00" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
       ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
       <div class="pad"><div class="btn-row">${d.id ? '<button class="btn sm" data-ord="delete">Delete envelope</button>' : ''}<div class="tb-spacer"></div><button class="btn sm" data-ord="new">Next envelope (N)</button></div></div>
       ${warn}
       <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
       <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-      <datalist id="ordFrames">${this.matches(String(d.image || '').replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>`;
+      <datalist id="ordFrames">${this.matches(String(d.image || '').replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join('')}</datalist></div>
+      <div class="ord-total pinned" id="ordTotal">${this.totalHTML(pr, d)}</div>`;
   },
   // ---------- several envelopes at once ----------
   async clickRow(id, e) {
