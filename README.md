@@ -156,3 +156,21 @@ downloads it the first time you use Extract. You can also copy
 PhotoCropper's engine is MIT (see `LICENSE-PhotoCropper`). Bundled components keep
 their own licences: mediapipe and its models (Apache 2.0), rembg (MIT), BiRefNet
 (MIT), onnxruntime (MIT), pywebview (BSD), Pillow (MIT-CMU), and Nunito Sans (OFL).
+
+### Meridian bulk order
+
+Orders > **Lab order** > **Build Meridian order…** makes one folder Meridian's
+bulk upload takes whole: the cropped files in a sub-folder per print size and
+`<shoot>-meridian-order.csv` beside them, a row per file with Meridian's product
+code, the quantity, Matte, and `crop=exact` (Crop already cut every file to the
+print's shape). It then runs Meridian's own checker (`validate_order.py`) and
+shows its errors, warnings and estimated total. Your Meridian account email and
+Ship / Pickup are set on that panel.
+
+Meridian's files live in `keeperstudio/meridian/`: their product list, designs,
+template, example, instructions and checker. The code each item is ordered as is
+under `meridian:` in Prices…: 8x10 `R1680A`, 5x7 `RA1657`, 4x6 `R1646`, a sheet of
+8 wallets = two `R623dc` (4-Wallets), team prints use their size's code, magnets
+`MAG45` / `MAG57`. Anything without a code (mini wallets, wallet magnets, key
+ring, badge: Meridian's bulk list has no matching product) is left out of the CSV
+and listed, so you can order it on the website.

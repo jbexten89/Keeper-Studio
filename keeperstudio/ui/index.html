@@ -608,8 +608,20 @@ textarea:focus{border-color:var(--accent)}
 .lab-grp>header{display:flex;gap:12px;align-items:baseline;padding:8px 12px;background:var(--panel-2);border-bottom:1px solid var(--border)}
 .lab-grp>header b{font-size:14px;font-weight:600}
 .lab-grp>header span{color:var(--muted);font-size:12px}
-.lab-it{display:grid;grid-template-columns:22px minmax(160px,1fr) 60px 2fr;gap:10px;padding:5px 12px;border-bottom:1px solid #16191D;align-items:center;font-variant-numeric:tabular-nums}
+.lab-it{display:grid;grid-template-columns:22px minmax(160px,1fr) 70px 50px 2fr;gap:10px;padding:5px 12px;border-bottom:1px solid #16191D;align-items:center;font-variant-numeric:tabular-nums}
 .lab-it:last-child{border-bottom:0}
+.lab-it .mc{color:var(--muted);font-size:12px}.lab-it .mc.bad{color:var(--amber)}
+.mer{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin:0 0 16px;background:var(--panel)}
+.mer-head{display:flex;gap:12px;align-items:baseline;margin:0 0 10px}.mer-head b{font-size:14px;font-weight:600}
+.mer-row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+.mer-row .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.mer-row input{width:260px}
+.mer-res{margin:12px 0 0;padding:10px 12px;border-radius:6px;background:var(--panel-2)}
+.mer-res.ok .mer-top b{color:#3CC77F}.mer-res.bad .mer-top b{color:var(--amber)}
+.mer-top{display:flex;gap:12px;align-items:center;margin:0 0 4px}.mer-top span{color:var(--muted)}
+.mer-res ul{margin:6px 0 0 18px;padding:0;font-size:12px;max-height:180px;overflow:auto}
+.mer-err li{color:var(--amber)}.mer-warn li{color:var(--muted)}
+.mer-sub{margin:8px 0 0;font-size:12px}
 .lab-it .q{text-align:right;color:var(--text)}
 .lab-it .who{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
 .lab-it .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3092,7 +3104,7 @@ const stemOf = n => String(n || '').replace(/\.[^.]+$/, '');
 const fmtDay = d => { if (!d) return ''; const t = new Date(d + 'T12:00:00'); return isNaN(t) ? d : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); };
 const Ord = {
   shoots: [], sid: null, d: null, cat: null, pricesPath: '', team: 'all', q: '', sort: { k: 'env', dir: 1 },
-  sel: null, draft: null, view: 'orders', lab: null, crops: '', onePer: true, building: false,
+  sel: null, draft: null, view: 'orders', lab: null, crops: '', onePer: true, building: false, mer: null, merBusy: false,
   saveT: null, state: '', err: false, undo: null, last: {}, stems: null, stemsKey: '', multi: new Set(), anchor: null,
   async load() {
     await this.loadCatalog();
@@ -3417,6 +3429,40 @@ const Ord = {
     } catch (e) { toast(esc(e.message), 6000); }
     this.building = false; renderView();
   },
+  async merSet(k, v) {
+    try { const r = await api('/api/orders/meridian-settings', { [k]: v }); if (this.lab) this.lab.meridian = r.settings; } catch (e) { toast(esc(e.message)); }
+    if (k !== 'account_email') renderView();
+  },
+  async buildMeridian() {
+    const s = this.shoot(); if (!s || this.merBusy) return;
+    const em = $('#modView [data-mer=account_email]');
+    if (em && em.value.trim() !== (this.lab.meridian.account_email || '')) await this.merSet('account_email', em.value.trim());
+    const parent = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!parent) return;
+    const dest = parent + (parent.includes('\\') ? '\\' : '/') + sanitize(`Meridian order - ${s.name}`);
+    this.merBusy = true; this.mer = null; renderView();
+    try { this.mer = await api('/api/orders/meridian-build', { shoot_id: this.sid, crops_dir: this.crops, out_dir: dest }); }
+    catch (e) { toast(esc(e.message), 6000); }
+    this.merBusy = false; renderView();
+  },
+  merHTML(L, found) {
+    const m = L.meridian || {}, R = this.mer;
+    const noEmail = !/@/.test(m.account_email || '');
+    const li = (a, f) => a.map(x => `<li>${f(x)}</li>`).join('');
+    const res = !R ? '' : `<div class="mer-res ${R.ok && !R.left_out.length ? 'ok' : 'bad'}">
+        <div class="mer-top"><b>${!R.ok ? '✗ Not ready' : R.left_out.length ? `✓ CSV ready · ${plural(R.left_out.length, 'print line')} not in it` : '✓ Ready to send'}</b><span>${plural(R.items, 'item')} · ${plural(R.files, 'file')}${R.total ? ` · about $${esc(R.total)} before shipping` : ''}</span>
+          <button class="btn sm" onclick="reveal(${esc(JSON.stringify(R.csv || R.out_dir))})">Show</button></div>
+        <div class="muted small">Meridian’s checker ${R.ok ? 'passed' : 'found problems'}: ${plural(R.errors.length, 'error')}, ${plural(R.warnings.length, 'warning')}.</div>
+        ${R.errors.length ? `<ul class="mer-err">${li(R.errors, esc)}</ul>` : ''}
+        ${R.warnings.length ? `<ul class="mer-warn">${li(R.warnings, esc)}</ul>` : ''}
+        ${R.left_out.length ? `<div class="mer-sub">Not in the CSV — order these another way:</div><ul class="mer-warn">${li(R.left_out, x => `${esc(x.group)} ×${x.qty} for ${esc(x.for.join(', '))}: ${esc(x.why)}`)}</ul>` : ''}
+      </div>`;
+    return `<div class="mer"><div class="mer-head"><b>Meridian bulk order</b><span class="muted small">One folder with a CSV, for Meridian’s bulk upload. Every print is the file Crop cut, sent as is.</span></div>
+      <div class="mer-row"><label class="fld">Meridian account email<input type="email" data-mer="account_email" value="${esc(m.account_email || '')}" placeholder="you@example.com" spellcheck="false"></label>
+        <div class="fld"><span>Delivery</span>${segHTML('merDelivery', m.delivery || 'ship', [['ship', 'Ship'], ['pickup', 'Pickup']])}</div>
+        <div class="tb-spacer"></div>
+        <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
+      ${res}</div>`;
+  },
   // ---------- drawing ----------
   left() {
     const sh = this.shoots.map(s => `<div class="row ${s.id === this.sid ? 'on' : ''}" data-oshoot="${s.id}"><span class="two"><span class="lbl">${esc(s.name)}</span><span class="sub">${esc([fmtDay(s.date), s.season, s.archived ? 'archived' : ''].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
@@ -3466,13 +3512,14 @@ const Ord = {
     const noPic = [...new Set(items.filter(i => !i.file && i.why === 'no photo picked').flatMap(i => i.for))];
     const prints = L.groups.reduce((a, g) => a + g.qty, 0);
     v.innerHTML = `<div class="ord-scroll"><div class="lab">
+      ${this.merHTML(L, found)}
       <div class="lab-ctrl"><div class="pathrow"><span class="path ${L.crops_dir && !L.crops_exists ? 'bad' : ''}" title="${esc(L.crops_dir)}">${esc(L.crops_dir || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-ord="lab-crops">Crops folder…</button></div>
         ${switchHTML('oneper', this.onePer, 'One file per print', 'For the Meridian website: two 4x6s become two files, so a whole size folder uploads with every quantity at 1. Off: one file each, with quantities in lab-order.csv (for ROES).')}
         <button class="btn primary" data-ord="lab-build" ${this.building || !L.crops_exists || !found ? 'disabled' : ''}>${this.building ? 'Building…' : 'Build lab folder…'}</button></div>
       ${L.crops_dir && !L.crops_exists ? `<div class="banner amber inline">That crops folder isn’t there any more — choose where Crop exported this shoot.</div>` : ''}
       ${noPic.length ? `<div class="banner amber inline">No photo picked yet for ${esc(noPic.slice(0, 5).join(', '))}${noPic.length > 5 ? ` and ${noPic.length - 5} more` : ''}</div>` : ''}
       <div class="lab-sum"><span><b>${prints}</b>to print</span><span><b>${need}</b>files</span>${L.crops_exists ? `<span><b>${found}</b>found</span><span><b>${need - found}</b>not cropped yet</span>` : ''}</div>
-      ${L.groups.map(g => `<div class="lab-grp"><header><b>${esc(g.group)}</b><span>${plural(g.qty, /wallet/i.test(g.group) ? 'sheet' : 'print')} · ${plural(g.files, 'file')}</span></header>${g.items.map(it => `<div class="lab-it"><span class="${it.found ? 'ok' : 'bad'}" title="${it.found ? 'Found in the crops folder' : it.file ? 'Not in the crops folder yet' : esc(it.why || 'No photo picked')}">${it.found ? '✓' : it.file ? '○' : '!'}</span><span class="f" title="${esc(it.found || it.file)}">${esc(it.file || it.why || 'no photo picked')}</span><span class="q">×${it.qty}</span><span class="who" title="${esc(it.for.join(', '))}">${esc(it.for.join(', '))}</span></div>`).join('')}</div>`).join('') || '<div class="ord-empty">Nothing has been ordered yet.</div>'}
+      ${L.groups.map(g => `<div class="lab-grp"><header><b>${esc(g.group)}</b><span>${plural(g.qty, /wallet/i.test(g.group) ? 'sheet' : 'print')} · ${plural(g.files, 'file')}</span></header>${g.items.map(it => `<div class="lab-it"><span class="${it.found ? 'ok' : 'bad'}" title="${it.found ? 'Found in the crops folder' : it.file ? 'Not in the crops folder yet' : esc(it.why || 'No photo picked')}">${it.found ? '✓' : it.file ? '○' : '!'}</span><span class="f" title="${esc(it.found || it.file)}">${esc(it.file || it.why || 'no photo picked')}</span><span class="mc ${it.file && !it.mcode ? 'bad' : ''}" title="${esc(it.mcode ? `Meridian: ${it.mname} ×${it.mqty}` : 'No Meridian product code yet: set one under Prices…, or order it on the website')}">${it.mcode ? esc(it.mcode) : it.file ? 'no code' : ''}</span><span class="q">×${it.qty}</span><span class="who" title="${esc(it.for.join(', '))}">${esc(it.for.join(', '))}</span></div>`).join('')}</div>`).join('') || '<div class="ord-empty">Nothing has been ordered yet.</div>'}
     </div></div>`;
   },
   totalHTML(pr, d) {
@@ -3704,6 +3751,7 @@ function bindModuleEvents() {
       else if (name === 'cutScope') { Cut.scope = v; renderLeft(); }
       else if (name === 'cutView') { Cut.view = v; renderView(); }
       else if (name === 'ordView') Ord.setView(v);
+      else if (name === 'merDelivery') Ord.merSet('delivery', v);
       else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v ? Ord.price(d.lines).total : 0; Ord.changed(true); }
       else if (name === 'rtStep') Ret.setStep(v);
       else if (name === 'rtMode') { Ret.brush.erase = v === 'erase'; Ret.right(); }
@@ -3769,7 +3817,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'mer-build') Ord.buildMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
@@ -3819,6 +3867,7 @@ function bindModuleEvents() {
   $('#right').addEventListener('input', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onInput(i); });
   $('#right').addEventListener('change', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onChange(i); });
   $('#modView').addEventListener('input', e => { const i = e.target.closest('[data-oq]'); if (i && S.module === 'orders') { Ord.q = i.value; Ord.paintRows(); } });
+  $('#modView').addEventListener('change', e => { const i = e.target.closest('[data-mer]'); if (i && S.module === 'orders') Ord.merSet(i.dataset.mer, i.value.trim()); });
   // prices.yaml edited in another program: pick the new prices up on return
   window.addEventListener('focus', () => { if (S.module === 'orders') Ord.loadCatalog().then(() => { if (S.module === 'orders') { renderRight(); Ord.modbar(); } }); });
 }

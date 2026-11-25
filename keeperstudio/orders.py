@@ -90,6 +90,7 @@ class Catalog:
     roes_delimiter: str = ";"
     source: str = ""
     warnings: list = field(default_factory=list)
+    meridian_items: dict = field(default_factory=dict)  # lab item -> {"code", "per", "same_as"}
 
     def __post_init__(self):
         self.by_id = {p.id: p for p in self.products}
@@ -176,6 +177,7 @@ def load_catalog(path: Path | None) -> Catalog:
         roes_items=roes_items(roes.get("items")),
         roes_delimiter=str(roes.get("delimiter") or ";"),
         source=source, warnings=warnings,
+        meridian_items=meridian_items((data.get("meridian") or {}).get("items")),
     )
 
 
@@ -192,6 +194,37 @@ def roes_items(raw) -> dict:
         out[str(k)] = {"name": str(v.get("name") or base.get("name") or k), "code": str(v.get("code") or "").strip(),
                        "same_as": str(v.get("same_as") or (base.get("same_as") if "code" not in v else "") or "")}
     return out
+
+
+# Meridian's bulk order CSV: the product code each lab item is ordered as.
+# per: how many of Meridian's items one of ours is (a sheet of 8 wallets is
+# two "4-Wallets"). An item without a code isn't sent; Lab order lists it.
+DEFAULT_MERIDIAN_ITEMS = {
+    "8x10": {"code": "R1680A"}, "5x7": {"code": "RA1657"}, "4x6": {"code": "R1646"},
+    "wallet": {"code": "R623dc", "per": 2},
+    "8x10-team": {"same_as": "8x10"}, "5x7-team": {"same_as": "5x7"},
+    "misc-magnet-4x5": {"code": "MAG45"}, "misc-magnet-5x7": {"code": "MAG57"},
+    "misc-mini-wallets-8": {"code": ""}, "misc-wallet-magnets-4": {"code": ""},
+    "misc-photo-key-ring": {"code": ""}, "misc-photo-badge": {"code": ""},
+}
+
+
+def meridian_items(raw) -> dict:
+    out = {k: dict(v) for k, v in DEFAULT_MERIDIAN_ITEMS.items()}
+    for k, v in (raw or {}).items() if isinstance(raw, dict) else []:
+        v = v if isinstance(v, dict) else {"code": v}
+        out[str(k)] = {"code": str(v.get("code") or "").strip(), "per": int(v.get("per") or 1),
+                       "same_as": str(v.get("same_as") or "")}
+    return out
+
+
+def meridian_code(catalog: "Catalog", key: str) -> tuple[str, int]:
+    """(product code, Meridian items per one of ours); code is blank when not set."""
+    it = catalog.meridian_items.get(key) or {}
+    if it.get("same_as") and not it.get("code"):
+        base = catalog.meridian_items.get(it["same_as"]) or {}
+        return str(base.get("code") or ""), int(it.get("per") or base.get("per") or 1)
+    return str(it.get("code") or ""), int(it.get("per") or 1)
 
 
 def roes_code(catalog: "Catalog", key: str) -> str:
@@ -460,11 +493,12 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
     team_photos = team_photos or {}
     items: dict[tuple, dict] = {}
 
-    def add(group, crop, file, qty, who, label, why=""):
+    def add(group, crop, file, qty, who, label, why="", item=""):
         if qty <= 0:
             return
         key = (group, file or f"?{who}")
         it = items.setdefault(key, {"group": group, "crop": crop, "label": label, "file": file, "qty": 0, "for": [],
+                                    "item": item,
                                     "why": why or ("" if file else "no photo picked")})
         it["qty"] += qty
         if who not in it["for"]:
@@ -481,17 +515,18 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
                 tframe = frame_stem(team_photos.get(tname))
                 crop = catalog.crop_team.get(size, size)
                 add(f"{PRINT_SIZES[size]['label']} Team", crop, f"{tframe}_{crop}" if tframe else "", qty,
-                    f"{tname} team" if tframe else f"{tname} team (no group photo picked)", f"{PRINT_SIZES[size]['label']} Team")
+                    f"{tname} team" if tframe else f"{tname} team (no group photo picked)", f"{PRINT_SIZES[size]['label']} Team",
+                    item=f"{size}-team")
             else:
                 crop = catalog.crop_individual.get(size, size)
                 label = f"{PRINT_SIZES[size]['label']} sheet" if PRINT_SIZES[size].get("sheet") else PRINT_SIZES[size]["label"]
-                add(PRINT_SIZES[size]["label"], crop, f"{frame}_{crop}" if frame else "", qty, who, label)
+                add(PRINT_SIZES[size]["label"], crop, f"{frame}_{crop}" if frame else "", qty, who, label, item=size)
         # Keepsakes go to the lab as the units bought: one "8 Mini Wallets" is one item to print.
         for l in normalize(o.get("lines"), catalog):
             p = catalog.get(l["product_id"])
             if p.type == "misc":
                 why = "" if p.crop or not frame else "no crop size set for it (Prices…)"
-                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why)
+                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why, item=p.id)
     groups: dict[str, list] = {}
     for it in items.values():
         groups.setdefault(it["group"], []).append(it)
@@ -750,4 +785,24 @@ roes:
     misc-magnet-5x7:       {name: "5 x 7 Magnet",        code: "MAG57"}
     misc-photo-key-ring:   {name: "Key Chain",           code: "KEY"}
     misc-photo-badge:      {name: "Photo Badge",         code: "BADGE"}
+
+# Meridian bulk order CSV (Orders > Lab order > Meridian bulk order). The codes
+# come from Meridian's product list (keeperstudio/meridian/products.csv). per:
+# how many Meridian items one of ours is: a sheet of 8 wallets is two of their
+# "4-Wallets" (R623dc). Leave a code blank for something with no bulk-upload
+# product yet; Lab order lists those so you can order them on the website.
+meridian:
+  items:
+    8x10:                  {code: R1680A}
+    5x7:                   {code: RA1657}
+    4x6:                   {code: R1646}
+    wallet:                {code: R623dc, per: 2}
+    8x10-team:             {same_as: 8x10}
+    5x7-team:              {same_as: 5x7}
+    misc-magnet-4x5:       {code: MAG45}
+    misc-magnet-5x7:       {code: MAG57}
+    misc-mini-wallets-8:   {code: ""}
+    misc-wallet-magnets-4: {code: ""}
+    misc-photo-key-ring:   {code: ""}
+    misc-photo-badge:      {code: ""}
 """

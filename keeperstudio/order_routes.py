@@ -6,6 +6,7 @@ import os
 import sys
 from pathlib import Path
 
+from . import meridian as M
 from . import orders as O
 from . import paths
 from .orderbook import OrderBook
@@ -174,7 +175,51 @@ def r_lab_plan(b):
             it["found"] = str(found[it["file"].lower()]) if it["file"] and it["file"].lower() in found else ""
     plan["crops_dir"] = crops
     plan["crops_exists"] = bool(crops) and Path(crops).is_dir()
+    cat = catalog()
+    for g in plan["groups"]:
+        for it in g["items"]:
+            code, per = O.meridian_code(cat, it.get("item") or "")
+            it["mcode"], it["mname"], it["mqty"] = code, M.product_name(code), it["qty"] * per
+    plan["meridian"] = meridian_settings()
     return plan
+
+
+def _meridian_path() -> Path:
+    return paths.data_dir() / "meridian.json"
+
+
+def meridian_settings() -> dict:
+    import json
+    try:
+        got = json.loads(_meridian_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        got = {}
+    return {**M.DEFAULT_SETTINGS, **{k: v for k, v in got.items() if k in M.DEFAULT_SETTINGS}}
+
+
+def r_meridian_settings(b):
+    import json
+    s = meridian_settings()
+    for k in M.DEFAULT_SETTINGS:
+        if k in b:
+            s[k] = str(b[k]).strip()
+    _meridian_path().write_text(json.dumps(s, indent=2), encoding="utf-8")
+    return {"settings": s, "problems": M.settings_problems(s)}
+
+
+def r_meridian_build(b):
+    sid = int(b["shoot_id"])
+    rows = [o for o in book.orders(sid) if o["lines"]]
+    plan = O.lab_plan(rows, catalog(), _team_photos(sid))
+    if not Path(b["crops_dir"]).is_dir():
+        raise FileNotFoundError(f"Crops folder not found: {b['crops_dir']}")
+    s = meridian_settings()
+    bad = M.settings_problems(s)
+    if bad:
+        raise ValueError(" ".join(bad))
+    shoot = next((x for x in book.shoots() if x["id"] == sid), {})
+    name = str(b.get("order_name") or shoot.get("name") or "Picture day")
+    return M.build(plan, catalog(), Path(b["crops_dir"]), Path(b["out_dir"]), s, name)
 
 
 def r_lab_build(b):
@@ -218,4 +263,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
+    "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
 }

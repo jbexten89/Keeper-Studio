@@ -1,0 +1,25 @@
+order_name,account_email,color_correction,delivery,item_id,product_code,design_name,quantity,file_name,image_order,text_fields,finish,mounting,texture,other_options,crop,crop_focus,caption,notes
+Hartley Wedding 2026,studio@example.com,no,ship,1,R1680A,,2,Hartley_0012.jpg,,,Gloss,,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,2,RA1657,,4,Hartley_0012.jpg,,,,,,,fill,top,,"Same image as item 1, different size"
+Hartley Wedding 2026,studio@example.com,no,ship,3,R623dc,,2,Hartley_0045.jpg,,,,,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,4,R1616,,1,Hartley_0101.jpg,,,Metallic,Matboard,Pebble,,fit,,,"White border, show the whole image"
+Hartley Wedding 2026,studio@example.com,no,ship,5,R616GWA-V,,1,Ceremony/Hartley_0230.jpg,,,,,,,fill,center,,File is in a subfolder
+Hartley Wedding 2026,studio@example.com,no,ship,6,DA616-H,,1,Hartley_0311.jpg,,,Brushed,Standout,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,7,FF-11x14,,1,Hartley_0402.jpg,,,Luster,,,Frame Style=Standard,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,8,PKG-Two-4x5,,3,Hartley_0118.jpg,,,,,,Cutting=Cut apart,fill,top,,
+Hartley Wedding 2026,studio@example.com,no,ship,9,PRF-4x6-WM,,1,Hartley_0500.jpg,,,Glossy Coating,,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,BOOK-1,PB-8X10-12UP,,1,Hartley_0001.jpg,1,,,,,,fill,center,Hartley_0001,
+Hartley Wedding 2026,studio@example.com,no,ship,BOOK-1,PB-8X10-12UP,,1,Hartley_0002.jpg,2,,,,,,fill,center,Hartley_0002,
+Hartley Wedding 2026,studio@example.com,no,ship,BOOK-1,PB-8X10-12UP,,1,Hartley_0003.jpg,3,,,,,,fill,center,Hartley_0003,One row per image in the book
+Hartley Wedding 2026,studio@example.com,no,ship,TAG-1,D64,,5,Hartley_0600.jpg,1,,,,,,fill,center,,Front
+Hartley Wedding 2026,studio@example.com,no,ship,TAG-1,D64,,5,Hartley_0601.jpg,2,,,,,,fill,center,,Back
+Hartley Wedding 2026,studio@example.com,no,ship,12,RA410,,2,Hartley_0700.jpg,,,,,,Bottle Color=Blue,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,MM-1,MM-8X10-V,Baseball · Style 1 · Vertical,2,Team/Moreno_Jake.jpg,1,Player name=Jake Moreno; Team name=Parsons Vikings; Year=2027,,,,,fill,center,,Player photo
+Hartley Wedding 2026,studio@example.com,no,ship,MM-1,MM-8X10-V,Baseball · Style 1 · Vertical,2,Team/Vikings_team.jpg,2,Player name=Jake Moreno; Team name=Parsons Vikings; Year=2027,,,,,fill,center,,Team photo
+Hartley Wedding 2026,studio@example.com,no,ship,MM-2,MM-8X10-V,Baseball · Style 1 · Vertical,1,Team/Lee_Sam.jpg,1,Player name=Sam Lee; Team name=Parsons Vikings; Year=2027,,,,,fill,center,,Player photo
+Hartley Wedding 2026,studio@example.com,no,ship,MM-2,MM-8X10-V,Baseball · Style 1 · Vertical,1,Team/Vikings_team.jpg,2,Player name=Sam Lee; Team name=Parsons Vikings; Year=2027,,,,,fill,center,,Same team photo for every player
+Hartley Wedding 2026,studio@example.com,no,ship,TC-1,TC-SET18,Baseball · Style 1 · set of 18,1,Team/Moreno_Jake.jpg,1,"Player name=Jake Moreno; Team name=Parsons Vikings; Position=Pitcher; Age=11; Height=4'10""; Weight=85; Coach=R. Diaz; League=Parsons Youth League",,,,,fill,center,,Player photo
+Hartley Wedding 2026,studio@example.com,no,ship,TC-1,TC-SET18,Baseball · Style 1 · set of 18,1,Team/Vikings_team.jpg,2,"Player name=Jake Moreno; Team name=Parsons Vikings; Position=Pitcher; Age=11; Height=4'10""; Weight=85; Coach=R. Diaz; League=Parsons Youth League",,,,,fill,center,,Team photo
+Hartley Wedding 2026,studio@example.com,no,ship,TM-1,TM-SET4,Football · Style 4 · set of 4,1,Team/Lee_Sam.jpg,,Team name=Parsons Vikings; Player name=Sam Lee,,,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,MC-1,MC-8X10,Football · Standard cover · 8×10,1,Team/Moreno_Jake.jpg,,Player name=Jake Moreno,Metallic,,,,fill,center,,
+Hartley Wedding 2026,studio@example.com,no,ship,TK-1,TK-8X10,Baseball,1,Team/Lee_Sam.jpg,,Player name=Sam Lee; Team name=Parsons Vikings,,,,,fill,center,,

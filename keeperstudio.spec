@@ -1,3 +1,4 @@
+from pathlib import Path
 # PyInstaller spec for Keeper Studio.
 #
 # Build on Windows (PyInstaller does not cross-compile):
@@ -40,6 +41,7 @@ a = Analysis(
     datas=[
         ("keeperstudio/ui/index.html", "ui"),
         ("assets/keeper-studio.ico", "assets"),
+        *[(str(f), "keeperstudio/meridian") for f in Path("keeperstudio/meridian").iterdir() if f.suffix in (".csv", ".py", ".md")],
         *mediapipe_data, *extra_datas, *metadata,
     ],
     hiddenimports=[
