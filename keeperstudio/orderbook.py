@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS shoots (
   season TEXT NOT NULL DEFAULT '',
   notes TEXT NOT NULL DEFAULT '',
   archived INTEGER NOT NULL DEFAULT 0,
+  shipping_cents INTEGER NOT NULL DEFAULT 0,
   created REAL NOT NULL
 );
 CREATE TABLE IF NOT EXISTS orders (
@@ -71,7 +72,14 @@ class OrderBook:
         self._db.execute("PRAGMA foreign_keys=ON")
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.executescript(SCHEMA)
+        self._migrate()
         self._db.commit()
+
+    def _migrate(self) -> None:
+        """Add columns that came after a user's order book was created."""
+        cols = {r["name"] for r in self._db.execute("PRAGMA table_info(shoots)")}
+        if "shipping_cents" not in cols:
+            self._db.execute("ALTER TABLE shoots ADD COLUMN shipping_cents INTEGER NOT NULL DEFAULT 0")
 
     def _daily_backup(self, folder: Path) -> None:
         try:
@@ -96,6 +104,12 @@ class OrderBook:
                 + ("" if include_archived else " WHERE archived=0")
                 + " ORDER BY archived, CASE WHEN date='' THEN 1 ELSE 0 END, date DESC, created DESC").fetchall()
         return [dict(r) for r in rows]
+
+    def set_shipping(self, sid: int, cents: int) -> None:
+        """What Meridian charged to ship the shoot's order, typed in by hand."""
+        with self._lock:
+            self._db.execute("UPDATE shoots SET shipping_cents=? WHERE id=?", (max(0, int(cents)), int(sid)))
+            self._db.commit()
 
     def save_shoot(self, data: dict) -> dict:
         name = str(data.get("name") or "").strip()

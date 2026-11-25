@@ -615,6 +615,7 @@ textarea:focus{border-color:var(--accent)}
 .otbl tr.new-row td{border-top:1px dashed var(--accent);border-bottom:1px dashed var(--accent)}
 .new-tag{display:inline-block;margin-right:10px;padding:1px 6px;border-radius:3px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;letter-spacing:.03em}
 @keyframes newflash{from{background:rgba(47,155,255,.35)}to{background:transparent}}.otbl tr.new-row.flash td{animation:newflash .9s ease-out}
+.tot-grid .ship-in{width:84px;height:22px;padding:0 6px;text-align:right;font:inherit;font-variant-numeric:tabular-nums}
 .shoot-foot{display:flex;align-items:center;gap:12px}.arch-sw{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;margin-left:auto}.arch-sw input{margin:0}
 .ord-total .sub .due{color:var(--amber)}
 .ord-total .sub .ok{color:#3CC77F}
@@ -3544,7 +3545,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span>You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
     }
     $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
   },
@@ -3964,6 +3965,12 @@ function bindModuleEvents() {
   $('#right').addEventListener('input', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onInput(i); });
   $('#right').addEventListener('change', e => { const i = e.target.closest('[data-of]'); if (i && S.module === 'orders') Ord.onChange(i); });
   $('#modView').addEventListener('input', e => { const i = e.target.closest('[data-oq]'); if (i && S.module === 'orders') { Ord.q = i.value; Ord.paintRows(); } });
+  document.addEventListener('change', async e => {
+    if (!(e.target.matches && e.target.matches('[data-oship]')) || !Ord.sid) return;
+    try { await api('/api/orders/shipping', { shoot_id: Ord.sid, amount: e.target.value.trim() }); await Ord.refresh(); renderLeft(); }
+    catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 3500); renderLeft(); }
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-oship]')) e.target.blur(); }, true);
   document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-ord-arch]')) { prefs.ordShowArchived = e.target.checked; savePrefs(); renderLeft(); } });
   $('#modView').addEventListener('change', e => { const i = e.target.closest('[data-mer]'); if (i && S.module === 'orders') Ord.merSet(i.dataset.mer, i.value.trim()); });
   // prices.yaml edited in another program: pick the new prices up on return

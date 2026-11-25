@@ -92,6 +92,9 @@ def r_list(b):
     total = sum(o["summary"]["total_cents"] for o in rows)
     paid = sum(o["summary"]["paid_cents"] for o in rows)
     lab = sum(o["summary"]["lab_cents"] for o in rows)
+    shoot = next((x for x in book.shoots() if x["id"] == sid), {})
+    ship = int(shoot.get("shipping_cents") or 0)
+    keep = total - lab - ship
     photos = book.team_photos(sid)
     teams = sorted({o["team"] for o in rows if o["team"]} | set(photos), key=str.lower)
     return {
@@ -100,11 +103,23 @@ def r_list(b):
                    "count": sum(1 for o in rows if o["team"] == t)} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
         "totals": {"orders": len(rows), "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
-                   "lab_cents": lab, "keep_cents": total - lab,
+                   "lab_cents": lab, "shipping_cents": ship, "keep_cents": keep,
+                   "profit_pct": round(100 * keep / total, 1) if total else None,
                    "unpaid": sum(1 for o in rows if o["summary"]["due_cents"] > 0),
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
     }
+
+
+def r_shipping(b):
+    try:
+        c = O.cents(b.get("amount") or 0)
+    except Exception:  # noqa: BLE001 - anything that isn't an amount
+        raise ValueError("Type the shipping as an amount, like 12.50.") from None
+    if c < 0:
+        raise ValueError("Shipping can't be negative.")
+    book.set_shipping(int(b["shoot_id"]), c)
+    return {"ok": True}
 
 
 def r_save(b):
@@ -311,5 +326,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/report": r_report, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
+    "/api/orders/report": r_report, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
 }

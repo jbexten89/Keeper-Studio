@@ -289,6 +289,31 @@ class OrderBookTests(unittest.TestCase):
         self.book.close()
         self.dir.cleanup()
 
+    def test_shipping_is_kept_per_shoot(self):
+        s = self.book.save_shoot({"name": "Winter"})
+        self.book.set_shipping(s["id"], 1250)
+        self.assertEqual(self.book.shoots()[0]["shipping_cents"], 1250)
+        # editing the shoot's name doesn't wipe the shipping
+        self.book.save_shoot({"id": s["id"], "name": "Winter Sports"})
+        self.assertEqual(self.book.shoots()[0]["shipping_cents"], 1250)
+
+    def test_old_order_book_gets_the_shipping_column(self):
+        import sqlite3
+        path = Path(self.dir.name, "old.sqlite3")
+        db = sqlite3.connect(path)
+        db.execute("CREATE TABLE shoots (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, date TEXT NOT NULL DEFAULT '',"
+                   " season TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0, created REAL NOT NULL)")
+        db.execute("INSERT INTO shoots (name, created) VALUES ('Fall', 0)")
+        db.commit()
+        db.close()
+        old = OrderBook(path)
+        try:
+            self.assertEqual(old.shoots()[0]["shipping_cents"], 0)
+            old.set_shipping(old.shoots()[0]["id"], 899)
+            self.assertEqual(old.shoots()[0]["shipping_cents"], 899)
+        finally:
+            old.close()
+
     def test_round_trip(self):
         s = self.book.save_shoot({"name": "Montpelier Basketball", "date": "2026-11-15"})
         o = self.book.save_order(s["id"], {"envelope": "18", "athlete": "Carter", "team": "9th", "glasses": True,
