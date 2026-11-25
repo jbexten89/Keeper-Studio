@@ -3175,6 +3175,14 @@ const Ord = {
     return this.d ? this.d.orders.filter(o => [o.edited, o.image].some(n => n && stemOf(n).toLowerCase() === st)) : [];
   },
   // Put a photo in front in the filmstrip without touching the envelope.
+  // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
+  pickTeam(name) {
+    this.team = name; renderLeft(); renderView();
+    const t = name !== 'all' && this.d ? this.d.teams.find(x => x.name === name) : null;
+    if (!t || !t.image || this.showPhoto(t.image)) return;
+    const p = this.photoFor(t.image);
+    if (p) toast(`${esc(name)}’s group photo ${esc(t.image)} is hidden by the filmstrip filter${S.filter && S.filter.flag ? ' (picks only is on)' : ''}.`, 3500);
+  },
   showPhoto(stem) {
     const p = stem ? this.photoFor(stem) : null; if (!p || !S.viewIndex.has(p.id)) return false;
     S.active = p.id; S.selected = new Set([p.id]); S.anchor = p.id;
@@ -3913,7 +3921,7 @@ function bindModuleEvents() {
         return;
       }
       const sh = t.closest('[data-oshoot]'); if (sh) { if (+sh.dataset.oshoot !== Ord.sid) Ord.pickShoot(+sh.dataset.oshoot); return; }
-      const tm = t.closest('[data-oteam]'); if (tm) { Ord.team = tm.dataset.oteam; renderLeft(); renderView(); return; }
+      const tm = t.closest('[data-oteam]'); if (tm) { Ord.pickTeam(tm.dataset.oteam); return; }
     }
     const cu = t.closest('[data-cut]');
     if (cu) {
