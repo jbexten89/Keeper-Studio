@@ -26,6 +26,29 @@ class ReportTests(unittest.TestCase):
         self.assertEqual(t["align"][t["head"].index("Total")], "money")
         self.assertEqual(len(t["rows"][1]["cells"]), len(t["head"]))
 
+    def test_shoot_summary(self):
+        decorated = []
+        for o in self.orders:
+            s = O.order_summary(o, CAT)
+            s["lab_cents"] = 100  # a stand-in lab estimate per envelope
+            decorated.append({**o, "summary": s})
+        decorated[0]["paid_method"], decorated[0]["paid_cents"] = "cash", decorated[0]["summary"]["total_cents"]
+        decorated[0]["summary"] = O.order_summary(decorated[0], CAT) | {"lab_cents": 100}
+        secs = {s["heading"]: s for s in R.shoot_summary(decorated, CAT, {"shipping_cents": 500})}
+        totals = {r["cells"][0]: r["cells"][1] for r in secs["Totals"]["rows"]}
+        sales = sum(o["summary"]["total_cents"] for o in decorated)
+        self.assertEqual(totals["Sales"], O.money(sales))
+        self.assertEqual(totals["You keep"], O.money(sales - 300 - 500))
+        teams = [r["cells"][0] for r in secs["By team (profit before shipping)"]["rows"]]
+        self.assertEqual(teams, ["9th Grade", "JV", "TOTAL"])
+        sold = {r["cells"][0]: r["cells"][2] for r in secs["What sold"]["rows"]}
+        self.assertEqual((sold["Package F"], sold["Package G"]), ("1", "1"))
+        self.assertIn("Still owed", secs)  # Riley and Sam haven't paid
+        self.assertEqual(len([r for r in secs["Still owed"]["rows"] if r["kind"] == "row"]), 2)
+        with tempfile.TemporaryDirectory() as d:
+            out = R.pdf_sections(list(secs.values()), Path(d, "summary"), "Shoot summary", "Test")
+            self.assertEqual(out.read_bytes()[:5], b"%PDF-")
+
     def test_every_export_makes_a_pdf(self):
         exports = {"pull": O.pull_sheet_csv(self.orders, CAT), "crop": O.crop_list_csv(self.orders, CAT, {}),
                    "items": O.line_items_csv(self.orders, CAT), "roes": O.roes_csv(self.orders, CAT, {})}

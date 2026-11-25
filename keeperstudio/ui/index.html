@@ -294,6 +294,7 @@ table.rep td{padding:4px 6px;border-bottom:1px solid #E1E4E9;vertical-align:top}
 table.rep tbody tr:nth-child(even):not(.grp):not(.tot) td{background:#FAFAFB}
 table.rep .r{text-align:right}table.rep .c{text-align:center}
 table.rep tr.grp td{background:#F1F3F6;font-weight:700;border-top:1px solid #9AA0AA;padding-top:7px}
+h4.rep-h{margin:18px 0 6px;font-size:14px;font-weight:600;color:#1b1e24}h4.rep-h:first-child{margin-top:0}
 table.rep tr.tot td{font-weight:700;border-top:1.5px solid #000;background:#E6E8EC}
 .fld{display:flex;flex-direction:column;gap:7px;margin:0 0 15px}
 .fld>span{font-variant:all-small-caps;letter-spacing:.08em;font-size:14px;color:var(--muted)}
@@ -3509,6 +3510,27 @@ const Ord = {
     try { const r = await api('/api/orders/meridian-settings', { [k]: v }); if (this.lab) this.lab.meridian = r.settings; } catch (e) { toast(esc(e.message)); }
     if (k !== 'account_email') renderView();
   },
+  async summary() {
+    if (!this.sid) return;
+    let R; try { R = await api('/api/orders/summary', { shoot_id: this.sid }); } catch (e) { return toast(esc(e.message)); }
+    const cls = a => a === 'money' ? 'r' : a === 'num' ? 'c' : '';
+    const table = t => `<table class="rep" style="${t.head.length <= 3 ? 'width:auto;min-width:360px' : ''}"><thead><tr>${t.head.map((h, i) => `<th class="${cls(t.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr class="${r.kind === 'total' ? 'tot' : ''}">${r.cells.map((c, i) => `<td class="${cls(t.align[i])}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)}</div></div>
+        <div class="m-actions" style="margin:0"><button class="btn" data-close>Close</button><button class="btn primary" data-sum-pdf>Save PDF…</button></div></div>
+      <div class="rep-paper">${R.sections.map(sec => `<h4 class="rep-h">${esc(sec.heading)}</h4>${table(sec)}`).join('')}</div>`, card => {
+      card.classList.add('report');
+      $('[data-sum-pdf]', card).addEventListener('click', async () => {
+        const s = this.shoot();
+        const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+        const p = await pickPath('save', { initial: dir, filename: `${sanitize((s && s.name) || 'Shoot')} - shoot summary.pdf`, types: ['PDF (*.pdf)'] }); if (!p) return;
+        try {
+          const r = await api('/api/orders/summary-pdf', { shoot_id: this.sid, path: p });
+          DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
+          toast(`Saved ${esc(baseName(r.path))} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 6000);
+        } catch (e) { toast(esc(e.message), 5000); }
+      });
+    });
+  },
   async previewMeridian() {
     const M = this.mer; if (!M || !M.csv) return;
     let R; try { R = await api('/api/orders/meridian-report', { csv: M.csv }); } catch (e) { return toast(esc(e.message)); }
@@ -3559,7 +3581,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b><span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad" style="padding-top:2px"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button></div>`);
     }
     $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
   },
@@ -3746,6 +3768,7 @@ const Ord = {
       <div class="tb-spacer"></div>
       <button class="btn sm" data-ord="import" ${dis} title="Add the orders from the website’s /admin CSV export">Import website CSV…</button>
       <span class="muted small">Export</span>
+      <button class="btn sm" data-ord="summary" ${dis} title="The whole shoot on a few pages: totals, teams, payments, what sold, prints, who still owes">Shoot summary</button>
       <button class="btn sm" data-oexp="pull" ${dis} title="One row per athlete with every print size counted — the sheet to stuff envelopes from">Pull sheet</button>
       <button class="btn sm" data-oexp="crop" ${dis} title="Exactly which crops to make: only the sizes families bought">Crop list</button>
       <button class="btn sm" data-oexp="roes" ${dis} title="${unm ? `${unm} print items still need Meridian’s ROES code (Prices…)` : 'ROES event import: each envelope as the individual prints it comes to'}">ROES file${unm ? ' ⚠' : ''}</button>
@@ -3936,7 +3959,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

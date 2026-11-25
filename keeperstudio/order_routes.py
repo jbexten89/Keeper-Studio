@@ -190,6 +190,26 @@ def _report_titles(b) -> tuple[str, str]:
     return R.TITLES[b["kind"]], " · ".join(bits)
 
 
+def _summary(b) -> dict:
+    sid = int(b["shoot_id"])
+    cat = catalog()
+    shoot = next((x for x in book.shoots() if x["id"] == sid), {})
+    orders = [_decorate(o, cat) for o in book.orders(sid)]
+    _, sub = _report_titles({"shoot_id": sid, "kind": "pull"})
+    if shoot.get("season"):
+        sub += f" · {shoot['season']}"
+    return {"title": "Shoot summary", "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot)}
+
+
+def r_summary(b):
+    return _summary(b)
+
+
+def r_summary_pdf(b):
+    s = _summary(b)
+    return {"path": str(R.pdf_sections(s["sections"], Path(b["path"]), s["title"], s["subtitle"]))}
+
+
 def r_report(b):
     """The export as a formatted table, for the preview."""
     title, subtitle = _report_titles(b)
@@ -333,5 +353,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/report": r_report, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
+    "/api/orders/report": r_report, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
 }
