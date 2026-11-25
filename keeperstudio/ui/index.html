@@ -581,6 +581,8 @@ textarea:focus{border-color:var(--accent)}
 .ord-total .big{font-size:26px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
 .ord-total .sub{color:var(--muted);font-size:12px;margin-left:auto;text-align:right}
 .ord-total .lab{display:block;margin-top:4px}
+.row.arch .lbl,.row.arch .sub,.row.arch .cnt{opacity:.5}.row.arch:hover .lbl,.row.arch:hover .sub,.row.arch.on .lbl,.row.arch.on .sub{opacity:.85}
+.arch-tag{display:inline-block;margin-left:6px;padding:0 5px;border:1px solid var(--border);border-radius:3px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);vertical-align:1px}
 .shoot-foot{display:flex;align-items:center;gap:12px}.arch-sw{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);cursor:pointer;white-space:nowrap;margin-left:auto}.arch-sw input{margin:0}
 .ord-total .sub .due{color:var(--amber)}
 .ord-total .sub .ok{color:#3CC77F}
@@ -3470,7 +3472,7 @@ const Ord = {
     // Archived shoots stay hidden unless the switch is on; the open shoot always shows.
     const nArch = this.shoots.filter(s => s.archived).length;
     const showArch = !!(prefs.ordShowArchived);
-    const sh = this.shoots.filter(s => showArch || !s.archived || s.id === this.sid).map(s => `<div class="row ${s.id === this.sid ? 'on' : ''}" data-oshoot="${s.id}"><span class="two"><span class="lbl">${esc(s.name)}</span><span class="sub">${esc([fmtDay(s.date), s.season, s.archived ? 'archived' : ''].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
+    const sh = this.shoots.filter(s => showArch || !s.archived || s.id === this.sid).map(s => `<div class="row ${s.id === this.sid ? 'on' : ''} ${s.archived ? 'arch' : ''}" data-oshoot="${s.id}" ${s.archived ? 'title="Archived"' : ''}><span class="two"><span class="lbl">${esc(s.name)}${s.archived ? '<span class="arch-tag">Archived</span>' : ''}</span><span class="sub">${esc([fmtDay(s.date), s.season].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
     let html = sectionHTML('o-shoots', 'Shoots', (sh || '<div class="hint">A shoot is one picture day: its envelopes, teams and lab order.</div>') + `<div class="pad shoot-foot"><button class="btn sm" data-ord="new-shoot">New shoot…</button>${nArch ? `<label class="arch-sw" title="Archived shoots are kept; this only hides them from the list"><input type="checkbox" data-ord-arch ${showArch ? 'checked' : ''}> Show archived (${nArch})</label>` : ''}</div>`);
     if (this.d) {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
