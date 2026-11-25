@@ -285,6 +285,16 @@ body.lights2 #viewport{background:#000}
 #modal.hidden{display:none}
 .modal-card{background:var(--panel);border:1px solid var(--border-2);border-radius:10px;padding:20px 22px;width:min(540px,92vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.6);user-select:text}
 .modal-card h3{margin:0 0 16px;font-weight:700;font-size:16px}
+.modal-card.report{width:min(1500px,96vw);max-height:92vh;display:flex;flex-direction:column}
+.rep-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between;margin:0 0 12px}.rep-head h3{margin:0 0 2px}
+.rep-paper{background:#fff;color:#1b1e24;border-radius:4px;padding:14px 16px;overflow:auto;flex:1;min-height:120px}
+table.rep{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
+table.rep th{position:sticky;top:-14px;background:#E6E8EC;border-bottom:1.5px solid #555B66;text-align:left;padding:5px 6px;font-weight:600;white-space:nowrap}
+table.rep td{padding:4px 6px;border-bottom:1px solid #E1E4E9;vertical-align:top}
+table.rep tbody tr:nth-child(even):not(.grp):not(.tot) td{background:#FAFAFB}
+table.rep .r{text-align:right}table.rep .c{text-align:center}
+table.rep tr.grp td{background:#F1F3F6;font-weight:700;border-top:1px solid #9AA0AA;padding-top:7px}
+table.rep tr.tot td{font-weight:700;border-top:1.5px solid #000;background:#E6E8EC}
 .fld{display:flex;flex-direction:column;gap:7px;margin:0 0 15px}
 .fld>span{font-variant:all-small-caps;letter-spacing:.08em;font-size:14px;color:var(--muted)}
 .radio,.check{display:flex;align-items:center;gap:8px;cursor:pointer}
@@ -2100,12 +2110,12 @@ async function runExport(o, card, dest) {
 /* ================= Modal, toast, help ================= */
 function openModal(html, onMount) {
   const m = $('#modal'); const card = $('.modal-card', m);
-  card.innerHTML = html; m.classList.remove('hidden');
+  card.classList.remove('report'); card.innerHTML = html; m.classList.remove('hidden');
   $$('[data-close]', card).forEach(b => b.addEventListener('click', () => { if (b.hasAttribute('data-close')) closeModal(); }));
   onMount && onMount(card);
   const f = $('[autofocus]', card); if (f) { f.focus(); f.select && f.select(); }
 }
-function closeModal() { if (S.exporting) return; $('#modal').classList.add('hidden'); $('.modal-card').innerHTML = ''; }
+function closeModal() { if (S.exporting) return; $('#modal').classList.add('hidden'); $('.modal-card').innerHTML = ''; $('.modal-card').classList.remove('report'); }
 const modalOpen = () => !$('#modal').classList.contains('hidden');
 function confirmDialog(title, sub, okLabel, onOk) {
   openModal(`<h3>${esc(title)}</h3><p class="muted">${esc(sub)}</p><div class="m-actions"><button class="btn" data-close>Cancel</button><button class="btn danger" data-ok>${esc(okLabel)}</button></div>`,
@@ -3387,14 +3397,32 @@ const Ord = {
   },
   setView(v) { this.view = v; this.render(); if (v === 'lab') this.loadLab(); },
   // ---------- exports, import, lab ----------
-  async exportCsv(kind) {
+  // Each export opens a formatted preview with Save PDF and Save CSV.
+  async preview(kind) {
+    if (!this.sid) return;
+    const team = this.team !== 'all' ? this.team : '';
+    let R; try { R = await api('/api/orders/report', { shoot_id: this.sid, kind, team }); } catch (e) { return toast(esc(e.message)); }
+    const cls = a => a === 'money' ? 'r' : a === 'num' ? 'c' : '';
+    const body = R.rows.map(r => r.kind === 'group' ? `<tr class="grp"><td colspan="${R.head.length}">${esc(r.label)}</td></tr>`
+      : `<tr class="${r.kind === 'total' ? 'tot' : ''}">${r.cells.map((c, i) => `<td class="${cls(R.align[i])}">${esc(c)}</td>`).join('')}</tr>`).join('');
+    const n = R.rows.filter(r => r.kind === 'row').length;
+    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)} · ${plural(n, 'row')}${kind === 'pull' ? ' · empty columns hidden' : ''}</div></div>
+        <div class="m-actions" style="margin:0"><button class="btn" data-close>Close</button><button class="btn" data-rep="csv">Save CSV…</button><button class="btn primary" data-rep="pdf">Save PDF…</button></div></div>
+      <div class="rep-paper">${n ? `<table class="rep"><thead><tr>${R.head.map((h, i) => `<th class="${cls(R.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>` : '<p class="muted">Nothing to show yet.</p>'}</div>`,
+      card => {
+        card.classList.add('report');
+        card.addEventListener('click', e => { const b = e.target.closest('[data-rep]'); if (b) this.exportCsv(kind, b.dataset.rep); });
+      });
+  },
+  async exportCsv(kind, fmt = 'csv') {
     if (!this.sid) return;
     let name; try { name = (await api('/api/orders/export-name', { shoot_id: this.sid, kind })).filename; } catch (e) { return toast(esc(e.message)); }
     if (this.team !== 'all') name = name.replace(/\.csv$/, ` - ${sanitize(this.team)}.csv`);
+    if (fmt === 'pdf') name = name.replace(/\.csv$/, '.pdf');
     const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
-    const p = await pickPath('save', { initial: dir, filename: name, types: ['CSV (*.csv)'] }); if (!p) return;
+    const p = await pickPath('save', { initial: dir, filename: name, types: [fmt === 'pdf' ? 'PDF (*.pdf)' : 'CSV (*.csv)'] }); if (!p) return;
     try {
-      const r = await api('/api/orders/export', { shoot_id: this.sid, kind, path: p, team: this.team !== 'all' ? this.team : '' });
+      const r = await api('/api/orders/export', { shoot_id: this.sid, kind, path: p, format: fmt, team: this.team !== 'all' ? this.team : '' });
       DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
       toast(`Saved ${esc(baseName(r.path))}${this.team !== 'all' ? ` (${esc(this.team)} only)` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>${r.unmapped.length ? `<br>${r.unmapped.length} print items have no ROES code yet — names were used instead; add the codes under Prices…` : ''}`, 6000);
     } catch (e) { toast(esc(e.message), 5000); }
@@ -3851,7 +3879,7 @@ function bindModuleEvents() {
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; Ord.paintRows(); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
-      const ex = t.closest('[data-oexp]'); if (ex) { Ord.exportCsv(ex.dataset.oexp); return; }
+      const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
       const oa = t.closest('[data-ord]');
       if (oa) {
         e.stopPropagation();

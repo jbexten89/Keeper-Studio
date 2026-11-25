@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from . import meridian as M
+from . import reports as R
 from . import orders as O
 from . import paths
 from .orderbook import OrderBook
@@ -150,14 +151,43 @@ EXPORTS = {
 }
 
 
-def r_export(b):
-    sid, kind, dest = int(b["shoot_id"]), b["kind"], b["path"]
+def _export_text(b) -> str:
+    sid, kind = int(b["shoot_id"]), b["kind"]
     if kind not in EXPORTS:
         raise ValueError("Unknown export.")
     rows = book.orders(sid)
     if b.get("team"):
         rows = [o for o in rows if o["team"] == b["team"]]
-    text = EXPORTS[kind][1](rows, catalog(), _team_photos(sid))
+    return EXPORTS[kind][1](rows, catalog(), _team_photos(sid))
+
+
+def _report_titles(b) -> tuple[str, str]:
+    s = next((x for x in book.shoots() if x["id"] == int(b["shoot_id"])), {})
+    bits = [s.get("name") or "Shoot"]
+    if s.get("date"):
+        try:
+            import datetime as dt
+            bits.append(dt.date.fromisoformat(s["date"]).strftime("%b %d, %Y").replace(" 0", " "))
+        except ValueError:
+            bits.append(s["date"])
+    if b.get("team"):
+        bits.append(f"{b['team']} only")
+    return R.TITLES[b["kind"]], " · ".join(bits)
+
+
+def r_report(b):
+    """The export as a formatted table, for the preview."""
+    title, subtitle = _report_titles(b)
+    return {"title": title, "subtitle": subtitle, **R.table(_export_text(b), b["kind"])}
+
+
+def r_export(b):
+    kind, dest = b["kind"], b["path"]
+    text = _export_text(b)
+    if b.get("format") == "pdf" or str(dest).lower().endswith(".pdf"):
+        title, subtitle = _report_titles(b)
+        out = R.pdf(R.table(text, kind), Path(dest), title, subtitle)
+        return {"path": str(out), "unmapped": []}
     dest = Path(dest)
     if dest.suffix.lower() != ".csv":
         dest = dest.with_suffix(".csv")
@@ -281,5 +311,5 @@ ROUTES = {
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
-    "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
+    "/api/orders/report": r_report, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build,
 }

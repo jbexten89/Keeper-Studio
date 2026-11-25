@@ -92,6 +92,14 @@ def _selftest() -> int:
             if not chk["ok"]:
                 raise ValueError("Meridian checker: " + chk["report"])
         lines.append(f"meridian: {len(meridian.products())} products, checker ok")
+        # PDF exports work inside the app.
+        from . import reports
+        with tempfile.TemporaryDirectory() as d:
+            t = reports.table("Envelope,Team,Athlete,5x7\n1,U10,Test,1\nTOTAL,1 athlete,,1\n", "pull")
+            out = reports.pdf(t, os.path.join(d, "t.pdf"), "Pull sheet", "Selftest")
+            if not open(out, "rb").read(5) == b"%PDF-":
+                raise ValueError("PDF export failed")
+        lines.append("reports: pdf ok")
         lines.append("OK")
         code = 0
     except Exception as exc:

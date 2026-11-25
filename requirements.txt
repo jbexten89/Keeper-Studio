@@ -11,3 +11,5 @@ pillow-heif==1.8.1
 rembg[cpu]==2.0.87
 # The app window (Microsoft Edge WebView2 on Windows)
 pywebview==6.2.1
+# PDF versions of the Orders exports (pull sheet, crop list, ...)
+reportlab==4.4.4
