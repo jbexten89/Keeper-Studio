@@ -554,6 +554,8 @@ kbd{font-size:10px}
 .otbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
 .otbl th{position:sticky;top:0;z-index:1;background:var(--panel);color:var(--muted);font-weight:400;font-variant:all-small-caps;letter-spacing:.06em;font-size:13px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--border);cursor:pointer;white-space:nowrap}
 .otbl th:hover{color:var(--text)}
+.otbl tfoot td{position:sticky;bottom:0;z-index:1;background:var(--panel);border-top:1px solid var(--border-2);padding:7px 10px;font-weight:600;white-space:nowrap}
+.otbl tfoot td.dim{font-weight:400}
 .otbl th.amt,.otbl td.amt{text-align:right}
 .otbl th .arr{color:var(--accent);margin-left:3px}
 .otbl td{padding:6px 10px;border-bottom:1px solid #16191D;white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
@@ -3674,11 +3676,23 @@ const Ord = {
     // An envelope that's open but not saved yet (nothing typed) still gets a row, so N visibly does something.
     const d = this.draft, fresh = this.sel === 'new' && d && !d.id;
     const newRow = !fresh ? '' : `<tr class="sel new-row" data-onew><td class="env">${esc(d.envelope)}</td><td colspan="10">${d.athlete.trim() ? esc(d.athlete) : '<span class="new-tag">New</span><span class="dim">Type the athlete’s name or press a package letter. It saves as soon as you do.</span>'}</td></tr>`;
-    box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('profit', 'Profit', 'amt')}${th('ppct', 'Profit %', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody></table>`
+    box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('profit', 'Profit', 'amt')}${th('ppct', 'Profit %', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody>${this.totalsRow(rows)}</table>`
       : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
     box.scrollTop = y;
     const nr = fresh && $('tr[data-onew]', box);
     if (nr && this._flashNew) { this._flashNew = false; nr.scrollIntoView({ block: 'nearest' }); nr.classList.add('flash'); }
+  },
+  // Totals of the envelopes in view (all teams, one team, or a search), pinned under the list.
+  totalsRow(rows) {
+    if (!rows.length) return '';
+    const sum = k => rows.reduce((a, o) => a + (o.summary[k] || 0), 0);
+    const tot = sum('total_cents'), lab = sum('lab_cents'), keep = sum('keep_cents'), due = sum('due_cents');
+    const glasses = rows.filter(o => o.glasses).length, nophoto = rows.filter(o => o.lines.length && !(o.image || o.edited)).length;
+    const scope = this.team !== 'all' ? this.team : 'All teams';
+    return `<tfoot><tr class="tot-row"><td class="env"></td><td colspan="2"><b>${esc(scope)}</b> · ${plural(rows.length, 'envelope')}${this.q ? ' (search)' : ''}</td><td></td>
+      <td class="${nophoto ? 'due' : 'dim'}">${nophoto ? `${nophoto} need a photo` : ''}</td><td>${glasses || ''}</td>
+      <td class="amt">${fmt$(tot)}</td><td class="amt dim">${fmt$(lab)}</td><td class="amt${keep < 0 ? ' due' : ''}">${fmt$(keep)}</td>
+      <td class="amt">${tot ? (100 * keep / tot).toFixed(1) + '%' : '—'}</td><td class="amt ${due > 0 ? 'due' : 'ok'}">${due > 0 ? fmt$(due) : 'All paid'}</td></tr></tfoot>`;
   },
   // Per envelope: sales minus Meridian's estimated lab cost (shipping is one charge for the shoot, in Totals).
   profitCells(s) {
