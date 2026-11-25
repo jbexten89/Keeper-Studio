@@ -27,8 +27,8 @@ from .. import orders as O
 
 HERE = Path(__file__).resolve().parent
 PRODUCTS = HERE / "products.csv"
-# Products Meridian confirmed by email that aren't in their products.csv yet.
-# The checker reads them together with Meridian's list.
+# Optional: products Meridian confirmed that aren't in their products.csv yet
+# (same columns). The checker reads them together with Meridian's list.
 PRODUCTS_EXTRA = HERE / "products-extra.csv"
 DESIGNS = HERE / "designs.csv"
 CHECKER = HERE / "validate_order.py"

@@ -1,4 +1,5 @@
 category,product_code,product_name,print_size_in,orientation,images_per_item,base_price_usd,price_note,finish_choices,mounting_choices,texture_choices,other_options,how_to_order
+Professional Prints,R1688,8 Mini Wallets,"1.5 x 2 (8 per sheet, same image)",either (rotates to fit the image),1,1.13,Per sheet of 8,Matte [default] | Gloss | Metallic (+$0.48),,,,Bulk upload
 Professional Prints,R623dc,4-Wallets,2.5 x 3.5 (each wallet),either,1,0.29,,Matte [default] | Gloss | Metallic,,No Texture [default] | Pebble (+$3.00) | Linen (+$0.20),,Bulk upload
 Professional Prints,R1631,3 x 3 Print,3 x 3,square,1,0.30,,Matte [default] | Gloss,No Mounting [default] | Matboard (+$3.00),No Texture [default] | Pebble (+$3.00) | Linen (+$0.20),,Bulk upload
 Professional Prints,R3X45,3.5 x 4.5 Print,3.5 x 4.5,either (rotates to fit the image),1,0.30,,Matte [default] | Gloss,No Mounting [default] | Matboard (+$3.00),No Texture [default] | Pebble (+$3.00) | Linen (+$0.20),,Bulk upload
@@ -253,6 +254,7 @@ Photo Gifts,MSPD1,Mousepad,,,1,12.00,,,,,,Bulk upload
 Photo Gifts,Plastic Keychain Large,Plastic Keychain - Large,,,1,2.50,,,,,,Bulk upload
 Photo Gifts,R606-2,Plastic Keychain - Medium,,,1,2.15,,,,,,Bulk upload
 Photo Gifts,R606-3,Plastic Keychain - Small,,,1,2.00,,,,,,Bulk upload
+Photo Gifts,RA78B,Wallet Magnets (Set of 4),"2.5 x 3.5 (set of 4, same image)",either (rotates to fit the image),1,4.12,Per set of 4,,,,,Bulk upload
 Photo Gifts,MAG45,4 x 5 Magnet,4 x 5,either (rotates to fit the image),1,2.50,,,,,,Bulk upload
 Photo Gifts,MAG57,5 x 7 Magnet,5 x 7,either (rotates to fit the image),1,4.50,,,,,,Bulk upload
 Photo Gifts,BLK3040,30 x 40 Blanket,30 x 40,either (rotates to fit the image),1,39.99,,,,,,Bulk upload
