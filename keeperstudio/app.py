@@ -79,6 +79,19 @@ def _selftest() -> int:
         lines.append(f"prices: {len(cat.products)} products from {cat.source}")
         if cat.warnings:
             raise ValueError("; ".join(cat.warnings))
+        # Meridian's files are bundled and their checker runs inside the app.
+        import tempfile
+        from PIL import Image
+        from . import meridian
+        with tempfile.TemporaryDirectory() as d:
+            Image.new("RGB", (1500, 2100)).save(os.path.join(d, "IMG_1_5x7.JPG"))
+            plan = {"groups": [{"group": "5x7", "items": [{"file": "IMG_1_5x7", "item": "5x7", "qty": 1, "for": ["Test"], "why": ""}]}]}
+            rows, _ = meridian.plan_rows(plan, cat, {"account_email": "test@example.com"}, "Selftest", lambda it: "IMG_1_5x7.JPG")
+            meridian.write_csv(rows, os.path.join(d, "o.csv"))
+            chk = meridian.check(os.path.join(d, "o.csv"), d)
+            if not chk["ok"]:
+                raise ValueError("Meridian checker: " + chk["report"])
+        lines.append(f"meridian: {len(meridian.products())} products, checker ok")
         lines.append("OK")
         code = 0
     except Exception as exc:
