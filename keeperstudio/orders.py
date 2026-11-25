@@ -197,15 +197,15 @@ def roes_items(raw) -> dict:
 
 
 # Meridian's bulk order CSV: the product code each lab item is ordered as.
-# per: how many of Meridian's items one of ours is (a sheet of 8 wallets is
-# two "4-Wallets"). An item without a code isn't sent; Lab order lists it.
+# per (optional): how many of Meridian's items one of ours is. An item
+# without a code isn't sent; Lab order lists it.
 DEFAULT_MERIDIAN_ITEMS = {
     "8x10": {"code": "R1680A"}, "5x7": {"code": "RA1657"}, "4x6": {"code": "R1646"},
-    "wallet": {"code": "R623dc", "per": 2},
+    "wallet": {"code": "PKG-8-Wallets"},
     "8x10-team": {"same_as": "8x10"}, "5x7-team": {"same_as": "5x7"},
     "misc-magnet-4x5": {"code": "MAG45"}, "misc-magnet-5x7": {"code": "MAG57"},
     "misc-mini-wallets-8": {"code": ""}, "misc-wallet-magnets-4": {"code": ""},
-    "misc-photo-key-ring": {"code": ""}, "misc-photo-badge": {"code": ""},
+    "misc-photo-key-ring": {"code": "R606-2"}, "misc-photo-badge": {"code": "R73"},
 }
 
 
@@ -787,22 +787,22 @@ roes:
     misc-photo-badge:      {name: "Photo Badge",         code: "BADGE"}
 
 # Meridian bulk order CSV (Orders > Lab order > Meridian bulk order). The codes
-# come from Meridian's product list (keeperstudio/meridian/products.csv). per:
-# how many Meridian items one of ours is: a sheet of 8 wallets is two of their
-# "4-Wallets" (R623dc). Leave a code blank for something with no bulk-upload
-# product yet; Lab order lists those so you can order them on the website.
+# come from Meridian's product list (keeperstudio/meridian/products.csv). per
+# (optional): how many Meridian items one of ours is. Leave a code blank for
+# something with no bulk-upload product yet; Lab order lists those so you can
+# order them on the website.
 meridian:
   items:
     8x10:                  {code: R1680A}
     5x7:                   {code: RA1657}
     4x6:                   {code: R1646}
-    wallet:                {code: R623dc, per: 2}
+    wallet:                {code: PKG-8-Wallets}
     8x10-team:             {same_as: 8x10}
     5x7-team:              {same_as: 5x7}
     misc-magnet-4x5:       {code: MAG45}
     misc-magnet-5x7:       {code: MAG57}
     misc-mini-wallets-8:   {code: ""}
     misc-wallet-magnets-4: {code: ""}
-    misc-photo-key-ring:   {code: ""}
-    misc-photo-badge:      {code: ""}
+    misc-photo-key-ring:   {code: R606-2}
+    misc-photo-badge:      {code: R73}
 """

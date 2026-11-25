@@ -42,18 +42,20 @@ class MeridianTests(unittest.TestCase):
         self.assertEqual(left, [])
         self.assertEqual({r["item_id"] for r in rows}, {"1", "2"})
 
-    def test_wallet_sheet_is_two_4_wallets_and_team_uses_its_size(self):
+    def test_wallet_sheet_is_8_wallets_and_team_uses_its_size(self):
         p = plan(*[order(f"K{i}", lines=cart(("pkg-g", 1), ("ac-wallets-8", 1)), image=f"IMG_{i}", id=i) for i in range(3)],
                  teams={"U10": "IMG_9000"})
         rows, _ = M.plan_rows(p, CAT, SETTINGS, "W", lambda it: f"x/{it['file']}.JPG")
         by = {r["file_name"]: r for r in rows}
-        self.assertEqual((by["x/IMG_0_2_5x3_5.JPG"]["product_code"], by["x/IMG_0_2_5x3_5.JPG"]["quantity"]), ("R623dc", "2"))
+        self.assertEqual((by["x/IMG_0_2_5x3_5.JPG"]["product_code"], by["x/IMG_0_2_5x3_5.JPG"]["quantity"]), ("PKG-8-Wallets", "1"))
         self.assertEqual((by["x/IMG_9000_7x5.JPG"]["product_code"], by["x/IMG_9000_7x5.JPG"]["quantity"]), ("RA1657", "3"))
 
     def test_keepsakes_without_a_code_are_left_out(self):
-        p = plan(order(lines=cart(("misc-magnet-4x5", 2), ("misc-mini-wallets-8", 1)), image="IMG_1"))
+        p = plan(order(lines=cart(("misc-magnet-4x5", 2), ("misc-photo-key-ring", 1), ("misc-photo-badge", 1),
+                                  ("misc-mini-wallets-8", 1)), image="IMG_1"))
         rows, left = M.plan_rows(p, CAT, SETTINGS, "W", lambda it: f"x/{it['file']}.JPG")
-        self.assertEqual([(r["product_code"], r["quantity"], r["finish"]) for r in rows], [("MAG45", "2", "")])
+        self.assertEqual(sorted((r["product_code"], r["quantity"], r["finish"]) for r in rows),
+                         [("MAG45", "2", ""), ("R606-2", "1", ""), ("R73", "1", "")])
         self.assertEqual([(l["file"], "no Meridian product code" in l["why"]) for l in left], [("IMG_1_1_7x2_2", True)])
 
     def test_build_passes_meridians_checker(self):

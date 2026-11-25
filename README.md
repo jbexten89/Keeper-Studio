@@ -169,8 +169,10 @@ Ship / Pickup are set on that panel.
 
 Meridian's files live in `keeperstudio/meridian/`: their product list, designs,
 template, example, instructions and checker. The code each item is ordered as is
-under `meridian:` in Prices…: 8x10 `R1680A`, 5x7 `RA1657`, 4x6 `R1646`, a sheet of
-8 wallets = two `R623dc` (4-Wallets), team prints use their size's code, magnets
-`MAG45` / `MAG57`. Anything without a code (mini wallets, wallet magnets, key
-ring, badge: Meridian's bulk list has no matching product) is left out of the CSV
-and listed, so you can order it on the website.
+under `meridian:` in Prices…: 8x10 `R1680A`, 5x7 `RA1657`, 4x6 `R1646`, 8 wallets
+`PKG-8-Wallets`, team prints use their size's code, magnets `MAG45` / `MAG57`,
+key ring `R606-2` (plastic keychain, medium), photo badge `R73` (3" pin-back
+button). Memory Mates go as an individual 5x7 and a team 5x7, as before.
+Anything without a code (mini wallets, wallet magnets: Meridian's bulk list has
+no matching product) is left out of the CSV and listed, so you can order it on
+the website.
