@@ -412,6 +412,9 @@ kbd{font-size:10px}
 .st-pill.ok{background:#3CC77F;color:#04150B}.st-pill.short{background:var(--amber);color:#1A1206}.st-pill.manual{background:var(--accent);color:#03111E}
 .st-pill.review{background:var(--reject);color:#fff}.st-pill.none{background:#22262D;color:var(--muted)}
 .crop-spin{position:absolute;left:50%;bottom:24px;transform:translateX(-50%);background:rgba(17,19,23,.95);border:1px solid var(--border-2);border-radius:18px;padding:7px 14px;display:flex;align-items:center;gap:8px;color:var(--muted);z-index:3}
+.crop-job{position:absolute;left:50%;top:52px;transform:translateX(-50%);width:min(440px,80%);background:rgba(17,19,23,.96);border:1px solid var(--border-2);border-radius:10px;padding:10px 14px;z-index:4;display:flex;flex-direction:column;gap:7px}
+.crop-job .cj-top{display:flex;align-items:center;gap:10px}.crop-job .cj-top span{color:var(--muted);margin-right:auto;font-variant-numeric:tabular-nums}
+.crop-job .cj-sub{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .crop-spin span{width:12px;height:12px;border-radius:50%;border:2px solid var(--accent);border-right-color:transparent;animation:spin .8s linear infinite}
 #cropAdj{position:absolute;inset:0}
 .adj-box{position:absolute;box-shadow:0 0 0 9999px rgba(5,6,8,.66);outline:2px solid var(--accent);cursor:move;touch-action:none}
@@ -2529,7 +2532,7 @@ const Crop = {
       v.innerHTML = `<div class="crop-stage" id="cropStage">
         <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
         <div class="crop-canvas cmp" id="cropCmp" hidden><img id="cropCmpImg" alt="" draggable="false"><svg id="cropCmpSvg" preserveAspectRatio="none"></svg><span class="cmp-tag" id="cmpTagR"></span></div>
-        <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div></div>`;
+        <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div><div class="crop-job" id="cropJob" hidden></div></div>`;
       this.bindAdjust();
     }
     const p = this.active(); const stage = $('#cropStage');
@@ -2537,7 +2540,8 @@ const Crop = {
     $('#cropCanvas').hidden = false;
     if (!this.plans.has(p.path) && !this.inflight.has(p.path)) setTimeout(() => this.ensurePlan(p), 0);
     const plan = this.plans.get(p.path);
-    $('#cropSpin').hidden = !this.inflight.has(p.path) || !!plan;
+    $('#cropSpin').hidden = !this.inflight.has(p.path) || !!plan || !!this.job;
+    this.paintJob();
     const W = (plan && plan.size && plan.size[0]) || p.w || 3, H = (plan && plan.size && plan.size[1]) || p.h || 2;
     const cmp = this.compare && !this.adjusting, gap = 16;
     const sw = cmp ? (stage.clientWidth - 48 - gap) / 2 : stage.clientWidth - 48, sh = stage.clientHeight - 96;
@@ -2601,6 +2605,18 @@ const Crop = {
     $('#cropHud').innerHTML = `<div class="hud-left">${st ? `<span class="st-pill ${st.cls}">${st.icon} ${plan.status === 'review' ? 'Needs review — ' + esc(plan.label) : st.label}</span>` : plan && plan.error ? `<span class="st-pill review">! ${esc(plan.error)}</span>` : '<span class="st-pill none">Checking framing…</span>'}
       <span class="hud-name">${esc(p.name)}</span><span class="muted">${i != null ? `${i + 1} of ${S.view.length}` : ''}</span></div>
       ${this.adjusting ? `<div class="hud-right"><span class="muted">${this.group ? 'Draw around the whole team · drag a corner to resize' : 'Drag or arrow keys to move (Shift = faster) · corner or + − to resize'}</span><button class="btn sm" data-crop="adj-cancel">Cancel</button><button class="btn sm primary" data-crop="adj-apply">Apply</button></div>` : ''}`;
+  },
+  // A real progress bar on the photo while Check framing or Export prints runs.
+  paintJob() {
+    const el = $('#cropJob'); if (!el) return;
+    const s = this.job && this.jobState && !this.jobState.finished ? this.jobState : null;
+    el.hidden = !s; if (!s) return;
+    const verb = this.jobKind === 'analyze' ? 'Checking framing' : 'Exporting prints';
+    const f = s.total ? s.done / s.total : 0, starting = !s.done && (s.busy || s.message);
+    el.innerHTML = `<div class="cj-top"><b>${verb}</b><span>${s.total ? `${s.done} of ${s.total}` : ''}${s.eta ? ` · about ${fmtDur(s.eta)} left` : ''}</span>
+        <button class="btn sm" data-cancel-job="${s.id}">Cancel</button></div>
+      <div class="prog ${starting ? 'busy' : ''}"><div class="bar" style="width:${(f * 100).toFixed(1)}%"></div></div>
+      <div class="cj-sub">${esc(starting ? (s.message || 'Loading face detector…') : (s.current || ''))}</div>`;
   },
   /* ---------- straighten ---------- */
   livePreview(deg) {
@@ -2843,7 +2859,11 @@ const Crop = {
     const nTeam = S.photos.filter(p => getMeta(p.key).team).length;
     S.selected = new Set(ids); S.active = ids[0]; S.anchor = ids[0]; this.scope = 'selected';
     refreshSelection(); renderLeft();
-    toast(`${plural(ids.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')} selected. Crop will check and export just these.`, 5000);
+    // You've chosen what to crop, so start checking any of them not checked yet.
+    const unchecked = ids.filter(id => !this.status.has(S.byId.get(id).path)).length;
+    const start = unchecked && !this.job;
+    toast(`${plural(ids.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')} selected.${start ? ` Checking framing on ${plural(unchecked, 'photo')} not checked yet.` : ' Crop will check and export just these.'}`, 5000);
+    if (start) this.analyze();
   },
   async setOut(path, custom) {
     this.outDir = path; this.outCustom = custom;
@@ -2860,7 +2880,7 @@ const Crop = {
     const fin = await pollJob(id, s => {
       this.jobState = s;
       for (const it of s.items) { const v = { status: it.status, label: it.label, reason: it.reason, src: 'check' }; this.status.set(it.path, v); batch.push([it.path, v]); if (it.plan) this.plans.set(it.path, it.plan); }
-      if (S.module === 'crop') { renderLeft(); schedule(R_CELLS); }
+      if (S.module === 'crop') { renderLeft(); schedule(R_CELLS); this.paintJob(); }
     });
     DB.putMany('cropstatus', batch).catch(() => {});
     this.job = null; this.jobState = null; renderAll();
@@ -2880,7 +2900,7 @@ const Crop = {
     const fin = await pollJob(id, s => {
       this.jobState = s;
       for (const it of s.items) { const v = { status: it.status, label: it.label, reason: it.reason, src: 'export' }; this.status.set(it.path, v); batch.push([it.path, v]); }
-      if (S.module === 'crop') { renderLeft(); schedule(R_CELLS); }
+      if (S.module === 'crop') { renderLeft(); schedule(R_CELLS); this.paintJob(); }
     });
     DB.putMany('cropstatus', batch).catch(() => {});
     this.job = null; this.jobState = null;
