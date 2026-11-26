@@ -878,6 +878,8 @@ async function api(path, body) {
 const enc = encodeURIComponent;
 const EDIT_VER = new Map();  // path -> retouch time, so a retouched photo's pictures refresh
 const ev = path => { const v = EDIT_VER.get(path); return v ? `&v=${v}` : ''; };
+// Features Jamie doesn't use: hidden from the menus, code kept so they can come back.
+const HIDDEN = new Set(['roes', 'import']);
 const thumbUrl = (path, s = 400) => `/thumb?p=${enc(path)}&s=${s}&t=${KS_TOKEN}${ev(path)}`;
 const previewUrl = (path, s = 2048) => `/preview?p=${enc(path)}&s=${s}&t=${KS_TOKEN}${ev(path)}`;
 const fullUrlFor = path => `/full?p=${enc(path)}&t=${KS_TOKEN}${ev(path)}`;
@@ -4425,13 +4427,13 @@ const Ord = {
         <button data-ord="edit-shoot" data-id="${this.sid || ''}">Edit shoot…<em>name, date, paid on picture day</em></button>
         <button data-ord="extras">School &amp; other orders…<em>free or paid prints not on an envelope</em></button>
         <button data-ord="prices">Prices…<em>packages, prices, lab codes</em></button>
-        <hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button></div></div>
+        ${HIDDEN.has('import') ? '' : `<hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button>`}</div></div>
       <div class="dd"><button class="btn sm" data-dd ${dis}>Export ▾</button><div class="dd-menu right">
         <button data-ord="summary">Shoot summary<em>totals, teams, payments, what sold, who owes</em></button>
         <button data-oexp="pull">Pull sheet<em>one row per athlete, to stuff envelopes from</em></button>
         <button data-oexp="crop">Crop list<em>only the sizes families bought</em></button>
         <hr><button data-oexp="items">Orders CSV<em>one row per item, for the books</em></button>
-        <button data-oexp="roes">ROES file${unm ? ' ⚠' : ''}<em>${unm ? `${unm} items still need a ROES code` : 'older ROES event import'}</em></button></div></div>`;
+        ${HIDDEN.has('roes') ? '' : `<button data-oexp="roes">ROES file${unm ? ' ⚠' : ''}<em>${unm ? `${unm} items still need a ROES code` : 'older ROES event import'}</em></button>`}</div></div>`;
   },
   key(e, k) {
     if (modalOpen()) return false;
