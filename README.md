@@ -172,7 +172,7 @@ build reuses it. A model an older build downloaded beside its exe
   scans and thumbnails (`library.py`), the catalog (`catalog.py`), orders
   (`orders.py` for prices and everything worked out from an order,
   `orderbook.py` for storage, `order_routes.py` for the endpoints), and the
-  interface (`ui/index.html`), shown in a native window by pywebview (`app.py`).
+  interface (`ui/index.html`, with its styles in `ui/app.css` and one script per tab in `ui/js/`), shown in a native window by pywebview (`app.py`).
 * `tests/`: `python -m unittest discover tests`. The order tests are the
   website's own pricing, pull-sheet, crop-list and ROES cases, and run on every
   build.

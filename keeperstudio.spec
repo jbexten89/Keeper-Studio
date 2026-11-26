@@ -40,6 +40,8 @@ a = Analysis(
     binaries=mediapipe_libs + extra_bins,
     datas=[
         ("keeperstudio/ui/index.html", "ui"),
+        ("keeperstudio/ui/app.css", "ui"),
+        ("keeperstudio/ui/js/*.js", "ui/js"),
         ("assets/keeper-studio.ico", "assets"),
         *[(str(f), "keeperstudio/meridian") for f in Path("keeperstudio/meridian").iterdir() if f.suffix in (".csv", ".py", ".md")],
         *mediapipe_data, *extra_datas, *metadata,

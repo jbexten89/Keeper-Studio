@@ -64,10 +64,14 @@ def _selftest() -> int:
         det = detectors.build(cfg.detector["name"], cfg.detector)
         det.detect(np.zeros((240, 320, 3), dtype=np.uint8))
         det.close()
-        ui = paths.bundle_dir() / "ui" / "index.html"
-        lines.append(f"ui exists: {ui.is_file()}")
-        if not ui.is_file():
-            raise FileNotFoundError(ui)
+        ui = paths.bundle_dir() / "ui"
+        page = (ui / "index.html").read_text(encoding="utf-8")
+        import re as _re
+        needed = [ui / m for m in _re.findall(r'(?:src|href)="/ui/([^"?]+)', page)]
+        missing = [str(f) for f in needed if not f.is_file()]
+        lines.append(f"ui files: {len(needed) - len(missing)} of {len(needed)}")
+        if missing:
+            raise FileNotFoundError(", ".join(missing))
         import webview  # noqa: F401
         lines.append("pywebview: ok")
         if os.name == "nt":

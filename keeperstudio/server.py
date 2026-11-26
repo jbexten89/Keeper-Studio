@@ -92,6 +92,13 @@ class Handler(BaseHTTPRequestHandler):
             html = (paths.bundle_dir() / "ui" / "index.html").read_text(encoding="utf-8")
             html = html.replace("__KS_TOKEN__", TOKEN).replace("__KS_VERSION__", __version__)
             return self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        if u.path.startswith("/ui/"):  # the page's own stylesheet and scripts
+            ui = (paths.bundle_dir() / "ui").resolve()
+            f = (ui / u.path[4:]).resolve()
+            types = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+            if f.suffix in types and ui in f.parents and f.is_file():
+                return self._send(200, f.read_bytes(), types[f.suffix])
+            return self._send(404, b"not found", "text/plain")
         if not self._authorised(q):
             return self._send(403, b"forbidden", "text/plain")
         try:

@@ -46,6 +46,14 @@ jobs:
       - name: Unit tests
         run: python -m unittest discover tests -v
 
+      - name: Screen smoke test
+        # Opens every tab and clicks through Orders in a real browser against the
+        # app's own server; any script error on the page fails the build.
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install chromium
+          python tests/ui_smoke.py
+
       - name: Build
         run: pyinstaller --noconfirm keeperstudio.spec
 
