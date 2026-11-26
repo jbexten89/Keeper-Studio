@@ -16,7 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import retouch, __version__, engine, jobs, library, order_routes, paths
+from . import retouch, __version__, engine, jobs, library, order_routes, paths, workfile
 from .catalog import Catalog
 
 TOKEN = secrets.token_urlsafe(24)
@@ -205,6 +205,33 @@ def r_db_get(b):
     return {"value": catalog.get(b["store"], b["key"])}
 
 
+def _work_args(b):
+    photos = [{"path": str(p["path"]), "rel": str(p.get("rel") or Path(p["path"]).name), "size": int(p["size"])}
+              for p in b.get("photos") or []]
+    return str(b["root"]), photos
+
+
+def r_work_status(b):
+    root, photos = _work_args(b)
+    return workfile.status(catalog, root, photos)
+
+
+def r_work_save(b):
+    root, photos = _work_args(b)
+    return workfile.save(catalog, root, photos)
+
+
+def r_work_restore(b):
+    root, photos = _work_args(b)
+    if b.get("source") == "moved":
+        n = workfile.restore_moved(catalog, root, photos, str(b["folder"]))
+    else:
+        n = workfile.restore_from_file(catalog, root, photos)
+    rot = {k: float(v) for k, v in catalog.entries("rotate")}
+    engine.rotations.update(rot)
+    return {"restored": n, "save": workfile.save(catalog, root, photos)}
+
+
 def r_db_put(b):
     catalog.put_many(b["store"], [(k, v) for k, v in b["items"]])
     return {"ok": True}
@@ -381,6 +408,7 @@ def r_cutout_existing(b):
 
 ROUTES = {
     "/api/hello": r_hello, "/api/update-check": r_update_check, "/api/open-url": r_open_url,
+    "/api/work/status": r_work_status, "/api/work/save": r_work_save, "/api/work/restore": r_work_restore,
     "/api/db/entries": r_db_entries, "/api/db/get": r_db_get, "/api/db/put": r_db_put, "/api/db/del": r_db_del,
     "/api/dialog": r_dialog,
     "/api/library/open": r_open_folder, "/api/library/info": r_info,

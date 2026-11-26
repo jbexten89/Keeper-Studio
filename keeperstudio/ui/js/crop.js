@@ -232,7 +232,7 @@ const Crop = {
   async setRotation(deg) {
     const p = this.active(); if (!p) return;
     deg = Math.round(clamp(+deg, -10, 10) * 10) / 10;
-    try { await api('/api/crop/rotate', { path: p.path, angle: deg }); } catch (e) { return toast(esc(e.message)); }
+    try { await api('/api/crop/rotate', { path: p.path, angle: deg }); Work.schedule(); } catch (e) { return toast(esc(e.message)); }
     if (deg) this.rotations.set(p.path, deg); else this.rotations.delete(p.path);
     if (this.manual.has(p.path)) {  // a hand placement was drawn on the old angle
       this.manual.delete(p.path); DB.del('manual', p.path).catch(() => {});

@@ -1193,7 +1193,7 @@ function bindFilmSize() {
   g.addEventListener('dblclick', () => setFilmH(124, true));
 }
 function bindModuleEvents() {
-  $('#banners').addEventListener('click', e => { const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
+  $('#banners').addEventListener('click', e => { const w = e.target.closest('[data-banner-work]'); if (w) { const b = S.banners.find(x => x.id === 'work'); if (b) Work.restore(b.work); return; } const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
   bindFilmSize();
   $('#top').addEventListener('click', e => { const b = e.target.closest('[data-module]'); if (b) setModule(b.dataset.module); });
   const onClick = async e => {

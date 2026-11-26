@@ -129,6 +129,7 @@ def run() -> int:
         step("Orders: Export menu", lambda: pg.click("text=Export ▾"))
         step("Orders: shoot summary", lambda: pg.click(".dd-menu >> text=Shoot summary"), 1500)
         step("close the summary", lambda: pg.keyboard.press("Escape"))
+        step("save folder work (Ctrl+S)", lambda: pg.keyboard.press("Control+s"), 900)
         step("help sheet", lambda: pg.keyboard.press("?"))
         step("close help", lambda: pg.keyboard.press("?"))
         b.close()

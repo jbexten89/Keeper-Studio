@@ -44,11 +44,13 @@ const thumbUrl = (path, s = 400) => `/thumb?p=${enc(path)}&s=${s}&t=${KS_TOKEN}$
 const previewUrl = (path, s = 2048) => `/preview?p=${enc(path)}&s=${s}&t=${KS_TOKEN}${ev(path)}`;
 const fullUrlFor = path => `/full?p=${enc(path)}&t=${KS_TOKEN}${ev(path)}`;
 const fileUrl = (path, bust) => `/file?p=${enc(path)}&t=${KS_TOKEN}${bust ? '&v=' + bust : ''}`;
+const WORK_STORES = new Set(['meta', 'collections', 'manual', 'styles']);
+const workTouched = s => { if (WORK_STORES.has(s) && typeof Work !== 'undefined') Work.schedule(); };
 const DB = {
   get: (s, k) => api('/api/db/get', { store: s, key: k }).then(r => r.value),
-  put: (s, k, v) => api('/api/db/put', { store: s, items: [[k, v]] }),
-  del: (s, k) => api('/api/db/del', { store: s, key: k }),
-  putMany: (s, list) => list.length ? api('/api/db/put', { store: s, items: list }) : Promise.resolve(),
+  put: (s, k, v) => api('/api/db/put', { store: s, items: [[k, v]] }).then(r => (workTouched(s), r)),
+  del: (s, k) => api('/api/db/del', { store: s, key: k }).then(r => (workTouched(s), r)),
+  putMany: (s, list) => list.length ? api('/api/db/put', { store: s, items: list }).then(r => (workTouched(s), r)) : Promise.resolve(),
   entries: s => api('/api/db/entries', { store: s }).then(r => r.entries),
 };
 const baseName = p => String(p || '').split(/[\\/]/).pop();
@@ -265,6 +267,60 @@ async function openFolder() {
   if (path) loadFolder(path);
 }
 const openFiles = openFolder;
+/* ================= Folder work file ================= */
+// Marks also go into "Keeper Studio work.json" in the shoot folder, so they survive the
+// folder being moved, renamed or opened on another PC (see keeperstudio/workfile.py).
+const Work = {
+  timer: null, pending: null, ready: false, warned: false,
+  // rel: the photo's place inside the opened folder (not including the folder's own name), with / separators
+  rel(p) { const r = String(S.root || '').replace(/[\\/]+$/, ''), q = String(p.path); return (q.toLowerCase().startsWith(r.toLowerCase()) ? q.slice(r.length) : p.name).replace(/\\/g, '/').replace(/^\/+/, ''); },
+  args() { return { root: S.root, photos: S.photos.map(p => ({ path: p.path, rel: this.rel(p), size: p.size })) }; },
+  schedule() {
+    if (!S.root || !S.photos.length || !this.ready) return;
+    this.pending = this.args();
+    clearTimeout(this.timer); this.timer = setTimeout(() => this.flush(), 4000);
+  },
+  async flush(say) {
+    clearTimeout(this.timer); this.timer = null;
+    if (say && dirtyMeta.size) await flushMeta();  // marks typed in the last moment
+    const a = this.pending || (say && S.root ? this.args() : null); this.pending = null;
+    if (!a || !a.root) return;
+    try {
+      const r = await api('/api/work/save', a);
+      if (r.error) { if (say || !this.warned) toast(esc(r.error), 5000); this.warned = true; return; }
+      if (say) toast(r.zip ? 'Photos opened from a .zip can’t have a work file; their marks are kept in the catalog' : r.skipped ? 'Nothing marked in this folder yet, so there was nothing to save' : `Saved this folder's work (${plural(r.photos, 'marked photo')}) to “Keeper Studio work.json” in the folder`, 4500);
+    } catch (e) { if (say) toast(esc(e.message)); }
+  },
+  // After a folder opens: offer to restore marks saved with it, or left behind where it used to be.
+  async check(gen) {
+    this.ready = false;
+    S.banners = S.banners.filter(b => b.id !== 'work');
+    let st;
+    try { st = await api('/api/work/status', this.args()); } catch { this.ready = true; return; }
+    if (gen !== S.gen) return;
+    if (!st.marks_here && st.file && st.file.photos) {
+      const when = st.file.saved ? new Date(st.file.saved * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      S.banners.push({ id: 'work', cls: 'info', text: `This folder has saved work: marks on ${plural(st.file.photos, 'photo')}${when ? `, saved ${when}` : ''}${st.file.folder && st.file.folder !== S.root ? ` in “${st.file.folder}”` : ''}. Bring them back?`, work: { source: 'file', label: 'Restore marks' } });
+    } else if (!st.marks_here && st.moved) {
+      S.banners.push({ id: 'work', cls: 'info', text: `${plural(st.moved.photos, 'photo')} in this folder were marked before, in “${st.moved.folder}”. Bring those marks over?`, work: { source: 'moved', folder: st.moved.folder, label: 'Bring marks over' } });
+    }
+    renderBanners();
+    this.ready = true;
+    if (st.marks_here && !st.file) { this.pending = this.args(); this.flush(); }  // first time: start the work file for a shoot that already has marks
+  },
+  async restore(w) {
+    const btn = $('#banners [data-banner-work]'); if (btn) btn.disabled = true;
+    let r;
+    try { r = await api('/api/work/restore', { ...this.args(), source: w.source, folder: w.folder || '' }); }
+    catch (e) { if (btn) btn.disabled = false; return toast(esc(e.message)); }
+    S.banners = S.banners.filter(b => b.id !== 'work');
+    metaMap.clear(); collections = [{ id: QUICK, name: 'Quick Collection', keys: new Set(), smart: null, created: 0 }]; await loadStore();
+    Crop.manual.clear(); Crop.styles.clear(); Crop.rotations.clear(); await Crop.load();
+    recomputeView(); renderAll(); renderBanners();
+    toast(`Restored marks on ${plural(r.restored, 'photo')}`, 4000);
+  },
+};
+
 async function loadFolder(path) {
   setLoading(`Reading “${baseName(path)}”…`);
   let res;
@@ -283,6 +339,7 @@ window.KS_onDropPaths = async paths => {
 function setLoading(msg) { S.loadingMsg = msg; if (!S.photos.length) renderEmpty(); }
 
 function loadPhotos(res) {
+  if (Work.pending) Work.flush();
   S.gen++; clearGrid(); clearFilm();
   S.photos = []; S.byId.clear(); S.byKey.clear(); S.byPath = new Map(); S.selected = new Set(); S.active = null; S.anchor = null;
   S.skipped = 0; S.skippedExt = new Map(); S.undecodable = 0; S.failures = []; S.surveyIds = []; undoStack.length = 0; S.loadingMsg = '';
@@ -304,6 +361,7 @@ function loadPhotos(res) {
   Mods.libraryLoaded();
   renderAll();
   infoPass(S.gen);
+  if (S.photos.length) Work.check(S.gen);
   if (!S.photos.length) toast(S.skipped ? 'No photos Keeper Studio can read in that folder' : 'That folder has no photos');
   else toast(`Loaded ${plural(S.photos.length, 'photo')} from “${esc(res.name)}”`);
 }
@@ -604,7 +662,7 @@ function starsHTML(r, interactive, cls = '') {
   return `<span class="stars ${r ? '' : 'zero'} ${cls}">${s}</span>`;
 }
 function renderBanners() {
-  $('#banners').innerHTML = S.banners.map(b => `<div class="banner ${b.cls || 'amber'}" data-id="${b.id}"><span>${esc(b.text)}</span>${b.action ? `<button class="btn sm banner-act" data-banner-url="${esc(b.action.url)}">${esc(b.action.label)}</button>` : ''}<button data-dismiss="${b.id}" title="${b.id === 'update' ? 'Later' : 'Dismiss'}">✕</button></div>`).join('');
+  $('#banners').innerHTML = S.banners.map(b => `<div class="banner ${b.cls || 'amber'}" data-id="${b.id}"><span>${esc(b.text)}</span>${b.action ? `<button class="btn sm banner-act" data-banner-url="${esc(b.action.url)}">${esc(b.action.label)}</button>` : ''}${b.work ? `<button class="btn sm banner-act primary" data-banner-work style="margin-left:auto">${esc(b.work.label)}</button>` : ''}<button data-dismiss="${b.id}" title="${b.id === 'update' ? 'Later' : 'Dismiss'}">✕</button></div>`).join('');
 }
 function renderTop() {
   if ($('#top')._built) return; $('#top')._built = true;
@@ -1436,7 +1494,7 @@ function buildHelp() {
     ${g('Tabs', [['Library', 'Ctrl 1'], ['Retouch (eye swap)', 'Ctrl 2  Q'], ['Crop', 'Ctrl 3  R'], ['Orders', 'Ctrl 4'], ['Composite', 'Ctrl 5'], ['Extract', 'Ctrl 6']])}
     ${g('Crop', [['Adjust framing', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O'], ['Color side by side', 'C'], ['Next / previous photo', '← →']], 'crop')}
     ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Next / previous team (Analysis)', '↑ ↓'], ['Floating photo preview', 'V'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A'], ['Filmstrip photo (opens its envelope)', '← →']], 'orders')}
-    ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
+    ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['Save folder work now (it also saves itself)', 'Ctrl/⌘ S'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
   if (!buildHelp.bound) { $('#help').addEventListener('click', () => toggleHelp(false)); buildHelp.bound = true; }
 }
@@ -1613,6 +1671,7 @@ function onKey(e) {
   if (mod && k === 'a') { e.preventDefault(); return S.module === 'orders' ? Ord.selectAllRows() : selectAll(); }
   if (mod && k === 'd') { e.preventDefault(); return S.module === 'orders' ? Ord.clearMulti() : deselect(); }
   if (mod && k === 'o') { e.preventDefault(); return openFolder(); }
+  if (mod && k === 's' && !e.shiftKey) { e.preventDefault(); return Work.flush(true); }
   if (mod && k === 'n') { e.preventDefault(); return openCollDialog(); }
   if (mod && e.altKey && e.code === 'KeyB') { e.preventDefault(); return saveQuickAs(); }
   if (mod && /^[1-6]$/.test(e.key)) { e.preventDefault(); return setModule(MODULES[+e.key - 1][0]); }

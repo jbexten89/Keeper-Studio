@@ -106,6 +106,13 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   tries new prices on any item at once, with a setting for families who stop
   buying an item when its price goes up, and says how many buyers a raise
   could lose and still make the same profit. Hide it when you don't need it.
+* **Folder work file:** marks (flags, stars, labels, team photos, collections,
+  hand framing, rotations) are also saved in `Keeper Studio work.json` inside
+  the shoot folder, a few seconds after each change (Ctrl+S saves at once). If
+  a folder is moved, renamed or opened on another PC, the app offers to
+  restore them; for folders moved before this existed, it finds the same
+  photos (name and size) where they used to be and offers to bring their
+  marks over.
 * **Paid on picture day:** a shoot setting (Edit shoot; on for new shoots).
   Envelopes count as paid in full unless you type what a family paid or mark
   it Unpaid; Payments shows them as "Picture day".
