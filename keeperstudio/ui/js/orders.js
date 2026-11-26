@@ -764,12 +764,12 @@ const Ord = {
     $('#anSub').textContent = all ? `${plural(A.shoots, 'shoot')} · ${plural(s.n, 'envelope')} with an order` : plural(s.n, 'envelope') + ' with an order';
     if (!s.n) { box.innerHTML = `<div class="ord-empty"><h3>Nothing sold yet</h3><p>Analysis fills in as envelopes are typed in.</p></div>`; return; }
     const kp = [
-      ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : s.extra && s.extra.count ? `incl. ${fmt$(s.extra.sales_cents)} school & other` : plural(s.n, 'envelope')],
+      ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : [s.extra && s.extra.sales_cents ? `incl. ${fmt$(s.extra.sales_cents)} school & other` : plural(s.n, 'envelope'), s.short ? `after ${fmt$(s.short)} accepted short` : ''].filter(Boolean).join(' · ')],
       ['Average order', fmt$(s.avg), one ? `shoot ${fmt$(w.avg)}` : 'per envelope', one ? vs(s.avg, w.avg) : ''],
       ['Lab cost (est.)', fmt$(s.lab), `${pct(s.lab, s.sales)} of sales`],
       ['Shipping', one ? '—' : fmt$(s.shipping), one ? 'one charge for the shoot' : all ? 'all shoots' : 'from Totals'],
       ['Profit', fmt$(s.profit), one ? 'before shipping' : 'after shipping', s.profit < 0 ? 'an-neg' : 'an-good'],
-      ['Still owed', fmt$(s.due), s.due ? `${pct(s.due, s.sales)} of sales` : 'all paid', s.due ? 'an-lo' : 'an-good'],
+      ['Still owed', fmt$(s.due), [s.due ? `${pct(s.due, s.sales)} of sales` : 'all paid', s.short ? `${fmt$(s.short)} accepted short (${s.short_n})` : '', s.change ? `${fmt$(s.change)} change to give (${s.change_n})` : ''].filter(Boolean).join(' · '), s.due || s.change ? 'an-lo' : 'an-good'],
       ['Profit %', pct(s.profit, s.sales, 1), one ? `shoot ${pct(w.profit_before, w.sales, 1)} before shipping` : 'of sales', mc(s.sales ? s.profit / s.sales : null)]];
     const P = A.products, pk = P.filter(p => p.kind === 'package'), ac = P.filter(p => p.kind === 'alacarte'), ks = P.filter(p => p.kind === 'keepsake');
     const pkN = pk.reduce((t, p) => t + p.sold, 0), mx = Math.max(1, ...pk.map(p => p.sold));
@@ -792,7 +792,10 @@ const Ord = {
     const sizes = OT.length ? `<div class="an-card"><h4>Order sizes</h4><div class="an-bars">${buckets.map(b => bar(b[0], b[1], bmax, `${b[1]} · ${pct(b[1], OT.length)}`)).join('')}</div><div class="dim small" style="margin-top:8px">Middle order ${fmt$(H.median)} · average ${fmt$(s.avg)}</div></div>` : '';
     const glance = OT.length ? `<div class="an-card"><h4>At a glance</h4><div class="glance">${g('added a la carte prints', s.ac_env, s.n)}${g('added a keepsake', s.ks_env, s.n)}${g('bought 2+ packages', H.multi_pkg, s.n, 'Siblings, or both sides of the family')}${g('bought no package', H.no_pkg, s.n, 'A la carte or keepsakes only')}<div class="gl"><b>${H.items_avg}</b><span>items per envelope<em>packages, prints and keepsakes</em></span></div></div></div>` : '';
     const pays = A.payments, pmax = Math.max(1, s.n);
-    const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : 'grn')).join('') + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed</div>`;
+    const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : 'grn')).join('')
+      + (s.short ? bar('Accepted short', s.short_n, pmax, `${plural(s.short_n, 'env')} · ${fmt$(s.short)}`, 'mut') : '')
+      + (s.change ? bar('Change to give', s.change_n, pmax, `${plural(s.change_n, 'env')} · ${fmt$(s.change)}`, 'amb') : '')
+      + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed${s.short ? ` · ${fmt$(s.short)} let go` : ''}</div>`;
     const lab = p => p.lab_each == null ? null : p.lab_each;
     const each = p => { const l = lab(p); if (l == null || !p.sold) return l == null ? '<span class="dim" title="No Meridian price for it">not priced</span>' : ''; const avg = p.sales / p.sold, m = (avg - l) / avg; return `<span class="${mc(m)}">${fmt$(avg - l)} · ${Math.round(100 * m)}%</span>`; };
     const items = (list, envs, sales, what) => {

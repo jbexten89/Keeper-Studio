@@ -43,7 +43,10 @@ def _totals(orders: list[dict], shipping: int) -> dict:
         if "misc" in types:
             ks += 1
             ks_s += types["misc"]
+    short = [int(o["summary"].get("short_cents") or 0) for o in orders]
+    change = [int(o["summary"].get("change_cents") or 0) for o in orders]
     return {"envelopes": len(orders), "n": n, "sales": sales, "lab": lab, "paid": paid, "due": sales - paid,
+            "short": sum(short), "short_n": sum(1 for c in short if c), "change": sum(change), "change_n": sum(1 for c in change if c),
             "shipping": shipping, "profit_before": sales - lab, "profit": sales - lab - shipping,
             "avg": sales // n if n else 0, "ac_env": ac, "ks_env": ks, "ac_sales": ac_s, "ks_sales": ks_s,
             }
