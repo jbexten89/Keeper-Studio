@@ -298,6 +298,10 @@ def order_summary(order: dict, catalog: Catalog) -> dict:
     """Totals plus what is still owed. Payment is due on picture day."""
     t = calculate(order.get("lines"), catalog)
     paid = int(order.get("paid_cents") or 0)
+    # On a prepaid shoot an envelope with nothing typed in was paid in full on picture day.
+    auto = bool(order.get("prepaid")) and paid == 0 and not (order.get("paid_method") or "")
+    if auto:
+        paid = t["total_cents"]
     pk = []
     for l in t["lines"]:
         p = catalog.get(l["product_id"])
@@ -308,8 +312,17 @@ def order_summary(order: dict, catalog: Catalog) -> dict:
         if l["type"] != "package":
             name = short_label(catalog.get(l["product_id"]))
             extras.append(f"{l['qty']}× {name}" if l["qty"] > 1 else name)
-    return {**t, "paid_cents": paid, "due_cents": t["total_cents"] - paid,
+    return {**t, "paid_cents": paid, "due_cents": t["total_cents"] - paid, "paid_auto": auto,
             "packages": " + ".join(pk), "extras": ", ".join(extras)}
+
+
+def paid_label(order: dict, summary: dict | None = None) -> str:
+    """How an envelope was paid, in words."""
+    s = summary or order.get("summary") or {}
+    if s.get("paid_auto"):
+        return "Picture day"
+    m = order.get("paid_method") or ""
+    return "Not paid" if m in ("", "none") else m.title()
 
 
 # ------------------------------------------------- prints (pull sheet) --
@@ -364,7 +377,18 @@ def expand(order: dict, catalog: Catalog) -> dict:
 
 
 def _sort_key(o: dict):
-    return (str(o.get("team") or "").lower(), str(o.get("athlete") or "").lower())
+    """Teams in the shoot's own order (team_rank, set when loaded), then A-Z; athletes A-Z."""
+    return (int(o.get("team_rank", 10_000)), str(o.get("team") or "").lower(), str(o.get("athlete") or "").lower())
+
+
+def team_ranks(orders: list[dict]) -> dict[str, int]:
+    return {o.get("team") or "": int(o.get("team_rank", 10_000)) for o in orders}
+
+
+def by_team_order(names, orders: list[dict]):
+    """Team names in the shoot's own order; ones it doesn't know go last, A-Z."""
+    r = team_ranks(orders)
+    return sorted(names, key=lambda t: (t in ("", "No team"), r.get(t, 10_000), str(t).lower()))
 
 
 def pull_sheet_csv(orders: list[dict], catalog: Catalog) -> str:
@@ -400,10 +424,11 @@ def line_items_csv(orders: list[dict], catalog: Catalog) -> str:
     """One row per item bought, like the website's /admin export, for the books."""
     rows = [["Envelope", "Team", "Athlete", "Coach", "Item", "Qty", "Unit price", "Line total", "Paid by", "Parent", "Phone", "Email", "Notes"]]
     for o in sorted(orders, key=_sort_key):
+        s = order_summary(o, catalog)
         for l in calculate(o.get("lines"), catalog)["lines"]:
             rows.append([str(o.get("envelope") or ""), o.get("team") or "", o.get("athlete") or "", o.get("coach") or "",
                          l["label"], str(l["qty"]), money(l["unit_cents"]), money(l["line_cents"]),
-                         (o.get("paid_method") or "Not paid").title(), o.get("parent") or "", o.get("phone") or "",
+                         paid_label(o, s), o.get("parent") or "", o.get("phone") or "",
                          o.get("email") or "", o.get("notes") or ""])
     return to_csv(rows)
 
@@ -461,7 +486,7 @@ def crop_list(orders: list[dict], catalog: Catalog, team_photos: dict | None = N
         athletes.append({"order_id": o.get("id"), "envelope": o.get("envelope"), "athlete": o.get("athlete") or "",
                          "team": o.get("team") or "", "frame": frame, "glasses": bool(o.get("glasses")), "jobs": jobs})
     team_list = []
-    for name in sorted(teams, key=str.lower):
+    for name in by_team_order(teams, orders):
         frame = frame_stem(team_photos.get(name))
         sizes = [{"size": s, "crop": catalog.crop_team.get(s, s), "label": f"{PRINT_SIZES[s]['label']} Team",
                   "ordered_by": n} for s, n in sorted(teams[name].items(), key=lambda kv: -kv[1])]

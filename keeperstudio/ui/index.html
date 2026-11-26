@@ -711,6 +711,8 @@ textarea:focus{border-color:var(--accent)}
 .tot-mini{display:none;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;font-size:12.5px;color:var(--muted)}.tot-mini b{color:var(--text);font-weight:600}.tot-mini b.due{color:var(--amber)}
 .tot-mini .linkish{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit}
 .sec.mini .tot-mini{display:flex}.sec.mini .tot-grid,.sec.mini .tot-btns{display:none}
+.row.dragging{opacity:.4}.row.drop-above{box-shadow:inset 0 2px 0 var(--accent)}.row.drop-below{box-shadow:inset 0 -2px 0 var(--accent)}
+.hdr-btn.az{font-size:11px;font-variant:normal;letter-spacing:0;padding:1px 6px}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}
 .an-kpis{grid-template-columns:repeat(7,minmax(0,1fr))!important}
@@ -2313,6 +2315,7 @@ function bindEvents() {
   $('#left').addEventListener('click', e => {
     const t = e.target;
     if (t.closest('[data-newcoll]')) { e.stopPropagation(); return openCollDialog(); }
+    if (t.closest('[data-teamaz]')) { e.stopPropagation(); return Ord.teamSortAZ(); }
     if (t.closest('[data-saveqc]')) { e.stopPropagation(); return saveQuickAs(); }
     const ed = t.closest('[data-edit]'); if (ed) { e.stopPropagation(); return openCollDialog(ed.dataset.edit); }
     const dl = t.closest('[data-delete]'); if (dl) { e.stopPropagation(); return deleteColl(dl.dataset.delete); }
@@ -2365,6 +2368,17 @@ function bindEvents() {
   const ro = new ResizeObserver(() => schedule(R_CELLS | R_ALL));
   ro.observe($('#viewport')); ro.observe($('#filmScroll'));
   new ResizeObserver(() => { if (S.module === 'orders') Ord.fitLeft(); }).observe($('#left'));
+  // Orders: drag a team in the Teams list to reorder
+  let tDrag = null;
+  $('#left').addEventListener('dragstart', e => { const r = e.target.closest && e.target.closest('[data-tdrag]'); if (!r) return; tDrag = r.dataset.tdrag; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', tDrag); r.classList.add('dragging'); });
+  $('#left').addEventListener('dragover', e => { if (tDrag == null) return; const r = e.target.closest('[data-tdrag]'); if (!r) return; e.preventDefault();
+    $$('#left .drop-above,#left .drop-below').forEach(x => x.classList.remove('drop-above', 'drop-below'));
+    const b = r.getBoundingClientRect(); r.classList.add(e.clientY < b.top + b.height / 2 ? 'drop-above' : 'drop-below'); });
+  $('#left').addEventListener('drop', e => { if (tDrag == null) return; e.preventDefault(); const r = e.target.closest('[data-tdrag]'); const name = tDrag; tDrag = null;
+    if (!r || r.dataset.tdrag === name) return renderLeft();
+    const above = r.classList.contains('drop-above'), names = Ord.d.teams.map(t => t.name).filter(t => t !== name), i = names.indexOf(r.dataset.tdrag);
+    Ord.dropTeam(name, above ? r.dataset.tdrag : (names[i + 1] ?? null)); });
+  $('#left').addEventListener('dragend', () => { tDrag = null; $$('#left .dragging,#left .drop-above,#left .drop-below').forEach(x => x.classList.remove('dragging', 'drop-above', 'drop-below')); });
 
   document.addEventListener('keyup', e => { const c = e.getModifierState && e.getModifierState('CapsLock'); if (c !== S.caps) { S.caps = c; syncToolbar(); } });
   document.addEventListener('keydown', onKey);
@@ -3340,6 +3354,23 @@ const Ord = {
   },
   // Put a photo in front in the filmstrip without touching the envelope.
   // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
+  prepaid() { const sh = this.shoot(); return !!(sh && sh.prepaid); },
+  // ---------- team order ----------
+  async setTeamOrder(names) {
+    try { await api('/api/orders/team-order', { shoot_id: this.sid, teams: names }); } catch (e) { return toast(esc(e.message)); }
+    await this.refresh(); this.render();
+  },
+  moveTeam(name, d) {
+    const ns = this.d.teams.map(t => t.name), i = ns.indexOf(name), j = i + d;
+    if (i < 0 || j < 0 || j >= ns.length) return;
+    [ns[i], ns[j]] = [ns[j], ns[i]]; this.setTeamOrder(ns);
+  },
+  teamSortAZ() { this.setTeamOrder(this.d.teams.map(t => t.name).sort(collator.compare)); },
+  dropTeam(name, before) {
+    const ns = this.d.teams.map(t => t.name).filter(t => t !== name);
+    const k = before == null ? ns.length : ns.indexOf(before);
+    ns.splice(k < 0 ? ns.length : k, 0, name); this.setTeamOrder(ns);
+  },
   // Analysis: up/down walks the Teams list on the left (All teams first).
   stepTeam(d) {
     const ids = [...new Set($$('#left [data-oteam]').map(x => x.dataset.oteam))];
@@ -3531,16 +3562,17 @@ const Ord = {
   },
   // ---------- shoots & teams ----------
   editShoot(isNew, id) {
-    const s = isNew ? { name: '', date: new Date().toISOString().slice(0, 10), season: '', notes: '' } : (this.shoots.find(x => x.id === (id || this.sid)) || {});
+    const s = isNew ? { name: '', date: new Date().toISOString().slice(0, 10), season: '', notes: '', prepaid: 1 } : (this.shoots.find(x => x.id === (id || this.sid)) || {});
     openModal(`<h3>${isNew ? 'New shoot' : 'Shoot'}</h3>
       <label class="fld"><span>Name</span><input id="shName" value="${esc(s.name)}" placeholder="e.g. Montpelier Basketball" autofocus spellcheck="false"></label>
       <div style="display:flex;gap:12px"><label class="fld" style="flex:1"><span>Picture day</span><input id="shDate" type="date" value="${esc(s.date)}"></label>
       <label class="fld" style="flex:1"><span>Season</span><input id="shSeason" value="${esc(s.season)}" placeholder="Winter 2026"></label></div>
       <label class="fld"><span>Notes</span><textarea id="shNotes" rows="3">${esc(s.notes)}</textarea></label>
+      <label class="chk" style="margin:4px 0 2px"><input type="checkbox" id="shPrepaid" ${s.prepaid ? 'checked' : ''}> Families pay on picture day <span class="muted small">— envelopes count as paid in full unless you type what they paid or mark them Unpaid</span></label>
       <div class="m-actions">${isNew ? '' : `<button class="btn" id="shDel" style="margin-right:auto">Delete…</button><button class="btn" id="shArch">${s.archived ? 'Unarchive' : 'Archive'}</button>`}<button class="btn" data-close>Cancel</button><button class="btn primary" data-ok>${isNew ? 'Create' : 'Save'}</button></div>`, card => {
       const go = async extra => {
-        const body = { ...(isNew ? {} : { id: s.id, archived: s.archived }), name: $('#shName', card).value, date: $('#shDate', card).value, season: $('#shSeason', card).value, notes: $('#shNotes', card).value, ...extra };
-        try { const r = await api('/api/orders/shoot/save', { shoot: body }); this.shoots = r.shoots; closeModal(); if (isNew) await this.pickShoot(r.shoot.id); else this.render(); }
+        const body = { ...(isNew ? {} : { id: s.id, archived: s.archived }), name: $('#shName', card).value, date: $('#shDate', card).value, season: $('#shSeason', card).value, notes: $('#shNotes', card).value, prepaid: $('#shPrepaid', card).checked, ...extra };
+        try { const r = await api('/api/orders/shoot/save', { shoot: body }); this.shoots = r.shoots; closeModal(); if (isNew) await this.pickShoot(r.shoot.id); else { if (s.id === this.sid) await this.refresh(); this.render(); } }
         catch (e) { toast(esc(e.message)); }
       };
       $('[data-ok]', card).addEventListener('click', () => go({}));
@@ -4079,8 +4111,8 @@ const Ord = {
     const sh = this.shoots.filter(s => showArch || !s.archived || s.id === this.sid).map(s => `<div class="row ${s.id === this.sid ? 'on' : ''} ${s.archived ? 'arch' : ''}" data-oshoot="${s.id}" ${s.archived ? 'title="Archived"' : ''}><span class="two"><span class="lbl">${esc(s.name)}${s.archived ? '<span class="arch-tag">Archived</span>' : ''}</span><span class="sub">${esc([fmtDay(s.date), s.season && !(s.date && String(s.season).trim() === String(s.date).slice(0, 4)) ? s.season : ''].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
     let html = sectionHTML('o-shoots', 'Shoots', (sh || '<div class="hint">A shoot is one picture day: its envelopes, teams and lab order.</div>') + `<div class="pad shoot-foot"><button class="btn sm" data-ord="new-shoot">New shoot…</button>${nArch ? `<label class="arch-sw" title="Archived shoots are kept; this only hides them from the list"><input type="checkbox" data-ord-arch ${showArch ? 'checked' : ''}> Show archived (${nArch})</label>` : ''}</div>`);
     if (this.d) {
-      const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
-      html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
+      const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}" draggable="true" data-tdrag="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-up" data-team="${esc(x.name)}" title="Move up">↑</button><button data-ord="team-down" data-team="${esc(x.name)}" title="Move down">↓</button><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
+      html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`, this.d.teams.length > 1 ? `<button class="hdr-btn az" data-teamaz title="Sort the teams A–Z (drag a team, or use ↑ ↓, to put them in your own order)">A–Z</button>` : '');
       const T = this.d.totals;
       html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad tot-btns"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button><button class="btn sm" data-ord="extras" title="Prints for the school, the park, teachers or a sponsor — free or paid — that aren't on any envelope">School &amp; other orders…</button></div>`);
     }
@@ -4172,8 +4204,9 @@ const Ord = {
     </div></div>`;
   },
   totalHTML(pr, d) {
-    const due = pr.total - (d.paid_cents || 0);
-    const st = !pr.total ? '' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
+    const auto = this.prepaid() && !d.paid_cents && !d.paid_method;
+    const due = auto ? 0 : pr.total - (d.paid_cents || 0);
+    const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
     return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span><div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
@@ -4223,7 +4256,7 @@ const Ord = {
       ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
-      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="0.00" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
+      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', this.prepaid() ? [['', 'Picture day'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card'], ['none', 'Unpaid']] : [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${this.prepaid() && !d.paid_method ? 'paid in full' : '0.00'}" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
       ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
       ${warn}
@@ -4424,7 +4457,7 @@ function bindModuleEvents() {
       else if (name === 'ordView') Ord.setView(v);
       else if (name === 'anScope') { Ord.anScope = v; renderView(); }
       else if (name === 'merDelivery') Ord.merSet('delivery', v);
-      else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v ? Ord.price(d.lines).total : 0; Ord.changed(true); }
+      else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v && v !== 'none' ? Ord.price(d.lines).total : 0; Ord.changed(true); }
       else if (name === 'rtStep') Ret.setStep(v);
       else if (name === 'rtMode') { Ret.brush.erase = v === 'erase'; Ret.right(); }
       return;
@@ -4489,7 +4522,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

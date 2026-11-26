@@ -106,6 +106,13 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   tries new prices on any item at once, with a setting for families who stop
   buying an item when its price goes up, and says how many buyers a raise
   could lose and still make the same profit. Hide it when you don't need it.
+* **Paid on picture day:** a shoot setting (Edit shoot; on for new shoots).
+  Envelopes count as paid in full unless you type what a family paid or mark
+  it Unpaid; Payments shows them as "Picture day".
+* **Team order:** teams are listed in the order you first used them. Drag a
+  team in the Teams list, or use its ↑ ↓, to rearrange; A–Z sorts them. That
+  order is used everywhere: the envelope list, lab and Meridian orders, the
+  pull sheet, the shoot summary and Analysis.
 * **School & other orders…** (under Totals) are prints that aren't on any
   envelope: for the school, the park, teachers or a sponsor. Each item is a
   size (4x6 to 16x20) and a Meridian product (print, standout, canvas, metal…)

@@ -363,3 +363,43 @@ class OrderBookTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrepaidAndTeamOrderTests(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from keeperstudio.orderbook import OrderBook
+        self.d = tempfile.TemporaryDirectory()
+        self.b = OrderBook(Path(self.d.name) / "o.sqlite3")
+
+    def tearDown(self):
+        self.b.close()
+        self.d.cleanup()
+
+    def test_new_shoots_are_prepaid_and_blank_envelopes_count_as_paid(self):
+        sid = self.b.save_shoot({"name": "Fall"})["id"]
+        self.assertEqual(self.b.shoots()[0]["prepaid"], 1)
+        self.b.save_order(sid, {"athlete": "A", "lines": cart(("pkg-a", 1))})
+        self.b.save_order(sid, {"athlete": "B", "lines": cart(("pkg-a", 1)), "paid_cents": 1000, "paid_method": "cash"})
+        self.b.save_order(sid, {"athlete": "C", "lines": cart(("pkg-a", 1)), "paid_method": "none"})
+        s = {o["athlete"]: O.order_summary(o, CAT) for o in self.b.orders(sid)}
+        self.assertEqual((s["A"]["due_cents"], s["A"]["paid_auto"]), (0, True))
+        self.assertEqual(s["B"]["due_cents"], 4000 - 1000)
+        self.assertEqual(s["C"]["due_cents"], 4000)
+        self.assertEqual(O.paid_label({}, s["A"]), "Picture day")
+        self.b.save_shoot({"id": sid, "name": "Fall", "prepaid": False})
+        a = next(o for o in self.b.orders(sid) if o["athlete"] == "A")
+        self.assertEqual(O.order_summary(a, CAT)["due_cents"], 4000)
+
+    def test_team_order_is_creation_order_then_as_arranged(self):
+        sid = self.b.save_shoot({"name": "Fall"})["id"]
+        for t in ("Varsity", "JV", "Cheer"):
+            self.b.save_order(sid, {"athlete": t[0], "team": t})
+        self.assertEqual(self.b.team_order(sid), ["Varsity", "JV", "Cheer"])
+        self.b.set_team_order(sid, ["Cheer", "Varsity"])
+        self.assertEqual(self.b.team_order(sid), ["Cheer", "Varsity", "JV"])
+        self.b.rename_team(sid, "Cheer", "Cheerleading")
+        self.assertEqual(self.b.team_order(sid), ["Cheerleading", "Varsity", "JV"])
+        os_ = self.b.orders(sid)
+        self.assertEqual([o["team"] for o in sorted(os_, key=O._sort_key)], ["Cheerleading", "Varsity", "JV"])

@@ -212,7 +212,8 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
     for o in orders:
         teams.setdefault(o.get("team") or "No team", []).append(o)
     trows = []
-    for name in sorted(teams, key=str.lower):
+    from .orders import by_team_order
+    for name in by_team_order(teams, orders):
         os_ = teams[name]
         t_s, t_p, t_l = (sum(S(o, k) for o in os_) for k in ("total_cents", "paid_cents", "lab_cents"))
         trows.append(row(name, len(os_), _money(t_s), _money(t_p), _money(t_s - t_p), _money(t_l), _money(t_s - t_l),
@@ -225,11 +226,12 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
 
     methods: dict[str, list[int]] = {}
     for o in orders:
-        m = (o.get("paid_method") or "").title() or "Not paid"
+        from .orders import paid_label
+        m = paid_label(o)
         methods.setdefault(m, [0, 0])
         methods[m][0] += 1
         methods[m][1] += S(o, "paid_cents")
-    order_m = ["Cash", "Check", "Card", "Other", "Not paid"]
+    order_m = ["Picture day", "Cash", "Check", "Card", "Other", "Not paid"]
     mrows = [row(m, methods[m][0], _money(methods[m][1])) for m in sorted(methods, key=lambda m: order_m.index(m) if m in order_m else 9)]
     mrows.append(tot("TOTAL", len(orders), _money(paid)))
     sections.append({"heading": "Payments", "head": ["Paid by", "Envelopes", "Collected"],
@@ -273,7 +275,7 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
         orows = [row(o.get("envelope") or "", o.get("athlete") or "(no name)", o.get("team") or "",
                      _money(S(o, "total_cents")), _money(S(o, "paid_cents")), _money(S(o, "due_cents")),
                      o.get("parent") or "", o.get("phone") or "")
-                 for o in sorted(owed, key=lambda o: ((o.get("team") or "").lower(), (o.get("athlete") or "").lower()))]
+                 for o in sorted(owed, key=lambda o: (int(o.get("team_rank", 10_000)), (o.get("team") or "").lower(), (o.get("athlete") or "").lower()))]
         orows.append(tot("TOTAL", f"{len(owed)} envelope{'s' if len(owed) != 1 else ''}", "", "", "",
                          _money(sum(S(o, 'due_cents') for o in owed)), "", ""))
         head = ["Env", "Athlete", "Team", "Total", "Paid", "Due", "Parent", "Phone"]

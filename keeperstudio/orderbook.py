@@ -74,7 +74,7 @@ EXTRA_FIELDS = ("kind", "customer", "contact", "items", "paid_method", "paid_cen
 
 ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
                 "image", "edited", "notes", "paid_method", "paid_cents", "lines", "web_order")
-PAID_METHODS = ("", "cash", "check", "card", "other")
+PAID_METHODS = ("", "cash", "check", "card", "other", "none")  # "none": owes it all, even on a prepaid shoot
 
 
 class OrderBook:
@@ -96,6 +96,10 @@ class OrderBook:
         cols = {r["name"] for r in self._db.execute("PRAGMA table_info(shoots)")}
         if "shipping_cents" not in cols:
             self._db.execute("ALTER TABLE shoots ADD COLUMN shipping_cents INTEGER NOT NULL DEFAULT 0")
+        if "prepaid" not in cols:  # families pay inside the envelope on picture day
+            self._db.execute("ALTER TABLE shoots ADD COLUMN prepaid INTEGER NOT NULL DEFAULT 0")
+        if "team_order" not in cols:  # the order teams are listed in, as the user arranged them
+            self._db.execute("ALTER TABLE shoots ADD COLUMN team_order TEXT NOT NULL DEFAULT '[]'")
 
     def _daily_backup(self, folder: Path) -> None:
         try:
@@ -138,9 +142,11 @@ class OrderBook:
                 self._db.execute("UPDATE shoots SET name=?, date=?, season=?, notes=?, archived=? WHERE id=?",
                                  (*vals, int(data["id"])))
                 sid = int(data["id"])
-            else:
-                sid = self._db.execute("INSERT INTO shoots (name, date, season, notes, archived, created) VALUES (?,?,?,?,?,?)",
-                                       (*vals, time.time())).lastrowid
+                if "prepaid" in data:
+                    self._db.execute("UPDATE shoots SET prepaid=? WHERE id=?", (1 if data["prepaid"] else 0, sid))
+            else:  # new shoots: families pay on picture day unless told otherwise
+                sid = self._db.execute("INSERT INTO shoots (name, date, season, notes, archived, created, prepaid) VALUES (?,?,?,?,?,?,?)",
+                                       (*vals, time.time(), 0 if data.get("prepaid") is False else 1)).lastrowid
             self._db.commit()
             return dict(self._db.execute("SELECT * FROM shoots WHERE id=?", (sid,)).fetchone())
 
@@ -157,15 +163,51 @@ class OrderBook:
         d["glasses"] = bool(d.get("glasses"))
         return d
 
+    def _prepaid(self, sid: int) -> bool:
+        r = self._db.execute("SELECT prepaid FROM shoots WHERE id=?", (int(sid),)).fetchone()
+        return bool(r and r["prepaid"])
+
     def orders(self, sid: int) -> list[dict]:
+        rank = {t: i for i, t in enumerate(self.team_order(sid))}
         with self._lock:
             rows = self._db.execute("SELECT * FROM orders WHERE shoot_id=? ORDER BY id", (int(sid),)).fetchall()
-        return [self._row(r) for r in rows]
+            pre = self._prepaid(sid)
+        return [{**self._row(r), "prepaid": pre, "team_rank": rank.get(r["team"], 10_000)} for r in rows]
 
     def get(self, oid: int) -> dict | None:
         with self._lock:
             r = self._db.execute("SELECT * FROM orders WHERE id=?", (int(oid),)).fetchone()
-        return self._row(r) if r else None
+            pre = self._prepaid(r["shoot_id"]) if r else False
+        return {**self._row(r), "prepaid": pre} if r else None
+
+    # ---------------------------------------------------------- team order --
+    def team_order(self, sid: int) -> list[str]:
+        """Every team in the shoot: as arranged, then any others in the order they were first used."""
+        with self._lock:
+            r = self._db.execute("SELECT team_order FROM shoots WHERE id=?", (int(sid),)).fetchone()
+            saved = json.loads((r["team_order"] if r else "") or "[]")
+            seen = [x["team"] for x in self._db.execute(
+                "SELECT team, MIN(created) c FROM orders WHERE shoot_id=? AND team<>'' GROUP BY team ORDER BY c, team",
+                (int(sid),)).fetchall()]
+            photos = [x["team"] for x in self._db.execute(
+                "SELECT team FROM team_photos WHERE shoot_id=? ORDER BY rowid", (int(sid),)).fetchall()]
+        live = set(seen) | set(photos)
+        out = [t for t in saved if t in live]
+        for t in seen + photos:
+            if t not in out:
+                out.append(t)
+        return out
+
+    def set_team_order(self, sid: int, names: list[str]) -> list[str]:
+        clean = []
+        for n in names or []:
+            n = str(n or "").strip()
+            if n and n not in clean:
+                clean.append(n)
+        with self._lock:
+            self._db.execute("UPDATE shoots SET team_order=? WHERE id=?", (json.dumps(clean), int(sid)))
+            self._db.commit()
+        return self.team_order(sid)
 
     def next_envelope(self, sid: int) -> str:
         with self._lock:
@@ -308,6 +350,13 @@ class OrderBook:
             n = self._db.execute("UPDATE orders SET team=?, updated=? WHERE shoot_id=? AND team=?",
                                  (new, time.time(), int(sid), old)).rowcount
             exists = self._db.execute("SELECT 1 FROM team_photos WHERE shoot_id=? AND team=?", (int(sid), new)).fetchone()
+            r0 = self._db.execute("SELECT team_order FROM shoots WHERE id=?", (int(sid),)).fetchone()
+            if r0:
+                tord = json.loads(r0["team_order"] or "[]")
+                if old in tord:
+                    tord = [new if t == old else t for t in tord]
+                    self._db.execute("UPDATE shoots SET team_order=? WHERE id=?",
+                                     (json.dumps(list(dict.fromkeys(tord))), int(sid)))
             for r in self._db.execute("SELECT id, items FROM extra_orders WHERE shoot_id=?", (int(sid),)).fetchall():
                 items, hit = json.loads(r["items"] or "[]"), False
                 for it in items:

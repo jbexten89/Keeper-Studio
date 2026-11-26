@@ -116,7 +116,8 @@ def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents
 
     teams = []
     if not one:
-        names = sorted({o.get("team") or "" for o in orders}, key=lambda t: (t == "", t.lower()))
+        from .orders import by_team_order
+        names = by_team_order({o.get("team") or "" for o in orders}, orders)
         for t in names:
             tt = _totals([o for o in orders if (o.get("team") or "") == t], 0)
             teams.append({"team": t or "No team", "n": tt["n"], "envelopes": tt["envelopes"], "sales": tt["sales"],
@@ -129,7 +130,7 @@ def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents
         if su["total_cents"] <= 0 and not su["paid_cents"]:
             continue
         if su["paid_cents"] > 0:
-            m = (o.get("paid_method") or "other").title()
+            m = "Picture day" if su.get("paid_auto") else ("Other" if (o.get("paid_method") or "") in ("", "none") else o["paid_method"].title())
             pays.setdefault(m, [0, 0])
             pays[m][0] += 1
             pays[m][1] += su["paid_cents"]
@@ -137,9 +138,9 @@ def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents
             pays.setdefault("Not paid", [0, 0])
             pays["Not paid"][0] += 1
             pays["Not paid"][1] += su["due_cents"]
-    order_m = ["Cash", "Check", "Card", "Other", "Not paid"]
+    order_m = ["Picture day", "Cash", "Check", "Card", "Other", "Not paid"]
     payments = [{"method": m, "envelopes": v[0], "cents": v[1]}
-                for m, v in sorted(pays.items(), key=lambda kv: order_m.index(kv[0]) if kv[0] in order_m else 4)]
+                for m, v in sorted(pays.items(), key=lambda kv: order_m.index(kv[0]) if kv[0] in order_m else 5)]
 
     compare = None
     if one:

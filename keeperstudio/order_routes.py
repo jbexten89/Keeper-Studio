@@ -103,7 +103,7 @@ def r_list(b):
     paid += ex["paid_cents"]
     lab += ex["lab_cents"]
     keep = total - lab - ship
-    teams = sorted({o["team"] for o in rows if o["team"]} | set(photos), key=str.lower)
+    teams = book.team_order(sid)
     return {
         "orders": rows, "next_envelope": book.next_envelope(sid),
         "teams": [{"name": t, "image": (photos.get(t) or {}).get("image", ""),
@@ -117,6 +117,10 @@ def r_list(b):
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
     }
+
+
+def r_team_order(b):
+    return {"teams": book.set_team_order(int(b["shoot_id"]), b.get("teams") or [])}
 
 
 def r_shipping(b):
@@ -296,7 +300,7 @@ def r_extra_delete(b):
 def r_extras_copy(b):
     """Copy another shoot's school & other orders here, unpaid; team counts follow the team names."""
     sid, src = int(b["shoot_id"]), int(b["from_shoot_id"])
-    teams = sorted({o["team"] for o in book.orders(sid) if o["team"]} | set(book.team_photos(sid)), key=str.lower)
+    teams = book.team_order(sid)
     n = 0
     for e in book.extras(src):
         items = []
@@ -464,7 +468,7 @@ ROUTES = {
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
     "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
-    "/api/orders/rename-team": r_rename_team, "/api/orders/price": r_price,
+    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
