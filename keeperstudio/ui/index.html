@@ -701,6 +701,16 @@ textarea:focus{border-color:var(--accent)}
 .ex-foot{display:flex;gap:24px;align-items:center;padding:10px 2px 0;color:var(--text)}.ex-foot b{font-weight:600}
 .tot-grid .sub{font-size:12px;color:var(--muted);padding-left:8px}.tot-grid b.sub{font-weight:400}.tot-grid .link{cursor:pointer;color:var(--accent)}.tot-grid .link:hover{text-decoration:underline}
 .ord-scroll.an{padding:12px 14px}
+.an-kpis{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+.an-good{color:#46C77F}.an-neg{color:#E5534B}.an-t td.an-lo,.an-t td.an-good,.an-t td.an-neg{font-weight:600}
+.an-k{border-top:3px solid var(--border-2)}.an-k.an-good{border-top-color:#46C77F}.an-k.an-lo{border-top-color:var(--amber)}.an-k.an-neg{border-top-color:#E5534B}
+.an-k.an-good b{color:#46C77F}.an-k.an-lo b{color:var(--amber)}.an-k.an-neg b{color:#E5534B}.an-k i,.an-k s{color:var(--muted)!important}
+.an-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:-4px}.an-legend i{font-style:normal}.an-legend .cat{margin-left:auto}.an-legend .cat i{margin:0 2px 0 8px}
+.c-pk{--cat:#2F9BFF}.c-ac{--cat:#A98BFF}.c-ks{--cat:#3CC7B8}.an-legend .c-pk,.an-legend .c-ac,.an-legend .c-ks{color:var(--cat)}
+.an-card.c-pk,.an-card.c-ac,.an-card.c-ks{border-left:3px solid var(--cat)}.an-card.c-pk h4,.an-card.c-ac h4,.an-card.c-ks h4{color:var(--cat)}
+.an-hb .tr div.grn{background:#46C77F}
+@media (max-width:1500px){.an-kpis{grid-template-columns:repeat(4,minmax(0,1fr))!important}}
+
 .an-body{display:flex;flex-direction:column;gap:12px}
 .an-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
 .an-k{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
@@ -3308,6 +3318,16 @@ const Ord = {
   },
   // Put a photo in front in the filmstrip without touching the envelope.
   // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
+  // Analysis: up/down walks the Teams list on the left (All teams first).
+  stepTeam(d) {
+    const ids = [...new Set($$('#left [data-oteam]').map(x => x.dataset.oteam))];
+    if (!ids.length) return;
+    const i = ids.indexOf(this.team), j = Math.max(0, Math.min(ids.length - 1, (i < 0 ? 0 : i + d)));
+    if (j === i) return;
+    if (this.anScope === 'all') this.anScope = 'shoot';
+    this.pickTeam(ids[j]);
+    const el = $(`#left [data-oteam="${CSS.escape(ids[j])}"]`); if (el) el.scrollIntoView({ block: 'nearest' });
+  },
   pickTeam(name) {
     this.team = name; renderLeft(); renderView();
     const t = name !== 'all' && this.d ? this.d.teams.find(x => x.name === name) : null;
@@ -3901,16 +3921,20 @@ const Ord = {
     const A = this.an, box = $('#anBody'); if (!A || !box) return;
     const all = this.anScope === 'all', one = !all && A.team != null, s = A.selection, w = A.shoot, sh = this.shoot() || {};
     const pct = (a, b, d = 0) => b ? (100 * a / b).toFixed(d) + '%' : '—';
+    // Colors: green = strong, amber = worth a look, red = losing money. Margins: 70%+ green, under 50% amber.
+    const mc = m => m == null || !isFinite(m) ? '' : m < 0 ? 'an-neg' : m < .5 ? 'an-lo' : m >= .7 ? 'an-good' : '';
+    const vs = (v, ref) => !ref || v == null ? '' : v >= ref * 1.1 ? 'an-good' : v <= ref * .9 ? 'an-lo' : '';
     $('#anTtl').textContent = all ? 'All shoots' : `${sh.name || ''} · ${one ? A.team : 'All teams'}`;
     $('#anSub').textContent = all ? `${plural(A.shoots, 'shoot')} · ${plural(s.n, 'envelope')} with an order` : plural(s.n, 'envelope') + ' with an order';
     if (!s.n) { box.innerHTML = `<div class="ord-empty"><h3>Nothing sold yet</h3><p>Analysis fills in as envelopes are typed in.</p></div>`; return; }
     const kp = [
       ['Sales', fmt$(s.sales), one ? `${pct(s.sales, w.sales)} of the shoot` : s.extra && s.extra.count ? `incl. ${fmt$(s.extra.sales_cents)} school & other` : plural(s.n, 'envelope')],
-      ['Average order', fmt$(s.avg), one ? `shoot ${fmt$(w.avg)}` : 'per envelope'],
+      ['Average order', fmt$(s.avg), one ? `shoot ${fmt$(w.avg)}` : 'per envelope', one ? vs(s.avg, w.avg) : ''],
       ['Lab cost (est.)', fmt$(s.lab), `${pct(s.lab, s.sales)} of sales`],
       ['Shipping', one ? '—' : fmt$(s.shipping), one ? 'one charge for the shoot' : all ? 'all shoots' : 'from Totals'],
-      ['Profit', fmt$(s.profit), one ? 'before shipping' : 'after shipping'],
-      ['Profit %', pct(s.profit, s.sales, 1), one ? `shoot ${pct(w.profit_before, w.sales, 1)} before shipping` : 'of sales']];
+      ['Profit', fmt$(s.profit), one ? 'before shipping' : 'after shipping', s.profit < 0 ? 'an-neg' : 'an-good'],
+      ['Still owed', fmt$(s.due), s.due ? `${pct(s.due, s.sales)} of sales` : 'all paid', s.due ? 'an-lo' : 'an-good'],
+      ['Profit %', pct(s.profit, s.sales, 1), one ? `shoot ${pct(w.profit_before, w.sales, 1)} before shipping` : 'of sales', mc(s.sales ? s.profit / s.sales : null)]];
     const P = A.products, pk = P.filter(p => p.kind === 'package'), ac = P.filter(p => p.kind === 'alacarte'), ks = P.filter(p => p.kind === 'keepsake');
     const pkN = pk.reduce((t, p) => t + p.sold, 0), mx = Math.max(1, ...pk.map(p => p.sold));
     const bar = (l, v, max, r, cls = '') => `<div class="an-hb"><span>${l}</span><div class="tr"><div class="${cls}" style="width:${max ? 100 * v / max : 0}%"></div></div><em>${r}</em></div>`;
@@ -3922,28 +3946,29 @@ const Ord = {
         const na = c.team == null || c.shoot == null, same = !na && f(c.kind, c.team) === f(c.kind, c.shoot), up = !na && c.team > c.shoot;
         return `<tr><td>${esc(c.label)}</td><td>${f(c.kind, c.team)}</td><td>${f(c.kind, c.shoot)}</td><td class="nw ${na || same ? 'dim' : up ? 'an-up' : 'an-dn'}">${na ? '' : same ? '= same' : up ? '▲ above' : '▼ below'}</td></tr>`; }).join('')}</table>`;
     } else {
-      const tp = A.teams.reduce((t, x) => t + x.profit, 0);
-      cmp = `<h4>By team</h4><table class="an-t"><tr><th>Team</th><th>Env</th><th>Sales</th><th>Avg order</th><th>Profit</th><th>Profit %</th></tr>${A.teams.map(t => `<tr class="${all ? '' : 'click'}" ${all ? '' : `data-oteam="${esc(t.team === 'No team' ? '' : t.team)}"`}><td>${esc(t.team)}</td><td>${t.n}</td><td>${fmt$(t.sales)}</td><td>${fmt$(t.avg)}</td><td>${fmt$(t.profit)}</td><td>${t.profit_pct == null ? '—' : t.profit_pct.toFixed(1) + '%'}</td></tr>`).join('')}<tr class="tot"><td>All teams</td><td>${s.n}</td><td>${fmt$(s.sales)}</td><td>${fmt$(s.avg)}</td><td>${fmt$(tp)}</td><td>${pct(tp, s.sales, 1)}</td></tr></table><div class="dim small">Team profit is before shipping.${all ? '' : ' Click a team to see it on its own.'}</div>`;
+      const tp = A.teams.reduce((t, x) => t + x.profit, 0), fs = s.family_sales ?? s.sales;
+      cmp = `<h4>By team</h4><table class="an-t"><tr><th>Team</th><th>Env</th><th>Sales</th><th>Avg order</th><th>Profit</th><th>Profit %</th></tr>${A.teams.map(t => `<tr class="${all ? '' : 'click'}" ${all ? '' : `data-oteam="${esc(t.team === 'No team' ? '' : t.team)}"`}><td>${esc(t.team)}</td><td>${t.n}</td><td>${fmt$(t.sales)}</td><td class="${vs(t.avg, s.avg)}">${fmt$(t.avg)}</td><td class="${t.profit < 0 ? 'an-neg' : ''}">${fmt$(t.profit)}</td><td class="${mc(t.profit_pct == null ? null : t.profit_pct / 100)}">${t.profit_pct == null ? '—' : t.profit_pct.toFixed(1) + '%'}</td></tr>`).join('')}<tr class="tot"><td>All teams</td><td>${s.n}</td><td>${fmt$(fs)}</td><td>${fmt$(s.avg)}</td><td>${fmt$(tp)}</td><td class="${mc(fs ? tp / fs : null)}">${pct(tp, fs, 1)}</td></tr></table><div class="dim small">Envelopes only (no school & other orders); team profit is before shipping.${all ? '' : ' Click a team to see it on its own.'}</div>`;
     }
     const pays = A.payments, pmax = Math.max(1, s.n);
-    const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : '')).join('') + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed</div>`;
+    const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : 'grn')).join('') + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed</div>`;
     const lab = p => p.lab_each == null ? null : p.lab_each;
-    const each = p => { const l = lab(p); if (l == null || !p.sold) return l == null ? '<span class="dim" title="No Meridian price for it">not priced</span>' : ''; const avg = p.sales / p.sold, m = (avg - l) / avg; return `<span class="${m < .5 ? 'an-lo' : ''}">${fmt$(avg - l)} · ${Math.round(100 * m)}%</span>`; };
+    const each = p => { const l = lab(p); if (l == null || !p.sold) return l == null ? '<span class="dim" title="No Meridian price for it">not priced</span>' : ''; const avg = p.sales / p.sold, m = (avg - l) / avg; return `<span class="${mc(m)}">${fmt$(avg - l)} · ${Math.round(100 * m)}%</span>`; };
     const items = (list, envs, sales, what) => {
       let tq = 0, ts = 0, tp = 0, tsh = 0;
       const rows = list.map(p => { const l = lab(p) || 0, pr = p.sales - l * p.sold; tq += p.sold; ts += p.sales; tp += pr; tsh += p.sold_shoot;
         const price = p.with_package != null ? `${fmt$(p.price)}<span class="dim"> · ${fmt$(p.with_package)} w/ pkg</span>` : fmt$(p.price);
-        return `<tr class="${p.sold ? '' : 'none'}"><td>${esc(p.label)}</td><td>${price}</td><td>${p.sold}</td>${one ? `<td class="dim">${p.sold_shoot}</td>` : ''}<td>${fmt$(p.sales)}</td><td>${p.sold ? each(p) : ''}</td><td>${p.sold ? fmt$(pr) : ''}</td></tr>`; }).join('');
+        return `<tr class="${p.sold ? '' : 'none'}"><td>${esc(p.label)}</td><td>${price}</td><td>${p.sold}</td>${one ? `<td class="dim">${p.sold_shoot}</td>` : ''}<td>${fmt$(p.sales)}</td><td>${p.sold ? each(p) : ''}</td><td class="${p.sold ? mc(p.sales ? pr / p.sales : null) : ''}">${p.sold ? fmt$(pr) : ''}</td></tr>`; }).join('');
       return `<table class="an-t"><tr><th>Item</th><th>Price</th><th>Sold</th>${one ? '<th title="Sold across the whole shoot">Shoot</th>' : ''}<th>Sales</th><th>Profit each</th><th>Profit</th></tr>${rows}<tr class="tot"><td>Total</td><td></td><td>${tq}</td>${one ? `<td class="dim">${tsh}</td>` : ''}<td>${fmt$(ts)}</td><td>${ts ? Math.round(100 * tp / ts) + '%' : ''}</td><td>${fmt$(tp)}</td></tr></table>
         <div class="dim small">${envs} of ${s.n} envelopes ${what} (${pct(envs, s.n)})${envs ? ` · average ${fmt$(Math.round(sales / envs))} each when they did` : ''}</div>`;
     };
     const pkRows = pk.filter(p => p.sold).map(p => { const l = lab(p); return `<tr><td>${esc(p.label)}</td><td>${p.sold}</td><td>${fmt$(p.price)}</td><td>${l == null ? '<span class="dim">not priced</span>' : fmt$(l)}</td><td>${each(p)}</td><td>${l == null ? '' : fmt$(p.sales - l * p.sold)}</td></tr>`; }).join('');
     const unp = A.lab_unpriced.length ? `<div class="banner amber inline" style="margin:0">Lab cost leaves out ${esc(A.lab_unpriced.join(', '))}: no Meridian price for ${A.lab_unpriced.length > 1 ? 'them' : 'it'} yet (Prices…).</div>` : '';
     box.innerHTML = `<div class="an-body">${unp}
-      <div class="an-kpis">${kp.map(k => `<div class="an-k"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
-      <div class="an-row r3"><div class="an-card"><h4>Package mix</h4>${mix}</div><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
-      <div class="an-row r2"><div class="an-card"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
-      <div class="an-card"><h4>Profit by package</h4>${pkRows ? `<table class="an-t"><tr><th>Package</th><th>Sold</th><th>Price</th><th>Lab cost</th><th>Profit each</th><th>Profit total</th></tr>${pkRows}</table>` : '<div class="dim">No packages sold.</div>'}<div class="dim small">Amber: keeps less than half its price after lab cost.</div></div>
+      <div class="an-kpis">${kp.map(k => `<div class="an-k ${k[3] || ''}"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
+      <div class="an-legend"><span><i class="an-good">●</i> strong (70%+ margin, 10%+ above the shoot)</span><span><i class="an-lo">●</i> worth a look (under 50% margin, 10%+ below, still owed)</span><span><i class="an-neg">●</i> losing money</span><span class="cat"><i class="c-pk">■</i> packages <i class="c-ac">■</i> a la carte <i class="c-ks">■</i> keepsakes</span></div>
+      <div class="an-row r3"><div class="an-card c-pk"><h4>Package mix</h4>${mix}</div><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
+      <div class="an-row r2"><div class="an-card c-ac"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card c-ks"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
+      <div class="an-card c-pk"><h4>Profit by package</h4>${pkRows ? `<table class="an-t"><tr><th>Package</th><th>Sold</th><th>Price</th><th>Lab cost</th><th>Profit each</th><th>Profit total</th></tr>${pkRows}</table>` : '<div class="dim">No packages sold.</div>'}<div class="dim small">Amber: keeps less than half its price after lab cost.</div></div>
       <div class="an-card wi ${prefs.ordWhatIfClosed ? 'closed' : ''}" id="anWi"><h4 class="wh" data-ord="wi-toggle"><span class="chev">▾</span>What if <span class="tag">try new prices</span><span class="wmini" id="wiMini"></span><button class="btn sm wclose">${prefs.ordWhatIfClosed ? 'Show' : 'Hide'}</button></h4>
         <div class="wif"><div class="wl" id="wiT"></div>
           <div class="wr"><div class="drop"><div>Families who stop buying an item when its price goes up</div><div class="dr"><input type="range" data-wi-drop min="0" max="50" step="5" value="${this.wiDrop}"><b id="wiDropV">${this.wiDrop}%</b></div><div class="dim small">Only applies to prices you raise. Lowered prices assume the same buyers.</div></div>
@@ -4228,6 +4253,7 @@ const Ord = {
     if (this.pickingTeam != null && e.key === 'Escape') { this.endTeamPick(); return true; }
     if (e.key === '/') { const i = $('#modView [data-oq]'); if (i) { i.focus(); i.select(); return true; } }
     if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
+    if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && this.view === 'an') { this.stepTeam(e.key === 'ArrowDown' ? 1 : -1); return true; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.view.length) { step(e.key === 'ArrowRight' ? 1 : -1); this.photoClicked(S.active); return true; }
     if (e.key === 'Delete' && this.draft) { this.del(); return true; }
