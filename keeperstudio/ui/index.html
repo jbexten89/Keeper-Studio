@@ -727,7 +727,10 @@ textarea:focus{border-color:var(--accent)}
 .an-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
 .an-k{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
 .an-k i{font-style:normal;color:var(--muted);font-size:12px;display:block}.an-k b{font-weight:500;font-size:22px;display:block;margin:2px 0;white-space:nowrap}.an-k s{text-decoration:none;color:var(--muted);font-size:12px}
-.an-row.r2b{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)}
+.an-row.r2b{grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start}
+.an-stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.glance{display:grid;grid-template-columns:repeat(3,1fr);gap:10px 14px}.glance .gl{display:flex;gap:10px;align-items:baseline}
+.glance .gl b{font-size:20px;font-weight:500;min-width:52px;text-align:right;color:var(--text)}.glance .gl span{font-size:12.5px;color:var(--text)}.glance .gl em{display:block;font-style:normal;color:var(--muted);font-size:11.5px}
 .team-t td,.team-t th{padding:4px 10px}.team-t td:first-child{white-space:nowrap}
 .team-t .tshare{text-align:left;white-space:nowrap;width:30%}.team-t .sh{display:inline-block;width:calc(100% - 44px);max-width:200px;height:8px;background:var(--raised);border-radius:3px;margin-right:8px;vertical-align:middle;overflow:hidden}.team-t .sh i{display:block;height:100%;background:var(--accent)}
 .pk-t td.pk-bar,.pk-t th.pk-bar{width:28%;text-align:left}.pk-t .an-hb{display:block}.pk-t .an-hb .tr{height:12px}
@@ -3976,6 +3979,13 @@ const Ord = {
       const tp = A.teams.reduce((t, x) => t + x.profit, 0), fs = s.family_sales ?? s.sales;
       cmp = `<h4>By team</h4><table class="an-t team-t"><tr><th>Team</th><th>Env</th><th>Sales</th><th class="tshare">Share of sales</th><th>Avg order</th><th>Profit</th><th>Profit %</th></tr>${A.teams.map(t => `<tr class="${all ? '' : 'click'}" ${all ? '' : `data-oteam="${esc(t.team === 'No team' ? '' : t.team)}"`}><td>${esc(t.team)}</td><td>${t.n}</td><td>${fmt$(t.sales)}</td><td class="tshare"><span class="sh"><i style="width:${fs ? 100 * t.sales / Math.max(...A.teams.map(x => x.sales), 1) : 0}%"></i></span>${fs ? Math.round(100 * t.sales / fs) + '%' : ''}</td><td class="${vs(t.avg, s.avg)}">${fmt$(t.avg)}</td><td class="${t.profit < 0 ? 'an-neg' : ''}">${fmt$(t.profit)}</td><td class="${mc(t.profit_pct == null ? null : t.profit_pct / 100)}">${t.profit_pct == null ? '—' : t.profit_pct.toFixed(1) + '%'}</td></tr>`).join('')}<tr class="tot"><td>All teams</td><td>${s.n}</td><td>${fmt$(fs)}</td><td></td><td>${fmt$(s.avg)}</td><td>${fmt$(tp)}</td><td class="${mc(fs ? tp / fs : null)}">${pct(tp, fs, 1)}</td></tr></table><div class="dim small">Envelopes only (no school & other orders); team profit is before shipping.${all ? '' : ' Click a team to see it on its own.'}</div>`;
     }
+    const H = A.habits || { order_totals: [] }, OT = H.order_totals || [];
+    const buckets = [[0, 1500, 'Under $15'], [1500, 2500, '$15–24'], [2500, 4000, '$25–39'], [4000, 6000, '$40–59'], [6000, 1e12, '$60 and up']]
+      .map(([lo, hi, l]) => [l, OT.filter(c => c >= lo && c < hi).length]);
+    const bmax = Math.max(1, ...buckets.map(b => b[1]));
+    const g = (l, n, of, tip = '') => `<div class="gl" title="${tip}"><b>${of ? Math.round(100 * n / of) + '%' : '—'}</b><span>${l}<em>${plural(n, 'envelope')}</em></span></div>`;
+    const sizes = OT.length ? `<div class="an-card"><h4>Order sizes</h4><div class="an-bars">${buckets.map(b => bar(b[0], b[1], bmax, `${b[1]} · ${pct(b[1], OT.length)}`)).join('')}</div><div class="dim small" style="margin-top:8px">Middle order ${fmt$(H.median)} · average ${fmt$(s.avg)}</div></div>` : '';
+    const glance = OT.length ? `<div class="an-card"><h4>At a glance</h4><div class="glance">${g('added a la carte prints', s.ac_env, s.n)}${g('added a keepsake', s.ks_env, s.n)}${g('bought 2+ packages', H.multi_pkg, s.n, 'Siblings, or both sides of the family')}${g('bought no package', H.no_pkg, s.n, 'A la carte or keepsakes only')}<div class="gl"><b>${H.items_avg}</b><span>items per envelope<em>packages, prints and keepsakes</em></span></div></div></div>` : '';
     const pays = A.payments, pmax = Math.max(1, s.n);
     const pay = '<div class="an-bars">' + pays.map(p => bar(esc(p.method), p.envelopes, pmax, `${plural(p.envelopes, 'env')}${p.method === 'Not paid' ? ' · ' + fmt$(p.cents) : ''}`, p.method === 'Not paid' ? 'amb' : 'grn')).join('') + `</div><div class="dim small" style="margin-top:8px">${fmt$(s.paid)} collected · ${fmt$(s.due)} still owed</div>`;
     const lab = p => p.lab_each == null ? null : p.lab_each;
@@ -3998,7 +4008,7 @@ const Ord = {
       <div class="an-kpis">${kp.map(k => `<div class="an-k ${k[3] || ''}"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
       <div class="an-legend"><span><i class="an-good">●</i> strong (70%+ margin, 10%+ above the shoot)</span><span><i class="an-lo">●</i> worth a look (under 50% margin, 10%+ below, still owed)</span><span><i class="an-neg">●</i> losing money</span><span class="cat"><i class="c-pk">■</i> packages <i class="c-ac">■</i> a la carte <i class="c-ks">■</i> keepsakes</span></div>
       <div class="an-card c-pk"><h4>Packages</h4><table class="an-t pk-t"><tr><th>Package</th><th>Price</th><th class="pk-bar">Sold</th><th></th><th>Lab cost</th><th>Profit each</th><th>Profit total</th><th>Share of profit</th></tr>${pkRows}</table></div>
-      <div class="an-row r2b"><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
+      <div class="an-row r2b"><div class="an-stack"><div class="an-card">${cmp}</div>${glance}</div><div class="an-stack"><div class="an-card"><h4>Payments</h4>${pay}</div>${sizes}</div></div>
       <div class="an-row r2"><div class="an-card c-ac"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card c-ks"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
       <div class="an-card wi ${prefs.ordWhatIfClosed ? 'closed' : ''}" id="anWi"><h4 class="wh" data-ord="wi-toggle"><span class="chev">▾</span>What if <span class="tag">try new prices</span><span class="wmini" id="wiMini"></span><button class="btn sm wclose">${prefs.ordWhatIfClosed ? 'Show' : 'Hide'}</button></h4>
         <div class="wif"><div class="wl" id="wiT"></div>

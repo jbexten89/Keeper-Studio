@@ -155,6 +155,19 @@ def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents
              "shoot": pct(whole["profit_before"], whole["sales"]), "kind": "pct1"},
         ]
 
+    live = [o for o in pick if o.get("lines") and o["summary"]["total_cents"] > 0]
+    totals_each = sorted(o["summary"]["total_cents"] for o in live)
+    pkgs_each = [sum(l["qty"] for l in o["summary"]["lines"] if l["type"] == "package") for o in live]
+    items_each = [sum(l["qty"] for l in o["summary"]["lines"]) for o in live]
+    n = len(live)
+    habits = {
+        "order_totals": totals_each,
+        "median": (totals_each[n // 2] if n % 2 else (totals_each[n // 2 - 1] + totals_each[n // 2]) // 2) if n else 0,
+        "multi_pkg": sum(1 for k in pkgs_each if k >= 2),
+        "no_pkg": sum(1 for k in pkgs_each if k == 0),
+        "items_avg": round(sum(items_each) / n, 1) if n else 0,
+    }
+
     unpriced = sorted({u for o in pick for u in (o["summary"].get("lab_unpriced") or [])})
     return {"team": team, "selection": sel, "shoot": whole, "products": products, "teams": teams,
-            "payments": payments, "compare": compare, "lab_unpriced": unpriced}
+            "payments": payments, "compare": compare, "lab_unpriced": unpriced, "habits": habits}
