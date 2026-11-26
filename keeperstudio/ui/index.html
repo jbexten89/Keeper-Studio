@@ -726,6 +726,12 @@ textarea:focus{border-color:var(--accent)}
 .ord-pv .pv-num{font-size:24px;font-weight:500;color:var(--accent);letter-spacing:.02em}.ord-pv .pv-note{font-size:13px;color:var(--amber)}
 .ord-pv .pv-who{margin-left:auto;font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis}
 .ord-pv .pv-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,var(--border-2) 50%,var(--border-2) 60%,transparent 60%,transparent 72%,var(--border-2) 72%,var(--border-2) 82%,transparent 82%)}
+.dd{position:relative;display:inline-block}
+.dd-menu{display:none;position:fixed;z-index:200;min-width:270px;background:var(--panel);border:1px solid var(--border-2);border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.55);padding:5px}
+.dd.open .dd-menu{display:block}
+.dd-menu button{display:block;width:100%;text-align:left;background:none;border:0;color:var(--text);font:inherit;font-size:13.5px;padding:7px 10px;border-radius:5px;cursor:pointer}
+.dd-menu button:hover{background:var(--accent-bg)}.dd-menu em{display:block;font-style:normal;font-size:11.5px;color:var(--muted)}
+.dd-menu hr{border:0;border-top:1px solid var(--border);margin:4px 2px}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}
 .an-kpis{grid-template-columns:repeat(7,minmax(0,1fr))!important}
@@ -2381,6 +2387,14 @@ function bindEvents() {
   const ro = new ResizeObserver(() => schedule(R_CELLS | R_ALL));
   ro.observe($('#viewport')); ro.observe($('#filmScroll'));
   new ResizeObserver(() => { if (S.module === 'orders') Ord.fitLeft(); }).observe($('#left'));
+  // small drop-down menus (Orders bar): click to open, any click closes
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('[data-dd]');
+    const open = $$('.dd.open');
+    if (t) { e.stopPropagation(); const dd = t.parentElement, was = dd.classList.contains('open'); open.forEach(x => x.classList.remove('open')); if (!was && !t.disabled) { dd.classList.add('open'); const m = dd.querySelector('.dd-menu'), r = t.getBoundingClientRect(); m.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+        if (m.classList.contains('right')) { m.style.right = (window.innerWidth - r.right) + 'px'; m.style.left = 'auto'; } else { m.style.left = r.left + 'px'; m.style.right = 'auto'; } } return; }
+    open.forEach(x => x.classList.remove('open'));
+  }, true);
   // Orders: drag a team in the Teams list to reorder
   let tDrag = null;
   $('#left').addEventListener('dragstart', e => { const r = e.target.closest && e.target.closest('[data-tdrag]'); if (!r) return; tDrag = r.dataset.tdrag; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', tDrag); r.classList.add('dragging'); });
@@ -4193,7 +4207,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}" draggable="true" data-tdrag="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-up" data-team="${esc(x.name)}" title="Move up">↑</button><button data-ord="team-down" data-team="${esc(x.name)}" title="Move down">↓</button><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`, this.d.teams.length > 1 ? `<button class="hdr-btn az" data-teamaz title="Sort the teams A–Z (drag a team, or use ↑ ↓, to put them in your own order)">A–Z</button>` : '');
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad tot-btns"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button><button class="btn sm" data-ord="extras" title="Prints for the school, the park, teachers or a sponsor — free or paid — that aren't on any envelope">School &amp; other orders…</button></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
     }
     // Shoots stay at the top and Totals at the bottom; Teams scrolls in between.
     const keep = {}; for (const id of ['o-shoots', 'o-teams', 'o-totals']) { const b = $(`#left [data-sec="${id}"] > .body`); if (b) keep[id] = b.scrollTop; }
@@ -4407,14 +4421,17 @@ const Ord = {
       ${S.photos.length ? `<button class="btn sm ${this.picksOnly() ? 'on' : ''}" data-ord="picks-only" title="Show only photos flagged Pick in the filmstrip (one per kid), so each new envelope moves on to the next kid">${this.picksOnly() ? '✓ ' : ''}Filmstrip: picks only</button>` : ''}
       ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
       <div class="tb-spacer"></div>
-      <button class="btn sm" data-ord="import" ${dis} title="Add the orders from the website’s /admin CSV export">Import website CSV…</button>
-      <span class="muted small">Export</span>
-      <button class="btn sm" data-ord="summary" ${dis} title="The whole shoot on a few pages: totals, teams, payments, what sold, prints, who still owes">Shoot summary</button>
-      <button class="btn sm" data-oexp="pull" ${dis} title="One row per athlete with every print size counted — the sheet to stuff envelopes from">Pull sheet</button>
-      <button class="btn sm" data-oexp="crop" ${dis} title="Exactly which crops to make: only the sizes families bought">Crop list</button>
-      <button class="btn sm" data-oexp="roes" ${dis} title="${unm ? `${unm} print items still need Meridian’s ROES code (Prices…)` : 'ROES event import: each envelope as the individual prints it comes to'}">ROES file${unm ? ' ⚠' : ''}</button>
-      <button class="btn sm" data-oexp="items" ${dis} title="One row per item bought, for the books">Orders CSV</button>
-      <button class="btn sm" data-ord="prices" title="Edit prices.yaml: packages, prices, ROES codes">Prices…</button>`;
+      <div class="dd"><button class="btn sm" data-dd ${dis}>Shoot ▾</button><div class="dd-menu right">
+        <button data-ord="edit-shoot" data-id="${this.sid || ''}">Edit shoot…<em>name, date, paid on picture day</em></button>
+        <button data-ord="extras">School &amp; other orders…<em>free or paid prints not on an envelope</em></button>
+        <button data-ord="prices">Prices…<em>packages, prices, lab codes</em></button>
+        <hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button></div></div>
+      <div class="dd"><button class="btn sm" data-dd ${dis}>Export ▾</button><div class="dd-menu right">
+        <button data-ord="summary">Shoot summary<em>totals, teams, payments, what sold, who owes</em></button>
+        <button data-oexp="pull">Pull sheet<em>one row per athlete, to stuff envelopes from</em></button>
+        <button data-oexp="crop">Crop list<em>only the sizes families bought</em></button>
+        <hr><button data-oexp="items">Orders CSV<em>one row per item, for the books</em></button>
+        <button data-oexp="roes">ROES file${unm ? ' ⚠' : ''}<em>${unm ? `${unm} items still need a ROES code` : 'older ROES event import'}</em></button></div></div>`;
   },
   key(e, k) {
     if (modalOpen()) return false;
