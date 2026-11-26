@@ -284,7 +284,7 @@ const Ord = {
     if (this.view !== 'orders') this.setView('orders');
     this.multi = new Set(); this.sel = 'new'; this.state = ''; this.err = false;
     this.draft = { envelope: this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
-      lines: [], glasses: false, paid_method: '', paid_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
+      lines: [], glasses: false, paid_method: '', paid_cents: 0, accepted_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
     if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
     const next = this.nextPhoto(after); this.autoPhoto = !!next;
     if (next) { this.draft.image = stemOf(next.name); this.showPhoto(this.draft.image); }
@@ -301,7 +301,7 @@ const Ord = {
     const d = this.draft; if (!d || !this.sid) return;
     if (!d.id && !d.athlete.trim() && !d.lines.length) { this.state = ''; this.paintState(); return; }  // nothing typed yet
     if (this._saving) { this._again = true; return this._saving; }
-    const body = {}; for (const k of ['id', 'envelope', 'athlete', 'team', 'coach', 'parent', 'phone', 'email', 'glasses', 'frames', 'image', 'edited', 'notes', 'paid_method', 'paid_cents', 'lines']) if (k in d) body[k] = d[k];
+    const body = {}; for (const k of ['id', 'envelope', 'athlete', 'team', 'coach', 'parent', 'phone', 'email', 'glasses', 'frames', 'image', 'edited', 'notes', 'paid_method', 'paid_cents', 'accepted_cents', 'lines']) if (k in d) body[k] = d[k];
     this._saving = (async () => {
       try {
         const o = (await api('/api/orders/save', { shoot_id: this.sid, order: body })).order;
@@ -887,7 +887,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}" data-tdrag="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-up" data-team="${esc(x.name)}" title="Move up">↑</button><button data-ord="team-down" data-team="${esc(x.name)}" title="Move down">↓</button><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`, this.d.teams.length > 1 ? `<button class="hdr-btn az" data-teamaz title="Sort the teams A–Z (drag a team, or use ↑ ↓, to put them in your own order)">A–Z</button>` : '');
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b>${T.change_cents ? `<span>Change to give (${T.change_n})</span><b class="due">${fmt$(T.change_cents)}</b>` : ''}<span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b>${T.change_cents ? `<span>Change to give (${T.change_n})</span><b class="due">${fmt$(T.change_cents)}</b>` : ''}${T.short_cents ? `<span title="Envelopes that came up short and you let it go; already left out of Sales">Accepted short (${T.short_n})</span><b class="dim">${fmt$(T.short_cents)}</b>` : ''}<span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
     }
     // Shoots stay at the top and Totals at the bottom; Teams scrolls in between.
     const keep = {}; for (const id of ['o-shoots', 'o-teams', 'o-totals']) { const b = $(`#left [data-sec="${id}"] > .body`); if (b) keep[id] = b.scrollTop; }
@@ -953,7 +953,7 @@ const Ord = {
   },
   rowHTML(o) {
     const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
-    const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.change_cents > 0 ? `<td class="amt due" title="Paid ${fmt$(s.handed_cents)}: give back ${fmt$(s.change_cents)} change">Change ${fmt$(s.change_cents)}</td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
+    const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.change_cents > 0 ? `<td class="amt due" title="Paid ${fmt$(s.handed_cents)}: give back ${fmt$(s.change_cents)} change">Change ${fmt$(s.change_cents)}</td>` : s.short_cents > 0 ? `<td class="amt ok" title="Came up ${fmt$(s.short_cents)} short and you accepted it">Paid <span class="dim">−${fmt$(s.short_cents)}</span></td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
     const on = this.multi.size > 1 ? this.multi.has(o.id) : o.id === this.sel;
     return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
       <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td><td>${pic ? esc(pic) : o.lines.length ? '<span class="warn">needs photo</span>' : ''}</td><td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td><td class="amt dim" title="Meridian's estimated cost${s.lab_unpriced && s.lab_unpriced.length ? ' (some items not priced)' : ''}">${s.lab_cents ? fmt$(s.lab_cents) : '—'}</td>${this.profitCells(s)}${due}</tr>`;
@@ -978,10 +978,11 @@ const Ord = {
   },
   totalHTML(pr, d) {
     const auto = this.prepaid() && !d.paid_cents && !d.paid_method;
-    const due = auto ? 0 : pr.total - (d.paid_cents || 0);
-    const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">Give ${fmt$(-due)} change</span>` : '<span class="ok">Paid in full</span>';
+    const short = Math.min(d.accepted_cents || 0, pr.total);
+    const due = auto ? 0 : pr.total - short - (d.paid_cents || 0);
+    const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">Give ${fmt$(-due)} change</span>` : short ? `<span class="ok">Paid ${fmt$(pr.total - short)} · accepted ${fmt$(short)} short</span>` : '<span class="ok">Paid in full</span>';
     return `<div class="tot-sum">${this.sumHTML(pr, d, st)}</div>
-      <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label>${due < 0 ? `<button class="btn sm" data-ord="change-given" title="You handed back the change: record the payment as the total">Change given</button>` : ''}</div>
+      <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label>${due < 0 ? `<button class="btn sm" data-ord="change-given" title="You handed back the change: record the payment as the total">Change given</button>` : ''}${due > 0 && d.paid_cents ? `<button class="btn sm" data-ord="short-accept" title="Let the ${fmt$(due)} go: the envelope counts as paid, and its total becomes what they paid">Accept ${fmt$(due)} short</button>` : ''}${short && due <= 0 ? `<button class="btn sm" data-ord="short-undo" title="They still owe the ${fmt$(short)}">Undo</button>` : ''}</div>
       <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
   sumHTML(pr, d, st) { return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`; },
@@ -1003,7 +1004,7 @@ const Ord = {
     const L = this.labEst && this.labEst.key === key ? this.labEst.s : null;
     if (!L) return '<span class="labline">Lab cost …</span>';
     const miss = L.lab_unpriced && L.lab_unpriced.length ? ` <span class="warn" title="No Meridian price for: ${esc(L.lab_unpriced.join(', '))}">+ ${L.lab_unpriced.length} not priced</span>` : '';
-    return `<span class="labline" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - L.lab_cents)}</span>`;
+    return `<span class="labline" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - Math.min(d.accepted_cents || 0, pr.total) - L.lab_cents)}</span>`;
   },
   photoHTML(d) {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
@@ -1145,7 +1146,7 @@ const Ord = {
   onInput(el) {
     const d = this.draft; if (!d) return;
     const k = el.dataset.of;
-    if (k === 'paid') { d.paid_cents = parse$(el.value); if (d.paid_cents && !d.paid_method) d.paid_method = 'cash'; }
+    if (k === 'paid') { d.paid_cents = parse$(el.value); d.accepted_cents = 0; if (d.paid_cents && !d.paid_method) d.paid_method = 'cash'; }
     else d[k] = el.value;
     if (k === 'image') { this.autoPhoto = false; const dl = $('#ordFrames'); if (dl) dl.innerHTML = this.matches(el.value.replace(/\D/g, '')).map(n => `<option value="${esc(n)}">`).join(''); }
     this.changed(false);
@@ -1249,7 +1250,7 @@ function bindModuleEvents() {
       else if (name === 'ordView') Ord.setView(v);
       else if (name === 'anScope') { Ord.anScope = v; renderView(); }
       else if (name === 'merDelivery') Ord.merSet('delivery', v);
-      else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.paid_cents = v && v !== 'none' ? Ord.price(d.lines).total : 0; Ord.changed(true); }
+      else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.accepted_cents = 0; d.paid_cents = v && v !== 'none' ? Ord.price(d.lines).total : 0; Ord.changed(true); }
       else if (name === 'rtStep') Ret.setStep(v);
       else if (name === 'rtMode') { Ret.brush.erase = v === 'erase'; Ret.right(); }
       return;
@@ -1315,7 +1316,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'pv') Ord.pvToggle(); else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

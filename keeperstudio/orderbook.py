@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS extra_orders_shoot ON extra_orders(shoot_id);
 EXTRA_FIELDS = ("kind", "customer", "contact", "items", "paid_method", "paid_cents", "check_no", "notes")
 
 ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
-                "image", "edited", "notes", "paid_method", "paid_cents", "lines", "web_order")
+                "image", "edited", "notes", "paid_method", "paid_cents", "accepted_cents", "lines", "web_order")
 PAID_METHODS = ("", "cash", "check", "venmo", "card", "other", "none")  # "none": owes it all, even on a prepaid shoot; "card" kept for old envelopes
 
 
@@ -100,6 +100,9 @@ class OrderBook:
             self._db.execute("ALTER TABLE shoots ADD COLUMN prepaid INTEGER NOT NULL DEFAULT 0")
         if "team_order" not in cols:  # the order teams are listed in, as the user arranged them
             self._db.execute("ALTER TABLE shoots ADD COLUMN team_order TEXT NOT NULL DEFAULT '[]'")
+        ocols = {r["name"] for r in self._db.execute("PRAGMA table_info(orders)")}
+        if "accepted_cents" not in ocols:  # came up short and the shortfall was let go
+            self._db.execute("ALTER TABLE orders ADD COLUMN accepted_cents INTEGER NOT NULL DEFAULT 0")
 
     def _daily_backup(self, folder: Path) -> None:
         try:
@@ -223,7 +226,7 @@ class OrderBook:
             v = data[k]
             if k == "glasses":
                 v = 1 if v else 0
-            elif k == "paid_cents":
+            elif k in ("paid_cents", "accepted_cents"):
                 v = max(0, int(v or 0))
             elif k == "lines":
                 v = json.dumps([{"product_id": str(l.get("product_id")), "qty": int(l.get("qty") or 0)}
@@ -272,7 +275,7 @@ class OrderBook:
             if m not in PAID_METHODS:
                 raise ValueError("Paid by must be cash, check, Venmo or other.")
         with self._lock:
-            n = sum(self._db.execute("UPDATE orders SET paid_method=?, paid_cents=?, updated=? WHERE shoot_id=? AND id=?",
+            n = sum(self._db.execute("UPDATE orders SET paid_method=?, paid_cents=?, accepted_cents=0, updated=? WHERE shoot_id=? AND id=?",
                                      (m, max(0, int(c)), time.time(), int(sid), int(i))).rowcount for i, m, c in pays)
             self._db.commit()
         return n

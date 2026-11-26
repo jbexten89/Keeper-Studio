@@ -297,6 +297,10 @@ def calculate(lines, catalog: Catalog) -> dict:
 def order_summary(order: dict, catalog: Catalog) -> dict:
     """Totals plus what is still owed. Payment is due on picture day."""
     t = calculate(order.get("lines"), catalog)
+    # Came up short and Jamie let it go: the envelope's total is what they paid.
+    short = min(max(0, int(order.get("accepted_cents") or 0)), t["total_cents"])
+    if short:
+        t = {**t, "list_total_cents": t["total_cents"], "total_cents": t["total_cents"] - short}
     paid = int(order.get("paid_cents") or 0)
     # On a prepaid shoot an envelope with nothing typed in was paid in full on picture day.
     auto = bool(order.get("prepaid")) and paid == 0 and not (order.get("paid_method") or "")
@@ -314,7 +318,7 @@ def order_summary(order: dict, catalog: Catalog) -> dict:
             extras.append(f"{l['qty']}× {name}" if l["qty"] > 1 else name)
     # Paid more than the total: the extra is change owed back, not money collected.
     change = max(0, paid - t["total_cents"])
-    return {**t, "paid_cents": paid - change, "handed_cents": paid, "change_cents": change,
+    return {**t, "paid_cents": paid - change, "handed_cents": paid, "change_cents": change, "short_cents": short,
             "due_cents": max(0, t["total_cents"] - paid), "paid_auto": auto,
             "packages": " + ".join(pk), "extras": ", ".join(extras)}
 

@@ -191,6 +191,7 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
     sections.append({"heading": "Totals", "head": ["", "Amount"], "align": ["text", "money"], "rows": [
         row("Envelopes", len(orders)), *sales_rows, row("Collected", _money(paid)),
         row(f"Still due ({owe_n} {'order' if extras else 'envelope'}{'s' if owe_n != 1 else ''})", _money(sales - paid)),
+        *([row(f"Accepted short ({sum(1 for o in orders if S(o, 'short_cents'))} envelopes, not in sales)", _money(S_short))] if (S_short := sum(S(o, "short_cents") for o in orders)) else []),
         *([row(f"Change still to give back ({sum(1 for o in orders if S(o, 'change_cents'))})", _money(S_change))] if (S_change := sum(S(o, "change_cents") for o in orders)) else []),
         row("Lab cost (Meridian list prices, estimated)", _money(lab)), row("Shipping", _money(ship)),
         tot("You keep", _money(keep)), row("Profit", _pct(keep, sales)),

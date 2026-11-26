@@ -433,3 +433,24 @@ class ChangeTests(unittest.TestCase):
                          (4000, 4000, 1000, 0, 5000))
         short = O.order_summary(order("B", "T", cart(("pkg-a", 1)), paid_cents=2500, paid_method="cash"), CAT)
         self.assertEqual((short["paid_cents"], short["due_cents"], short["change_cents"]), (2500, 1500, 0))
+
+
+class AcceptShortTests(unittest.TestCase):
+    def test_accepted_short_lowers_the_total_and_clears_what_is_due(self):
+        o = order("A", "T", cart(("pkg-a", 1)), paid_cents=2500, paid_method="cash", accepted_cents=1500)
+        s = O.order_summary(o, CAT)
+        self.assertEqual((s["list_total_cents"], s["total_cents"], s["due_cents"], s["short_cents"]), (4000, 2500, 0, 1500))
+
+    def test_it_is_stored_and_reset_by_a_bulk_payment(self):
+        import tempfile
+        from pathlib import Path
+        from keeperstudio.orderbook import OrderBook
+        with tempfile.TemporaryDirectory() as d:
+            b = OrderBook(Path(d) / "o.sqlite3")
+            sid = b.save_shoot({"name": "Fall", "prepaid": False})["id"]
+            oid = b.save_order(sid, {"athlete": "A", "lines": cart(("pkg-a", 1)), "paid_cents": 2500,
+                                     "paid_method": "cash", "accepted_cents": 1500})["id"]
+            self.assertEqual(b.get(oid)["accepted_cents"], 1500)
+            b.set_payments(sid, [(oid, "venmo", 4000)])
+            self.assertEqual(b.get(oid)["accepted_cents"], 0)
+            b.close()
