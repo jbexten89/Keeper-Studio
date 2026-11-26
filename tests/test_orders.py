@@ -423,3 +423,13 @@ class BulkPaymentTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 b.set_payments(sid, [(ids[2], "bitcoin", 1)])
             b.close()
+
+
+class ChangeTests(unittest.TestCase):
+    def test_overpaying_is_change_owed_not_money_collected(self):
+        o = order("A", "T", cart(("pkg-a", 1)), paid_cents=5000, paid_method="cash")
+        s = O.order_summary(o, CAT)
+        self.assertEqual((s["total_cents"], s["paid_cents"], s["change_cents"], s["due_cents"], s["handed_cents"]),
+                         (4000, 4000, 1000, 0, 5000))
+        short = O.order_summary(order("B", "T", cart(("pkg-a", 1)), paid_cents=2500, paid_method="cash"), CAT)
+        self.assertEqual((short["paid_cents"], short["due_cents"], short["change_cents"]), (2500, 1500, 0))

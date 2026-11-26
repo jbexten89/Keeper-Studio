@@ -312,7 +312,10 @@ def order_summary(order: dict, catalog: Catalog) -> dict:
         if l["type"] != "package":
             name = short_label(catalog.get(l["product_id"]))
             extras.append(f"{l['qty']}× {name}" if l["qty"] > 1 else name)
-    return {**t, "paid_cents": paid, "due_cents": t["total_cents"] - paid, "paid_auto": auto,
+    # Paid more than the total: the extra is change owed back, not money collected.
+    change = max(0, paid - t["total_cents"])
+    return {**t, "paid_cents": paid - change, "handed_cents": paid, "change_cents": change,
+            "due_cents": max(0, t["total_cents"] - paid), "paid_auto": auto,
             "packages": " + ".join(pk), "extras": ", ".join(extras)}
 
 

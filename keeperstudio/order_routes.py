@@ -110,6 +110,8 @@ def r_list(b):
                    "count": sum(1 for o in rows if o["team"] == t)} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
         "totals": {"orders": len(rows), "family_cents": fam_total, "extras": ex, "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
+                   "change_cents": sum(o["summary"].get("change_cents", 0) for o in rows),
+                   "change_n": sum(1 for o in rows if o["summary"].get("change_cents")),
                    "lab_cents": lab, "shipping_cents": ship, "keep_cents": keep,
                    "profit_pct": round(100 * keep / total, 1) if total else None,
                    "unpaid": sum(1 for o in rows if o["summary"]["due_cents"] > 0)
