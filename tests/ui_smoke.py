@@ -22,6 +22,10 @@ import urllib.request
 from pathlib import Path
 
 TMP = Path(tempfile.mkdtemp(prefix="ks-ui-smoke-"))
+# Playwright finds its browsers under LOCALAPPDATA, which is about to point at the
+# throwaway data folder, so pin it to where `playwright install` put them.
+if os.name == "nt" and not os.environ.get("PLAYWRIGHT_BROWSERS_PATH"):
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "ms-playwright")
 os.environ["LOCALAPPDATA"] = str(TMP / "data")  # Windows
 os.environ["XDG_DATA_HOME"] = str(TMP / "data")  # Linux
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
