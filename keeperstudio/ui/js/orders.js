@@ -1025,13 +1025,13 @@ const Ord = {
       return;
     }
     const pr = this.price(d.lines);
-    const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${p.price % 100 ? fmt$(p.price) : '$' + (p.price / 100)}</small></button>`; }).join('');
+    const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another · Right-click takes one off">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${p.price % 100 ? fmt$(p.price) : '$' + (p.price / 100)}</small></button>`; }).join('');
     const notes = d.lines.map(l => this.prod(l.product_id)).filter(p => p && p.type === 'package').map(p => `<b>${esc(p.label)}</b> ${esc(p.summary)}`).join('<br>');
     const qrow = p => { const q = this.qty(p.id); return `<div class="qrow ${q ? 'has' : ''}"><span class="nm" title="${esc(p.unit_label)}">${esc(p.short)}</span><span class="pr">${p.type === 'alacarte' && pr.hasPkg ? `<s>${fmt$(p.price)}</s>` : ''}${fmt$(this.unit(p, pr.hasPkg))}</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${q}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`; };
     const fld = (k, l, wide, extra = '') => `<label class="fld ${wide ? 'wide' : ''}"><span>${l}</span><input data-of="${k}" value="${esc(d[k])}" spellcheck="false" ${extra}></label>`;
     $('#right').innerHTML = `<div class="scroll ord-ed">
       ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid who">${fld('envelope', 'Env #', false, 'title="Envelope number"')}${fld('team', 'Team', false, 'list="ordTeams"')}${fld('athlete', 'Athlete', false, 'placeholder="First and last name"')}${fld('coach', 'Coach', false, 'list="ordCoaches"')}</div>`)}
-      ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
+      ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div>${this.products('package').filter(p => this.qty(p.id) > 1).map(p => `<div class="qrow has pkg-qrow"><span class="nm">${esc(p.label)}</span><span class="pr">${fmt$(p.price)} each</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${this.qty(p.id)}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`).join('')}<div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
@@ -1221,6 +1221,10 @@ function bindFilmSize() {
   g.addEventListener('dblclick', () => setFilmH(124, true));
 }
 function bindModuleEvents() {
+  $('#right').addEventListener('contextmenu', e => {
+    const pk = S.module === 'orders' && e.target.closest('[data-opkg]'); if (!pk) return;
+    e.preventDefault(); const q = Ord.qty(pk.dataset.opkg); if (q) Ord.setQty(pk.dataset.opkg, q - 1);
+  });
   $('#banners').addEventListener('click', e => { const w = e.target.closest('[data-banner-work]'); if (w) { const b = S.banners.find(x => x.id === 'work'); if (b) Work.restore(b.work); return; } const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
   bindFilmSize();
   $('#top').addEventListener('click', e => { const b = e.target.closest('[data-module]'); if (b) setModule(b.dataset.module); });

@@ -731,6 +731,7 @@ textarea:focus{border-color:var(--accent)}
 .paid-amt{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:12.5px;white-space:nowrap}
 .paid-amt input{width:84px;height:28px;text-align:right;background:var(--bg);border:1px solid var(--border-2);border-radius:5px;color:var(--text);font:inherit;font-size:14px;padding:0 8px;user-select:text}
 .paid-amt input:focus{border-color:var(--accent);outline:none}
+.pkg-qrow{margin-top:8px}.pkg-qrow .nm{font-weight:600}
 .bulk-pay{display:flex;flex-wrap:wrap;gap:8px}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}
