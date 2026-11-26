@@ -732,6 +732,7 @@ textarea:focus{border-color:var(--accent)}
 .paid-amt input{width:84px;height:28px;text-align:right;background:var(--bg);border:1px solid var(--border-2);border-radius:5px;color:var(--text);font:inherit;font-size:14px;padding:0 8px;user-select:text}
 .paid-amt input:focus{border-color:var(--accent);outline:none}
 .pkg-qrow{margin-top:8px}.pkg-qrow .nm{font-weight:600}
+.env-gaps{font-weight:400!important;text-align:right}.env-gaps .linkish{background:none;border:0;padding:0;font:inherit;color:var(--accent);cursor:pointer}.env-gaps .linkish:hover{text-decoration:underline}.env-gaps .dup{color:var(--amber)}
 .bulk-pay{display:flex;flex-wrap:wrap;gap:8px}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}

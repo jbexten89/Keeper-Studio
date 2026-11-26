@@ -118,7 +118,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived, ordWhatIfClosed: !!prefs.ordWhatIfClosed, ordPv: prefs.ordPv || null })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived, ordWhatIfClosed: !!prefs.ordWhatIfClosed, ordPv: prefs.ordPv || null, ordSort: prefs.ordSort || null })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */

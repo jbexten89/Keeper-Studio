@@ -9,7 +9,7 @@ const parse$ = s => { const v = parseFloat(String(s || '').replace(/[$,\s]/g, ''
 const stemOf = n => String(n || '').replace(/\.[^.]+$/, '');
 const fmtDay = d => { if (!d) return ''; const t = new Date(d + 'T12:00:00'); return isNaN(t) ? d : t.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); };
 const Ord = {
-  shoots: [], sid: null, d: null, cat: null, pricesPath: '', team: 'all', q: '', sort: { k: 'env', dir: 1 },
+  shoots: [], sid: null, d: null, cat: null, pricesPath: '', team: 'all', q: '', sort: (prefs.ordSort && prefs.ordSort.k) ? prefs.ordSort : { k: 'env', dir: 1 },
   sel: null, draft: null, view: 'orders', lab: null, crops: '', onePer: true, building: false, mer: null, merBusy: false,
   saveT: null, state: '', err: false, undo: null, last: {}, stems: null, stemsKey: '', multi: new Set(), anchor: null,
   async load() {
@@ -47,6 +47,19 @@ const Ord = {
   // Put a photo in front in the filmstrip without touching the envelope.
   // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
   prepaid() { const sh = this.shoot(); return !!(sh && sh.prepaid); },
+  // Envelope numbers 1…highest that no envelope has (maybe a paper envelope not typed in yet), and numbers used twice.
+  envGaps() {
+    const nums = (this.d ? this.d.orders : []).map(o => String(o.envelope || '').trim()).filter(x => /^\d+$/.test(x)).map(Number);
+    const seen = new Map(); for (const n of nums) seen.set(n, (seen.get(n) || 0) + 1);
+    const hi = nums.length ? Math.max(...nums) : 0, missing = [];
+    for (let n = 1; n <= hi && missing.length < 200; n++) if (!seen.has(n)) missing.push(n);
+    return { missing, dup: [...seen].filter(([, c]) => c > 1).map(([n]) => n).sort((a, b) => a - b) };
+  },
+  envGapsHTML() {
+    const { missing, dup } = this.envGaps(), list = (ns, cls) => ns.slice(0, 8).map(n => `<button class="linkish ${cls}" data-ord="env-missing" data-n="${n}" title="${cls === 'dup' ? `Two envelopes are #${n}` : `Start envelope #${n}`}">${n}</button>`).join(', ') + (ns.length > 8 ? ` +${ns.length - 8}` : '');
+    return (missing.length ? `<span title="Numbers between 1 and the highest envelope that no envelope has — maybe a paper envelope not typed in yet, or one you deleted. Click one to start it.">Missing #</span><b class="env-gaps">${list(missing, 'miss')}</b>` : '')
+      + (dup.length ? `<span title="Two or more envelopes share these numbers">Used twice #</span><b class="env-gaps due">${dup.slice(0, 8).map(n => `<button class="linkish dup" data-ord="env-dup" data-n="${n}">${n}</button>`).join(', ')}</b>` : '');
+  },
   // How families pay. Card only shows on an old envelope that already says Card.
   payChoices(cur) {
     const ways = [['cash', 'Cash'], ['check', 'Check'], ['venmo', 'Venmo'], ...(cur === 'card' ? [['card', 'Card']] : [])];
@@ -221,8 +234,12 @@ const Ord = {
     const q = this.q.trim().toLowerCase();
     if (q) r = r.filter(o => [o.envelope, o.athlete, o.team, o.coach, o.parent, o.phone, o.image, o.edited, o.frames, o.summary.packages, o.notes].join(' ').toLowerCase().includes(q));
     const { k, dir } = this.sort;
-    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : k === 'lab' ? o.summary.lab_cents : k === 'profit' ? o.summary.keep_cents : k === 'ppct' ? (o.summary.total_cents ? o.summary.keep_cents / o.summary.total_cents : -1e9) : String(o[k] || '').toLowerCase();
-    return r.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || collator.compare(a.athlete, b.athlete) || a.id - b.id; });
+    const teamIx = new Map((this.d.teams || []).map((t, n) => [t.name, n]));
+    const teamRank = o => (o.team ? (teamIx.has(o.team) ? teamIx.get(o.team) : 9e8) : 1e9);
+    const photoNum = o => { const m = String(o.edited || o.image || '').match(/(\d+)(?!.*\d)/); return m ? +m[1] : 1e12; };
+    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : k === 'lab' ? o.summary.lab_cents : k === 'profit' ? o.summary.keep_cents : k === 'ppct' ? (o.summary.total_cents ? o.summary.keep_cents / o.summary.total_cents : -1e9) : k === 'team' ? teamRank(o) : k === 'image' ? photoNum(o) : String(o[k] || '').toLowerCase();
+    const envN = o => (/^\d+$/.test(String(o.envelope).trim()) ? +o.envelope : 1e9);
+    return r.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || envN(a) - envN(b) || collator.compare(a.athlete, b.athlete) || a.id - b.id; });
   },
   // ---------- pricing while typing (the server prices what is saved) ----------
   price(lines) {
@@ -269,11 +286,12 @@ const Ord = {
     const b = box.getBoundingClientRect(), r = tr.getBoundingClientRect();
     if (r.top < b.top + head + 2 || r.bottom > b.bottom - foot - 2) box.scrollTop += (r.top + r.height / 2) - (b.top + head + (b.height - head - foot) / 2);
   },
-  async newOrder() {
+  async newOrder(env) {
     if (!this.sid) return this.editShoot(true);
     // A new envelope with nothing typed is already open: point at it instead of starting another.
     const d0 = this.draft;
     if (this.sel === 'new' && d0 && !d0.id && !d0.athlete.trim() && !d0.lines.length) {
+      if (env != null) { d0.envelope = String(env); renderRight(); }
       if (this.view !== 'orders') this.setView('orders');
       this._flashNew = true; this.paintRows();
       setTimeout(() => { const i = $('#right [data-of="athlete"]'); if (i) i.focus(); }, 0);
@@ -283,7 +301,7 @@ const Ord = {
     await this.flush();
     if (this.view !== 'orders') this.setView('orders');
     this.multi = new Set(); this.sel = 'new'; this.state = ''; this.err = false;
-    this.draft = { envelope: this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
+    this.draft = { envelope: env != null ? String(env) : this.d ? this.d.next_envelope : '1', athlete: '', team: this.team !== 'all' ? this.team : (this.last.team || ''), coach: this.last.coach || '',
       lines: [], glasses: false, paid_method: '', paid_cents: 0, accepted_cents: 0, image: '', frames: '', edited: '', parent: '', phone: '', email: '', notes: '' };
     if (this.draft.team && !this.last.coach && this.d) { const o = this.d.orders.find(o => o.team === this.draft.team && o.coach); if (o) this.draft.coach = o.coach; }
     const next = this.nextPhoto(after); this.autoPhoto = !!next;
@@ -890,7 +908,7 @@ const Ord = {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}" data-tdrag="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-up" data-team="${esc(x.name)}" title="Move up">↑</button><button data-ord="team-down" data-team="${esc(x.name)}" title="Move down">↓</button><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`, this.d.teams.length > 1 ? `<button class="hdr-btn az" data-teamaz title="Sort the teams A–Z (drag a team, or use ↑ ↓, to put them in your own order)">A–Z</button>` : '');
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b>${T.change_cents ? `<span>Change to give (${T.change_n})</span><b class="due">${fmt$(T.change_cents)}</b>` : ''}${T.short_cents ? `<span title="Envelopes that came up short and you let it go; already left out of Sales">Accepted short (${T.short_n})</span><b class="dim">${fmt$(T.short_cents)}</b>` : ''}<span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b>${T.change_cents ? `<span>Change to give (${T.change_n})</span><b class="due">${fmt$(T.change_cents)}</b>` : ''}${this.envGapsHTML()}${T.short_cents ? `<span title="Envelopes that came up short and you let it go; already left out of Sales">Accepted short (${T.short_n})</span><b class="dim">${fmt$(T.short_cents)}</b>` : ''}<span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div>`);
     }
     // Shoots stay at the top and Totals at the bottom; Teams scrolls in between.
     const keep = {}; for (const id of ['o-shoots', 'o-teams', 'o-totals']) { const b = $(`#left [data-sec="${id}"] > .body`); if (b) keep[id] = b.scrollTop; }
@@ -1311,7 +1329,7 @@ function bindModuleEvents() {
     if (S.module === 'orders') {
       const pk = t.closest('[data-opkg]'); if (pk) { const q = Ord.qty(pk.dataset.opkg); Ord.setQty(pk.dataset.opkg, e.shiftKey ? q + 1 : q ? 0 : 1); return; }
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
-      const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; Ord.paintRows(); return; }
+      const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.paintRows(); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
       const bp = t.closest('[data-bulkpay]'); if (bp) { e.stopPropagation(); return Ord.bulkPay(bp.dataset.bulkpay); }
@@ -1323,7 +1341,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
