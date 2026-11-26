@@ -713,6 +713,17 @@ textarea:focus{border-color:var(--accent)}
 .sec.mini .tot-mini{display:flex}.sec.mini .tot-grid,.sec.mini .tot-btns{display:none}
 .row.dragging{opacity:.4}.row.drop-above{box-shadow:inset 0 2px 0 var(--accent)}.row.drop-below{box-shadow:inset 0 -2px 0 var(--accent)}
 .hdr-btn.az{font-size:11px;font-variant:normal;letter-spacing:0;padding:1px 6px}
+.ord-pv{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--border-2);border-radius:8px;box-shadow:0 14px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;min-width:220px;min-height:220px}
+.ord-pv.moving{opacity:.92;user-select:none}
+.ord-pv .pv-head{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);cursor:move;user-select:none}
+.ord-pv .pv-t{font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord-pv .pv-x{background:none;border:0;color:var(--muted);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px}.ord-pv .pv-x:hover{color:var(--text);background:var(--raised)}
+.ord-pv .pv-img{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;background:#050608;cursor:zoom-in}
+.ord-pv .pv-img img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.ord-pv .pv-none{position:absolute;color:var(--muted);font-size:12.5px;text-align:center;padding:12px}
+.ord-pv .pv-lens{position:absolute;display:none;border:2px solid var(--accent);border-radius:50%;pointer-events:none;background-repeat:no-repeat;box-shadow:0 6px 20px rgba(0,0,0,.6)}
+.ord-pv .pv-sub{padding:6px 12px;font-size:12px;color:var(--muted);border-top:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ord-pv .pv-grip{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize;background:linear-gradient(135deg,transparent 50%,var(--border-2) 50%,var(--border-2) 60%,transparent 60%,transparent 72%,var(--border-2) 72%,var(--border-2) 82%,transparent 82%)}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}
 .an-kpis{grid-template-columns:repeat(7,minmax(0,1fr))!important}
@@ -935,7 +946,7 @@ const S = {
   exporting: null,
 };
 function savePrefs() {
-  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived, ordWhatIfClosed: !!prefs.ordWhatIfClosed })); } catch {}
+  try { localStorage.setItem('keeperstudio.prefs', JSON.stringify({ sort: S.sort, sortDir: S.sortDir, thumbSize: S.thumbSize, filmH: S.filmH, leftW: S.leftW, rightW: S.rightW, autoAdvance: S.autoAdvance, panels: S.panels, sections: S.sections, ordShowArchived: !!prefs.ordShowArchived, ordWhatIfClosed: !!prefs.ordWhatIfClosed, ordPv: prefs.ordPv || null })); } catch {}
 }
 
 /* ---------- Metadata (flags / ratings / labels) ---------- */
@@ -2468,6 +2479,7 @@ function setModule(m) {
   if (S.module === m) return;
   if (S.module === 'orders') Ord.endTeamPick();
   if (S.fs) exitFs();
+  setTimeout(() => Ord.pvPaint());
   if (Crop.adjusting) Crop.cancelAdjust(true);
   Crop.closeTune();
   S.module = m;
@@ -3355,6 +3367,69 @@ const Ord = {
   // Put a photo in front in the filmstrip without touching the envelope.
   // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
   prepaid() { const sh = this.shoot(); return !!(sh && sh.prepaid); },
+  // ---------- floating preview ----------
+  // A movable, resizable photo of the open envelope (or the picked team's group photo).
+  pvToggle() {
+    const pv = prefs.ordPv = { x: null, y: 90, w: 380, h: 500, ...(prefs.ordPv || {}) };
+    pv.open = !pv.open; savePrefs(); this.pvPaint(); this.modbar();
+  },
+  pvPaint() {
+    let el = $('#ordPv');
+    const pv = prefs.ordPv;
+    if (S.module !== 'orders' || !pv || !pv.open || !S.photos.length) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div'); el.id = 'ordPv'; el.className = 'ord-pv';
+      el.innerHTML = `<div class="pv-head"><span class="pv-t"></span><button class="pv-x" title="Close (V)">✕</button></div><div class="pv-img"><img alt=""><div class="pv-none"></div><div class="pv-lens"></div></div><div class="pv-sub"></div><div class="pv-grip" title="Drag to resize"></div>`;
+      document.body.appendChild(el);
+      this.pvWire(el);
+    }
+    const W = window.innerWidth, H = window.innerHeight;
+    pv.w = clamp(pv.w || 380, 220, W - 20); pv.h = clamp(pv.h || 500, 220, H - 20);
+    if (pv.x == null) pv.x = W - pv.w - 300;
+    pv.x = clamp(pv.x, 0, W - 80); pv.y = clamp(pv.y, 0, H - 40);
+    Object.assign(el.style, { left: pv.x + 'px', top: pv.y + 'px', width: pv.w + 'px', height: pv.h + 'px' });
+    // what to show
+    const d = this.draft, o = d || (this.sel != null && this.d && this.d.orders.find(x => x.id === this.sel));
+    let stem = '', title = '', sub = '';
+    if (o) {
+      stem = o.edited || o.image || '';
+      title = o.athlete || 'New envelope';
+      sub = [o.envelope ? `Env ${o.envelope}` : '', o.team, stem ? stemOf(stem) + (o.edited ? ' (retouched)' : '') : 'No photo yet'].filter(Boolean).join(' · ');
+    } else if (this.team && this.team !== 'all' && this.d) {
+      const t = this.d.teams.find(x => x.name === this.team); stem = (t && t.image) || '';
+      title = `${this.team} team`; sub = stem ? 'Group photo ' + stem : 'No group photo yet';
+    } else { title = 'Preview'; sub = 'Open an envelope or pick a team'; }
+    const p = stem ? this.photoFor(stem) : null;
+    $('.pv-t', el).textContent = title; $('.pv-sub', el).textContent = sub;
+    const img = $('img', el), none = $('.pv-none', el);
+    if (p) { const u = previewUrl(p.path, 1600); if (img.dataset.u !== u) { img.dataset.u = u; img.src = u; } img.hidden = false; none.textContent = ''; el.dataset.p = p.id; }
+    else { img.hidden = true; img.removeAttribute('src'); img.dataset.u = ''; none.textContent = stem ? `${stemOf(stem)} isn't in the open folder` : (o ? 'No photo picked for this envelope' : ''); el.dataset.p = ''; }
+  },
+  pvWire(el) {
+    const save = () => savePrefs();
+    const drag = (e, mode) => {
+      e.preventDefault(); const pv = prefs.ordPv, sx = e.clientX, sy = e.clientY, o = { ...pv };
+      const mv = ev => { if (mode === 'move') { pv.x = o.x + ev.clientX - sx; pv.y = o.y + ev.clientY - sy; } else { pv.w = o.w + ev.clientX - sx; pv.h = o.h + ev.clientY - sy; } this.pvPaint(); };
+      const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); el.classList.remove('moving'); save(); };
+      el.classList.add('moving'); window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+    };
+    $('.pv-head', el).addEventListener('pointerdown', e => { if (!e.target.closest('.pv-x')) drag(e, 'move'); });
+    $('.pv-grip', el).addEventListener('pointerdown', e => drag(e, 'size'));
+    $('.pv-x', el).addEventListener('click', () => this.pvToggle());
+    // hover: a magnifier over the photo
+    const box = $('.pv-img', el), lens = $('.pv-lens', el), img = $('img', el);
+    box.addEventListener('pointermove', e => {
+      if (img.hidden || !img.naturalWidth) return;
+      const b = box.getBoundingClientRect(), r = img.getBoundingClientRect();
+      const fx = (e.clientX - r.left) / r.width, fy = (e.clientY - r.top) / r.height;
+      if (fx < 0 || fx > 1 || fy < 0 || fy > 1) { lens.style.display = 'none'; return; }
+      const Z = 2.6, L = 170;
+      Object.assign(lens.style, { display: 'block', left: (e.clientX - b.left - L / 2) + 'px', top: (e.clientY - b.top - L / 2) + 'px', width: L + 'px', height: L + 'px',
+        backgroundImage: `url("${img.src}")`, backgroundSize: `${r.width * Z}px ${r.height * Z}px`, backgroundPosition: `${-(fx * r.width * Z - L / 2)}px ${-(fy * r.height * Z - L / 2)}px` });
+    });
+    box.addEventListener('pointerleave', () => { lens.style.display = 'none'; });
+    box.addEventListener('dblclick', () => { const id = +el.dataset.p; if (id) { S.active = id; S.selected = new Set([id]); S.anchor = id; refreshSelection(); ensureVisible(); if (!S.fs) toggleFs(); } });
+  },
   // ---------- team order ----------
   async setTeamOrder(names) {
     try { await api('/api/orders/team-order', { shoot_id: this.sid, teams: names }); } catch (e) { return toast(esc(e.message)); }
@@ -3382,7 +3457,7 @@ const Ord = {
     const el = $(`#left [data-oteam="${CSS.escape(ids[j])}"]`); if (el) el.scrollIntoView({ block: 'nearest' });
   },
   pickTeam(name) {
-    this.team = name; renderLeft(); renderView();
+    this.team = name; renderLeft(); renderView(); this.pvPaint();
     const t = name !== 'all' && this.d ? this.d.teams.find(x => x.name === name) : null;
     if (!t || !t.image || this.showPhoto(t.image)) return;
     const p = this.photoFor(t.image);
@@ -4239,6 +4314,7 @@ const Ord = {
       <div class="pad-x" style="padding-bottom:10px">${switchHTML('glasses', !!d.glasses, 'Glasses — glare to fix')}</div>`;
   },
   right() {
+    this.pvPaint();
     if (this.multi.size > 1) return this.bulkRight();
     const d = this.draft;
     const warn = this.cat && this.cat.warnings.length ? `<div class="hint" style="color:var(--amber)">${this.cat.warnings.map(esc).join('<br>')}</div>` : '';
@@ -4323,6 +4399,7 @@ const Ord = {
     const unm = this.cat ? this.cat.unmapped_roes.length : 0;
     if (this.pickingTeam != null) { $('#modbar').innerHTML = `<span class="banner amber inline" style="margin:0">Click the ${esc(this.pickingTeam)} team photo in the filmstrip</span><div class="tb-spacer"></div><button class="btn sm" data-ord="cancel-team-pick">Cancel (Esc)</button>`; return; }
     $('#modbar').innerHTML = `${this.sid ? segHTML('ordView', this.view, [['orders', 'Envelopes'], ['lab', 'Lab order'], ['an', 'Analysis']]) : ''}
+      ${S.photos.length ? `<button class="btn sm ${prefs.ordPv && prefs.ordPv.open ? 'on' : ''}" data-ord="pv" title="A floating photo of the open envelope (V)">${prefs.ordPv && prefs.ordPv.open ? '✓ ' : ''}Preview</button>` : ''}
       ${S.photos.length ? `<button class="btn sm ${this.picksOnly() ? 'on' : ''}" data-ord="picks-only" title="Show only photos flagged Pick in the filmstrip (one per kid), so each new envelope moves on to the next kid">${this.picksOnly() ? '✓ ' : ''}Filmstrip: picks only</button>` : ''}
       ${S.photos.length && this.d && this.d.orders.length ? '<button class="btn sm" data-ord="select-photos" title="Select every photo picked for an envelope (and the group photos), so Crop exports just those">Select ordered photos</button>' : ''}
       <div class="tb-spacer"></div>
@@ -4340,6 +4417,7 @@ const Ord = {
     if (this.pickingTeam != null && e.key === 'Escape') { this.endTeamPick(); return true; }
     if (e.key === '/') { const i = $('#modView [data-oq]'); if (i) { i.focus(); i.select(); return true; } }
     if (k === 'n' && !e.shiftKey) { this.newOrder(); return true; }
+    if (k === 'v' && !e.shiftKey && S.photos.length) { this.pvToggle(); return true; }
     if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && this.view === 'an') { this.stepTeam(e.key === 'ArrowDown' ? 1 : -1); return true; }
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (this.view !== 'orders') return false; this.move(e.key === 'ArrowDown' ? 1 : -1); return true; }
     if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && S.view.length) { step(e.key === 'ArrowRight' ? 1 : -1); this.photoClicked(S.active); return true; }
@@ -4522,7 +4600,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'pv') Ord.pvToggle(); else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
