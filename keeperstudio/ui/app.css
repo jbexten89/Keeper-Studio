@@ -704,7 +704,7 @@ textarea:focus{border-color:var(--accent)}
 .tot-mini{display:none;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;font-size:12.5px;color:var(--muted)}.tot-mini b{color:var(--text);font-weight:600}.tot-mini b.due{color:var(--amber)}
 .tot-mini .linkish{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit}
 .sec.mini .tot-mini{display:flex}.sec.mini .tot-grid,.sec.mini .tot-btns{display:none}
-.row.dragging{opacity:.4}.row.drop-above{box-shadow:inset 0 2px 0 var(--accent)}.row.drop-below{box-shadow:inset 0 -2px 0 var(--accent)}
+.row.dragging{opacity:.4}body.team-dragging,body.team-dragging *{cursor:grabbing!important;user-select:none!important}.row.drop-above{box-shadow:inset 0 2px 0 var(--accent)}.row.drop-below{box-shadow:inset 0 -2px 0 var(--accent)}
 .hdr-btn.az{font-size:11px;font-variant:normal;letter-spacing:0;padding:1px 6px}
 .ord-pv{position:fixed;z-index:60;background:var(--panel);border:1px solid var(--border-2);border-radius:8px;box-shadow:0 14px 40px rgba(0,0,0,.6);display:flex;flex-direction:column;overflow:hidden;min-width:220px;min-height:220px}
 .ord-pv.moving{opacity:.92;user-select:none}

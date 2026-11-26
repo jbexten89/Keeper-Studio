@@ -102,6 +102,19 @@ def run() -> int:
         step("Orders: preview off", lambda: pg.keyboard.press("v"))
         step("Orders: close envelope", lambda: pg.keyboard.press("Escape"))
         step("Orders: pick a team", lambda: pg.click("#left [data-oteam='JV']"))
+
+        def drag_team():
+            a = pg.locator("#left [data-tdrag='JV']").bounding_box()
+            t = pg.locator("#left [data-tdrag='Varsity']").bounding_box()
+            pg.mouse.move(a["x"] + 30, a["y"] + a["height"] / 2)
+            pg.mouse.down()
+            for i in range(1, 9):
+                pg.mouse.move(a["x"] + 30, a["y"] + a["height"] / 2 + (t["y"] + 3 - a["y"] - a["height"] / 2) * i / 8)
+            pg.mouse.up()
+        step("Orders: drag a team to the top", drag_team, 1000)
+        STEPS.append("Orders: the dragged team moved")
+        if pg.evaluate("() => document.querySelector('#left [data-tdrag]').dataset.tdrag") != "JV":
+            errors.append("Orders: dragging JV above Varsity didn't move it")
         step("Orders: all teams", lambda: pg.click("#left [data-oteam='all']"))
         step("Orders: lab order", lambda: pg.click("[data-seg='ordView'] [data-v='lab']"), 1200)
         step("Orders: analysis", lambda: pg.click("[data-seg='ordView'] [data-v='an']"), 1200)

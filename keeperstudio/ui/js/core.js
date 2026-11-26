@@ -1558,17 +1558,40 @@ function bindEvents() {
         if (m.classList.contains('right')) { m.style.right = (window.innerWidth - r.right) + 'px'; m.style.left = 'auto'; } else { m.style.left = r.left + 'px'; m.style.right = 'auto'; } } return; }
     open.forEach(x => x.classList.remove('open'));
   }, true);
-  // Orders: drag a team in the Teams list to reorder
+  // Orders: drag a team in the Teams list to reorder. Done with plain mouse events, not the
+  // browser's drag-and-drop, which in the app's window can stall while a drag is in flight.
   let tDrag = null;
-  $('#left').addEventListener('dragstart', e => { const r = e.target.closest && e.target.closest('[data-tdrag]'); if (!r) return; tDrag = r.dataset.tdrag; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', tDrag); r.classList.add('dragging'); });
-  $('#left').addEventListener('dragover', e => { if (tDrag == null) return; const r = e.target.closest('[data-tdrag]'); if (!r) return; e.preventDefault();
+  const tClear = () => $$('#left .dragging,#left .drop-above,#left .drop-below').forEach(x => x.classList.remove('dragging', 'drop-above', 'drop-below'));
+  $('#left').addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const r = e.target.closest('[data-tdrag]'); if (!r || e.target.closest('button')) return;
+    tDrag = { name: r.dataset.tdrag, y: e.clientY, on: false, id: e.pointerId };
+  });
+  window.addEventListener('pointermove', e => {
+    if (!tDrag) return;
+    if (!tDrag.on) {
+      if (Math.abs(e.clientY - tDrag.y) < 6) return;
+      tDrag.on = true; document.body.classList.add('team-dragging');
+      const src = $(`#left [data-tdrag="${CSS.escape(tDrag.name)}"]`); if (src) src.classList.add('dragging');
+    }
+    e.preventDefault();
     $$('#left .drop-above,#left .drop-below').forEach(x => x.classList.remove('drop-above', 'drop-below'));
-    const b = r.getBoundingClientRect(); r.classList.add(e.clientY < b.top + b.height / 2 ? 'drop-above' : 'drop-below'); });
-  $('#left').addEventListener('drop', e => { if (tDrag == null) return; e.preventDefault(); const r = e.target.closest('[data-tdrag]'); const name = tDrag; tDrag = null;
-    if (!r || r.dataset.tdrag === name) return renderLeft();
-    const above = r.classList.contains('drop-above'), names = Ord.d.teams.map(t => t.name).filter(t => t !== name), i = names.indexOf(r.dataset.tdrag);
-    Ord.dropTeam(name, above ? r.dataset.tdrag : (names[i + 1] ?? null)); });
-  $('#left').addEventListener('dragend', () => { tDrag = null; $$('#left .dragging,#left .drop-above,#left .drop-below').forEach(x => x.classList.remove('dragging', 'drop-above', 'drop-below')); });
+    const el = document.elementFromPoint(e.clientX, e.clientY), r = el && el.closest('[data-tdrag]');
+    if (r && r.dataset.tdrag !== tDrag.name) { const bb = r.getBoundingClientRect(); r.classList.add(e.clientY < bb.top + bb.height / 2 ? 'drop-above' : 'drop-below'); tDrag.over = r.dataset.tdrag; tDrag.above = e.clientY < bb.top + bb.height / 2; }
+    else tDrag.over = null;
+    // scroll the team list when dragging near its top or bottom edge
+    const box = $('#left [data-sec="o-teams"] > .body'); if (box) { const bb = box.getBoundingClientRect(); if (e.clientY < bb.top + 24) box.scrollTop -= 12; else if (e.clientY > bb.bottom - 24) box.scrollTop += 12; }
+  });
+  window.addEventListener('pointerup', () => {
+    if (!tDrag) return;
+    const d = tDrag; tDrag = null; document.body.classList.remove('team-dragging'); tClear();
+    if (!d.on) return;  // a plain click: let it pick the team
+    S.suppressTeamClick = true; setTimeout(() => { S.suppressTeamClick = false; }, 0);
+    if (!d.over || d.over === d.name) return;
+    const names = Ord.d.teams.map(t => t.name).filter(t => t !== d.name), i = names.indexOf(d.over);
+    Ord.dropTeam(d.name, d.above ? d.over : (names[i + 1] ?? null));
+  });
+  window.addEventListener('pointercancel', () => { tDrag = null; document.body.classList.remove('team-dragging'); tClear(); });
 
   document.addEventListener('keyup', e => { const c = e.getModifierState && e.getModifierState('CapsLock'); if (c !== S.caps) { S.caps = c; syncToolbar(); } });
   document.addEventListener('keydown', onKey);
