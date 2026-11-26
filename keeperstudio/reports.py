@@ -231,7 +231,7 @@ def shoot_summary(orders: list[dict], catalog, shoot: dict, extras: list[dict] |
         methods.setdefault(m, [0, 0])
         methods[m][0] += 1
         methods[m][1] += S(o, "paid_cents")
-    order_m = ["Picture day", "Cash", "Check", "Card", "Other", "Not paid"]
+    order_m = ["Picture day", "Cash", "Check", "Venmo", "Card", "Other", "Not paid"]
     mrows = [row(m, methods[m][0], _money(methods[m][1])) for m in sorted(methods, key=lambda m: order_m.index(m) if m in order_m else 9)]
     mrows.append(tot("TOTAL", len(orders), _money(paid)))
     sections.append({"heading": "Payments", "head": ["Paid by", "Envelopes", "Collected"],

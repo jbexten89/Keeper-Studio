@@ -47,6 +47,20 @@ const Ord = {
   // Put a photo in front in the filmstrip without touching the envelope.
   // Clicking a team in the left pane filters the envelopes and selects its group photo in the filmstrip.
   prepaid() { const sh = this.shoot(); return !!(sh && sh.prepaid); },
+  // How families pay. Card only shows on an old envelope that already says Card.
+  payChoices(cur) {
+    const ways = [['cash', 'Cash'], ['check', 'Check'], ['venmo', 'Venmo'], ...(cur === 'card' ? [['card', 'Card']] : [])];
+    return this.prepaid() ? [['', 'Picture day'], ...ways, ['none', 'Unpaid']] : [['', 'Unpaid'], ...ways];
+  },
+  async bulkPay(method) {
+    const ids = [...this.multi]; if (!ids.length) return;
+    try {
+      const r = await api('/api/orders/bulk-pay', { shoot_id: this.sid, ids, method });
+      await this.refresh(); this.render();
+      const label = (this.payChoices().find(x => x[0] === method) || [, method])[1];
+      toast(`${plural(r.changed, 'envelope')} marked ${method === 'none' || (!method && !this.prepaid()) ? 'unpaid' : method ? `paid by ${esc(label)}` : 'paid on picture day'}`, 4000);
+    } catch (e) { toast(esc(e.message), 5000); }
+  },
   // ---------- floating preview ----------
   // A movable, resizable photo of the open envelope (or the picked team's group photo).
   pvToggle() {
@@ -617,7 +631,7 @@ const Ord = {
         <div class="ex-add"><span class="muted">Add:</span><button class="btn sm" data-x="add" data-src="teams">+ Every team photo</button><button class="btn sm" data-x="add" data-src="team">+ One team's photo</button><button class="btn sm" data-x="add" data-src="photo">+ One photo…</button>${X.crops_checked ? '' : `<span class="muted small" style="margin-left:auto">Crops aren't checked: choose the crops folder under Lab order.</span>`}</div>
         ${banner}
         <div class="ex-pay"><span>Paid</span><input class="ex-money" data-xf="paid" value="${((cur.paid_cents || 0) / 100).toFixed(2)}" inputmode="decimal">
-          ${segHTML('exPaid', pm, [['cash', 'Cash'], ['check', 'Check'], ['card', 'Card'], ['other', 'Other']])}
+          ${segHTML('exPaid', pm, [['cash', 'Cash'], ['check', 'Check'], ['venmo', 'Venmo'], ...(pm === 'card' ? [['card', 'Card']] : []), ['other', 'Other']])}
           ${pm === 'check' ? `<input data-xf="check_no" value="${esc(cur.check_no || '')}" placeholder="Check #" style="width:110px" spellcheck="false">` : ''}
           <span class="${s.due_cents ? 'due' : 'muted'}" style="margin-left:auto">${s.free ? 'Free' : s.due_cents ? `Still owed ${fmt$(s.due_cents)}` : 'Paid in full'}</span>
           <button class="btn sm" data-x="invoice" ${s.free ? 'disabled title="Nothing to bill"' : ''}>Invoice PDF…</button></div>
@@ -1016,7 +1030,7 @@ const Ord = {
       ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
-      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', this.prepaid() ? [['', 'Picture day'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card'], ['none', 'Unpaid']] : [['', 'Unpaid'], ['cash', 'Cash'], ['check', 'Check'], ['card', 'Card']])}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${this.prepaid() && !d.paid_method ? 'paid in full' : '0.00'}" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
+      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${this.prepaid() && !d.paid_method ? 'paid in full' : '0.00'}" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
       ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
       ${warn}
@@ -1057,8 +1071,12 @@ const Ord = {
     $('#right').innerHTML = `<div class="scroll">${sectionHTML('o-bulk', `${sel.length} envelopes selected`, `<div class="hint">${now} Type a team and/or coach to give all of them; a box left empty is left alone.</div>
       <div class="of-grid"><label class="fld wide"><span>Team</span><input id="bulkTeam" list="ordTeams" spellcheck="false" placeholder="e.g. 7th Grade"></label>
       <label class="fld wide"><span>Coach</span><input id="bulkCoach" list="ordCoaches" spellcheck="false"></label></div>
-      <div class="pad"><div class="btn-row"><button class="btn sm" data-ord="clear-multi">Clear selection</button><div class="tb-spacer"></div><button class="btn primary" data-ord="bulk-apply">Apply to ${sel.length}</button></div></div>
-      <div class="hint">Afterwards, set the team's group photo with ▣ on the team at the left.<br><br>Ctrl-click adds or removes one envelope · Shift-click selects a run · Ctrl+A selects all shown · Esc clears.</div>`)}
+      <div class="pad"><div class="btn-row"><button class="btn sm" data-ord="clear-multi">Clear selection</button><div class="tb-spacer"></div><button class="btn primary" data-ord="bulk-apply">Apply to ${sel.length}</button></div></div>`)}
+      ${sectionHTML('o-bulkpay', 'Payment', (() => { const due = sel.reduce((t, o) => t + (o.summary ? o.summary.due_cents : 0), 0), tot = sel.reduce((t, o) => t + (o.summary ? o.summary.total_cents : 0), 0);
+        return `<div class="hint">Mark all ${sel.length} paid in full the same way. ${fmt$(tot)} in all${due ? `, ${fmt$(due)} of it still owed` : ', all paid'}.</div>
+        <div class="pad bulk-pay">${this.payChoices().map(([v, l]) => `<button class="btn sm" data-bulkpay="${v}">${!v && !this.prepaid() ? 'Unpaid' : l}</button>`).join('')}</div>`; })())}
+      ${sectionHTML('o-bulkhelp', 'Selecting', `
+      <div class="hint">Ctrl-click adds or removes one envelope · Shift-click selects a run · Ctrl+A selects all shown · Esc clears. Set a team's group photo with ▣ on the team at the left.</div>`)}
       <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
       <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>`;
     const go = () => this.bulkApply();
@@ -1279,6 +1297,7 @@ function bindModuleEvents() {
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; Ord.paintRows(); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
+      const bp = t.closest('[data-bulkpay]'); if (bp) { e.stopPropagation(); return Ord.bulkPay(bp.dataset.bulkpay); }
       const oa = t.closest('[data-ord]');
       if (oa) {
         e.stopPropagation();

@@ -101,6 +101,9 @@ def run() -> int:
         step("Orders: preview on", lambda: pg.keyboard.press("v"))
         step("Orders: preview off", lambda: pg.keyboard.press("v"))
         step("Orders: close envelope", lambda: pg.keyboard.press("Escape"))
+        step("Orders: select several envelopes", lambda: (pg.keyboard.press("Escape"), pg.locator("#modView tr[data-oid]").nth(2).click(modifiers=["Control"]),
+                                                     pg.locator("#modView tr[data-oid]").nth(3).click(modifiers=["Control"])), 800)
+        step("Orders: mark them paid by Venmo", lambda: pg.click("[data-bulkpay='venmo']"), 1000)
         step("Orders: pick a team", lambda: pg.click("#left [data-oteam='JV']"))
 
         def drag_team():

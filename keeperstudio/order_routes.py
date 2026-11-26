@@ -144,6 +144,15 @@ def r_bulk(b):
     return {"changed": book.bulk_update(int(b["shoot_id"]), b.get("ids") or [], b.get("fields") or {})}
 
 
+def r_bulk_pay(b):
+    """Mark many envelopes paid at once: cash/check/venmo/other = paid in full; "" = picture day; "none" = unpaid."""
+    sid, ids, m = int(b["shoot_id"]), {int(i) for i in b.get("ids") or []}, str(b.get("method") or "").lower()
+    cat = catalog()
+    pays = [(o["id"], m, O.calculate(o["lines"], cat)["total_cents"] if m not in ("", "none") else 0)
+            for o in book.orders(sid) if o["id"] in ids]
+    return {"changed": book.set_payments(sid, pays)}
+
+
 def r_delete(b):
     return {"deleted": book.delete_order(int(b["id"]))}
 
@@ -466,7 +475,7 @@ def r_open_prices(b):
 ROUTES = {
     "/api/orders/catalog": r_catalog, "/api/orders/shoots": r_shoots,
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
-    "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk,
+    "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk, "/api/orders/bulk-pay": r_bulk_pay,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
     "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,

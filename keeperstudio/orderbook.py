@@ -74,7 +74,7 @@ EXTRA_FIELDS = ("kind", "customer", "contact", "items", "paid_method", "paid_cen
 
 ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
                 "image", "edited", "notes", "paid_method", "paid_cents", "lines", "web_order")
-PAID_METHODS = ("", "cash", "check", "card", "other", "none")  # "none": owes it all, even on a prepaid shoot
+PAID_METHODS = ("", "cash", "check", "venmo", "card", "other", "none")  # "none": owes it all, even on a prepaid shoot; "card" kept for old envelopes
 
 
 class OrderBook:
@@ -263,6 +263,17 @@ class OrderBook:
         with self._lock:
             n = self._db.execute(f"UPDATE orders SET {sets}, updated=? WHERE shoot_id=? AND id IN ({','.join('?' * len(ids))})",
                                  (*clean.values(), time.time(), int(sid), *ids)).rowcount
+            self._db.commit()
+        return n
+
+    def set_payments(self, sid: int, pays: list[tuple[int, str, int]]) -> int:
+        """Set (id, method, paid cents) on many envelopes at once."""
+        for _, m, _ in pays:
+            if m not in PAID_METHODS:
+                raise ValueError("Paid by must be cash, check, Venmo or other.")
+        with self._lock:
+            n = sum(self._db.execute("UPDATE orders SET paid_method=?, paid_cents=?, updated=? WHERE shoot_id=? AND id=?",
+                                     (m, max(0, int(c)), time.time(), int(sid), int(i))).rowcount for i, m, c in pays)
             self._db.commit()
         return n
 

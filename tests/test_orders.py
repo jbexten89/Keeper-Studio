@@ -403,3 +403,23 @@ class PrepaidAndTeamOrderTests(unittest.TestCase):
         self.assertEqual(self.b.team_order(sid), ["Cheerleading", "Varsity", "JV"])
         os_ = self.b.orders(sid)
         self.assertEqual([o["team"] for o in sorted(os_, key=O._sort_key)], ["Cheerleading", "Varsity", "JV"])
+
+
+class BulkPaymentTests(unittest.TestCase):
+    def test_mark_several_paid_by_venmo_then_unpaid(self):
+        import tempfile
+        from pathlib import Path
+        from keeperstudio.orderbook import OrderBook
+        with tempfile.TemporaryDirectory() as d:
+            b = OrderBook(Path(d) / "o.sqlite3")
+            sid = b.save_shoot({"name": "Fall", "prepaid": False})["id"]
+            ids = [b.save_order(sid, {"athlete": n, "lines": cart(("pkg-a", 1))})["id"] for n in "ABC"]
+            self.assertEqual(b.set_payments(sid, [(ids[0], "venmo", 4000), (ids[1], "venmo", 4000)]), 2)
+            s = {o["athlete"]: O.order_summary(o, CAT) for o in b.orders(sid)}
+            self.assertEqual((s["A"]["due_cents"], s["B"]["due_cents"], s["C"]["due_cents"]), (0, 0, 4000))
+            self.assertEqual(O.paid_label(next(o for o in b.orders(sid) if o["athlete"] == "A"), s["A"]), "Venmo")
+            b.set_payments(sid, [(ids[0], "none", 0)])
+            self.assertEqual(O.order_summary(next(o for o in b.orders(sid) if o["athlete"] == "A"), CAT)["due_cents"], 4000)
+            with self.assertRaises(ValueError):
+                b.set_payments(sid, [(ids[2], "bitcoin", 1)])
+            b.close()

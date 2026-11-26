@@ -138,9 +138,9 @@ def analyze(orders: list[dict], catalog: Catalog, unit_lab: dict, shipping_cents
             pays.setdefault("Not paid", [0, 0])
             pays["Not paid"][0] += 1
             pays["Not paid"][1] += su["due_cents"]
-    order_m = ["Picture day", "Cash", "Check", "Card", "Other", "Not paid"]
+    order_m = ["Picture day", "Cash", "Check", "Venmo", "Card", "Other", "Not paid"]
     payments = [{"method": m, "envelopes": v[0], "cents": v[1]}
-                for m, v in sorted(pays.items(), key=lambda kv: order_m.index(kv[0]) if kv[0] in order_m else 5)]
+                for m, v in sorted(pays.items(), key=lambda kv: order_m.index(kv[0]) if kv[0] in order_m else 6)]
 
     compare = None
     if one:
