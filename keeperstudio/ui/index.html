@@ -700,6 +700,17 @@ textarea:focus{border-color:var(--accent)}
 .ex-foot2{display:flex;gap:10px;margin-top:10px}.ex-foot2 input{flex:1}
 .ex-foot{display:flex;gap:24px;align-items:center;padding:10px 2px 0;color:var(--text)}.ex-foot b{font-weight:600}
 .tot-grid .sub{font-size:12px;color:var(--muted);padding-left:8px}.tot-grid b.sub{font-weight:400}.tot-grid .link{cursor:pointer;color:var(--accent)}.tot-grid .link:hover{text-decoration:underline}
+.ord-left{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.ord-left>.sec{flex:none;display:flex;flex-direction:column;min-height:0}
+.ord-left>.sec>.body{overflow:auto;min-height:0}
+.ord-left>.sec[data-sec="o-shoots"]>.body{max-height:min(30vh,260px)}
+.ord-left>.sec[data-sec="o-teams"]:not(.closed){flex:1 1 auto;min-height:90px}
+.ord-left>.sec[data-sec="o-teams"]>.body{flex:1}
+.ord-left>.sec[data-sec="o-totals"]{flex:none;margin-top:auto}
+.ord-left>.sec[data-sec="o-totals"]>.body{overflow:visible}
+.tot-mini{display:none;flex-wrap:wrap;gap:4px 12px;padding:8px 12px;font-size:12.5px;color:var(--muted)}.tot-mini b{color:var(--text);font-weight:600}.tot-mini b.due{color:var(--amber)}
+.tot-mini .linkish{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font:inherit}
+.sec.mini .tot-mini{display:flex}.sec.mini .tot-grid,.sec.mini .tot-btns{display:none}
 .tot-btns{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding-top:6px!important}.tot-btns .btn{width:100%;justify-content:center;text-align:center}
 .ord-scroll.an{padding:12px 14px}
 .an-kpis{grid-template-columns:repeat(7,minmax(0,1fr))!important}
@@ -2344,6 +2355,7 @@ function bindEvents() {
 
   const ro = new ResizeObserver(() => schedule(R_CELLS | R_ALL));
   ro.observe($('#viewport')); ro.observe($('#filmScroll'));
+  new ResizeObserver(() => { if (S.module === 'orders') Ord.fitLeft(); }).observe($('#left'));
 
   document.addEventListener('keyup', e => { const c = e.getModifierState && e.getModifierState('CapsLock'); if (c !== S.caps) { S.caps = c; syncToolbar(); } });
   document.addEventListener('keydown', onKey);
@@ -4045,15 +4057,28 @@ const Ord = {
     // Archived shoots stay hidden unless the switch is on; the open shoot always shows.
     const nArch = this.shoots.filter(s => s.archived).length;
     const showArch = !!(prefs.ordShowArchived);
-    const sh = this.shoots.filter(s => showArch || !s.archived || s.id === this.sid).map(s => `<div class="row ${s.id === this.sid ? 'on' : ''} ${s.archived ? 'arch' : ''}" data-oshoot="${s.id}" ${s.archived ? 'title="Archived"' : ''}><span class="two"><span class="lbl">${esc(s.name)}${s.archived ? '<span class="arch-tag">Archived</span>' : ''}</span><span class="sub">${esc([fmtDay(s.date), s.season].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
+    const sh = this.shoots.filter(s => showArch || !s.archived || s.id === this.sid).map(s => `<div class="row ${s.id === this.sid ? 'on' : ''} ${s.archived ? 'arch' : ''}" data-oshoot="${s.id}" ${s.archived ? 'title="Archived"' : ''}><span class="two"><span class="lbl">${esc(s.name)}${s.archived ? '<span class="arch-tag">Archived</span>' : ''}</span><span class="sub">${esc([fmtDay(s.date), s.season && !(s.date && String(s.season).trim() === String(s.date).slice(0, 4)) ? s.season : ''].filter(Boolean).join(' · ') || ' ')}</span></span><span class="row-acts"><button data-ord="edit-shoot" data-id="${s.id}" title="Edit shoot">✎</button></span><span class="cnt">${s.n || ''}</span></div>`).join('');
     let html = sectionHTML('o-shoots', 'Shoots', (sh || '<div class="hint">A shoot is one picture day: its envelopes, teams and lab order.</div>') + `<div class="pad shoot-foot"><button class="btn sm" data-ord="new-shoot">New shoot…</button>${nArch ? `<label class="arch-sw" title="Archived shoots are kept; this only hides them from the list"><input type="checkbox" data-ord-arch ${showArch ? 'checked' : ''}> Show archived (${nArch})</label>` : ''}</div>`);
     if (this.d) {
       const team = x => `<div class="row ${this.team === x.name ? 'on' : ''}" data-oteam="${esc(x.name)}"><span class="two"><span class="lbl">${esc(x.name)}</span><span class="sub">${x.image ? 'Group photo ' + esc(x.image) : 'No group photo yet'}</span></span><span class="row-acts"><button data-ord="team-photo" data-team="${esc(x.name)}" title="Set the group photo">▣</button><button data-ord="team-rename" data-team="${esc(x.name)}" title="Rename team">✎</button></span><span class="cnt">${x.count}</span></div>`;
       html += sectionHTML('o-teams', 'Teams', `<div class="row ${this.team === 'all' ? 'on' : ''}" data-oteam="all"><span class="lbl">All teams</span><span class="cnt">${this.d.orders.length}</span></div>${this.d.teams.map(team).join('')}`);
       const T = this.d.totals;
-      html += sectionHTML('o-totals', 'Totals', `<div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad tot-btns"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button><button class="btn sm" data-ord="extras" title="Prints for the school, the park, teachers or a sponsor — free or paid — that aren't on any envelope">School &amp; other orders…</button></div>`);
+      html += sectionHTML('o-totals', 'Totals', `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Keep <b>${fmt$(T.keep_cents || 0)}</b></span><span>Profit <b>${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b></span><span>Due <b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b></span><button class="linkish" data-ord="tot-full">Show all</button></div><div class="tot-grid"><span>Envelopes</span><b>${T.orders}</b><span>Sales</span><b class="big">${fmt$(T.total_cents)}</b>${T.extras && T.extras.count ? `<span class="sub">Families</span><b class="sub">${fmt$(T.family_cents)}</b><span class="sub link" data-ord="extras" title="Prints for the school, the park, teachers…">School &amp; other (${T.extras.count})</span><b class="sub link" data-ord="extras">${fmt$(T.extras.sales_cents)}</b>` : ''}<span title="Meridian's list prices; shipping and tax not included">Lab cost (est.)</span><b>${fmt$(T.lab_cents || 0)}</b><span title="What Meridian charged to ship this shoot's order. Type it in from the invoice.">Shipping</span><b><input class="ship-in" data-oship value="${T.shipping_cents ? (T.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></b><span title="Sales minus lab cost and shipping">You keep</span><b>${fmt$(T.keep_cents || 0)}</b><span title="You keep ÷ sales">Profit</span><b class="${T.profit_pct != null && T.profit_pct < 0 ? 'due' : ''}">${T.profit_pct == null ? '—' : T.profit_pct.toFixed(1) + '%'}</b><span>Collected</span><b>${fmt$(T.paid_cents)}</b><span>Still due${T.unpaid ? ` (${T.unpaid})` : ''}</span><b class="${T.due_cents > 0 ? 'due' : ''}">${fmt$(T.due_cents)}</b><span>Need a photo</span><b class="${T.no_photo ? 'due' : ''}">${T.no_photo}</b><span>Glasses</span><b>${T.glasses}</b></div><div class="pad tot-btns"><button class="btn sm" data-ord="summary" title="The whole shoot: totals, teams, payments, what sold, prints, who still owes">Shoot summary…</button><button class="btn sm" data-ord="extras" title="Prints for the school, the park, teachers or a sponsor — free or paid — that aren't on any envelope">School &amp; other orders…</button></div>`);
     }
-    $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
+    // Shoots stay at the top and Totals at the bottom; Teams scrolls in between.
+    const keep = {}; for (const id of ['o-shoots', 'o-teams', 'o-totals']) { const b = $(`#left [data-sec="${id}"] > .body`); if (b) keep[id] = b.scrollTop; }
+    $('#left').innerHTML = `<div class="ord-left">${html}</div><div class="left-foot"><button class="btn primary big" data-ord="new" ${this.sid ? '' : 'disabled'}>New envelope</button></div>`;
+    for (const id in keep) { const b = $(`#left [data-sec="${id}"] > .body`); if (b) b.scrollTop = keep[id]; }
+    const on = $('#left [data-sec="o-teams"] .row.on'); if (on && this._teamScroll !== this.team) { this._teamScroll = this.team; on.scrollIntoView({ block: 'nearest' }); }
+    this.fitLeft();
+    const so = $('#left [data-sec="o-shoots"] .row.on'); if (so && this._shootScroll !== this.sid) { this._shootScroll = this.sid; so.scrollIntoView({ block: 'nearest' }); }
+  },
+  // A short window: Totals shrinks to one line (Sales, Keep, Profit, Due) so Teams keeps some rows.
+  fitLeft() {
+    const sec = $('#left [data-sec="o-totals"]'), tb = $('#left [data-sec="o-teams"]:not(.closed) > .body'); if (!sec) return;
+    sec.classList.remove('mini');
+    if (this.totFull || !tb) return;
+    if (tb.clientHeight < 115) sec.classList.add('mini');
   },
   center() {
     const v = $('#modView'); v.dataset.mod = 'orders';
@@ -4445,7 +4470,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
