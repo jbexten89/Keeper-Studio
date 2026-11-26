@@ -805,3 +805,7 @@ textarea:focus{border-color:var(--accent)}
 .rt-adj label{flex:1;display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);position:relative}
 .rt-adj input{width:100%;background:#0E1013;color:var(--text);border:1px solid var(--border);border-radius:5px;padding:4px 18px 4px 6px;font:inherit;font-size:12.5px}
 .rt-adj i{position:absolute;right:6px;bottom:6px;font-style:normal;font-size:11px;color:var(--dim)}
+
+/* Envelope total box: one color for where the envelope stands, green for what you keep */
+.tot-sum .st .ok{color:#3CC77F}.tot-sum .st .due{color:var(--amber)}.tot-sum .st .chg{color:var(--accent)}.tot-sum .st .short{color:rgba(227,160,79,.75)}
+.tot-sum .labline .keep{color:#3CC77F}.tot-sum .labline .keep.neg{color:#E0605A}

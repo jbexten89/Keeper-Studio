@@ -237,7 +237,7 @@ const Ord = {
     const teamIx = new Map((this.d.teams || []).map((t, n) => [t.name, n]));
     const teamRank = o => (o.team ? (teamIx.has(o.team) ? teamIx.get(o.team) : 9e8) : 1e9);
     const photoNum = o => { const m = String(o.edited || o.image || '').match(/(\d+)(?!.*\d)/); return m ? +m[1] : 1e12; };
-    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : k === 'lab' ? o.summary.lab_cents : k === 'profit' ? o.summary.keep_cents : k === 'ppct' ? (o.summary.total_cents ? o.summary.keep_cents / o.summary.total_cents : -1e9) : k === 'team' ? teamRank(o) : k === 'image' ? photoNum(o) : String(o[k] || '').toLowerCase();
+    const val = o => k === 'env' ? (/^\d+$/.test(o.envelope) ? +o.envelope : 1e9) : k === 'total' ? o.summary.total_cents : k === 'due' ? o.summary.due_cents : k === 'lab' ? o.summary.lab_cents : k === 'profit' ? o.summary.keep_cents : k === 'ppct' ? (o.summary.total_cents ? o.summary.keep_cents / o.summary.total_cents : -1e9) : k === 'team' ? teamRank(o) : k === 'image' ? photoNum(o) : k === 'glasses' ? (o.glasses ? 0 : 1) : String(o[k] || '').toLowerCase();
     const envN = o => (/^\d+$/.test(String(o.envelope).trim()) ? +o.envelope : 1e9);
     return r.slice().sort((a, b) => { const x = val(a), y = val(b); return (x < y ? -1 : x > y ? 1 : 0) * dir || envN(a) - envN(b) || collator.compare(a.athlete, b.athlete) || a.id - b.id; });
   },
@@ -947,7 +947,7 @@ const Ord = {
     // An envelope that's open but not saved yet (nothing typed) still gets a row, so N visibly does something.
     const d = this.draft, fresh = this.sel === 'new' && d && !d.id;
     const newRow = !fresh ? '' : `<tr class="sel new-row" data-onew><td class="env">${esc(d.envelope)}</td><td colspan="10">${d.athlete.trim() ? esc(d.athlete) : '<span class="new-tag">New</span><span class="dim">Type the athlete’s name or press a package letter. It saves as soon as you do.</span>'}</td></tr>`;
-    box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}<th title="Glasses">Glasses</th>${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('profit', 'Profit', 'amt')}${th('ppct', 'Profit %', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody>${this.totalsRow(rows)}</table>`
+    box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}${th('glasses', 'Glasses')}${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('profit', 'Profit', 'amt')}${th('ppct', 'Profit %', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody>${this.totalsRow(rows)}</table>`
       : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
     box.scrollTop = y;
     const nr = fresh && $('tr[data-onew]', box);
@@ -1001,7 +1001,7 @@ const Ord = {
     const auto = this.prepaid() && !d.paid_cents && !d.paid_method;
     const short = Math.min(d.accepted_cents || 0, pr.total);
     const due = auto ? 0 : pr.total - short - (d.paid_cents || 0);
-    const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">Give ${fmt$(-due)} change</span>` : short ? `<span class="ok">Paid ${fmt$(pr.total - short)} · accepted ${fmt$(short)} short</span>` : '<span class="ok">Paid in full</span>';
+    const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="chg">Give ${fmt$(-due)} change</span>` : short ? `<span class="short">Paid ${fmt$(pr.total - short)} · accepted ${fmt$(short)} short</span>` : '<span class="ok">Paid in full</span>';
     return `<div class="tot-sum">${this.sumHTML(pr, d, st)}</div>
       <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label>${due < 0 ? `<button class="btn sm" data-ord="change-given" title="You handed back the change: record the payment as the total">Change given</button>` : ''}${due > 0 && d.paid_cents ? `<button class="btn sm" data-ord="short-accept" title="Let the ${fmt$(due)} go: the envelope counts as paid, and its total becomes what they paid">Accept ${fmt$(due)} short</button>` : ''}${short && due <= 0 ? `<button class="btn sm" data-ord="short-undo" title="They still owe the ${fmt$(short)}">Undo</button>` : ''}</div>
       <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
@@ -1025,7 +1025,7 @@ const Ord = {
     const L = this.labEst && this.labEst.key === key ? this.labEst.s : null;
     if (!L) return '<span class="labline">Lab cost …</span>';
     const miss = L.lab_unpriced && L.lab_unpriced.length ? ` <span class="warn" title="No Meridian price for: ${esc(L.lab_unpriced.join(', '))}">+ ${L.lab_unpriced.length} not priced</span>` : '';
-    return `<span class="labline" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · You keep ${fmt$(pr.total - Math.min(d.accepted_cents || 0, pr.total) - L.lab_cents)}</span>`;
+    return `<span class="labline" title="Meridian's list prices; shipping and tax not included">Lab cost ≈ ${fmt$(L.lab_cents)}${miss} · ${(k => `<span class="keep ${k < 0 ? 'neg' : ''}">You keep ${fmt$(k)}</span>`)(pr.total - Math.min(d.accepted_cents || 0, pr.total) - L.lab_cents)}</span>`;
   },
   photoHTML(d) {
     const stem = d.edited || d.image, ph = stem ? this.photoFor(stem) : null, act = S.byId.get(S.active);
