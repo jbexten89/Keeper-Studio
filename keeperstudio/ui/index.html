@@ -3432,7 +3432,16 @@ const Ord = {
     this.sel = id; this.draft = JSON.parse(JSON.stringify(o)); this.state = ''; this.err = false;
     this.showPhoto(o.edited || o.image);
     this.paintRows(); renderRight();
-    const tr = $(`#modView tr[data-oid="${id}"]`); if (tr) tr.scrollIntoView({ block: 'nearest' });
+    this.revealRow(id);
+  },
+  // Scroll the envelope list so a row shows clear of the sticky header and totals row.
+  revealRow(id) {
+    const tr = $(`#modView tr[data-oid="${id}"]`); if (!tr) return;
+    let box = tr.parentElement; while (box && box !== document.body && !(box.scrollHeight > box.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(box).overflowY))) box = box.parentElement;
+    if (!box || box === document.body) { tr.scrollIntoView({ block: 'center' }); return; }
+    const tbl = tr.closest('table'), head = tbl && tbl.tHead ? tbl.tHead.offsetHeight : 0, foot = tbl && tbl.tFoot ? tbl.tFoot.offsetHeight : 0;
+    const b = box.getBoundingClientRect(), r = tr.getBoundingClientRect();
+    if (r.top < b.top + head + 2 || r.bottom > b.bottom - foot - 2) box.scrollTop += (r.top + r.height / 2) - (b.top + head + (b.height - head - foot) / 2);
   },
   async newOrder() {
     if (!this.sid) return this.editShoot(true);
