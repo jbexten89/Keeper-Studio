@@ -239,6 +239,11 @@ def run_config(settings: dict):
 # are written back into config.yaml in place, keeping every comment.
 # (group, section, key, label, min, max, default when missing from config.yaml)
 # section "ratio:NAME" is a value inside that size's entry in the ratios list.
+# Team photos are framed by a fixed band of the photo: the top edge this share
+# of the height down from the top, the bottom edge this share up from the bottom.
+# Both 0 = frame around the people found instead (the old way).
+BAND_TOP, BAND_BOTTOM = 0.17, 0.21
+
 TUNABLES = [
     ("Full length", "framing", "eye_line_fraction", "Eye line", 0.02, 0.6, None),
     ("Full length", "framing", "headroom_fraction", "Headroom", 0.0, 0.5, None),
@@ -250,6 +255,8 @@ TUNABLES = [
     ("Preschool", "framing", "preschool_headroom_fraction", "Headroom", 0.0, 0.5, None),
     ("Square (tight)", "ratio:3_5x3_5", "eye_line_fraction", "Eye line", 0.02, 0.8, None),
     ("Square (tight)", "ratio:3_5x3_5", "headroom_fraction", "Headroom", 0.0, 0.6, None),
+    ("Group shots", "landscape", "band_top_fraction", "Top edge (down from the top)", 0.0, 0.45, BAND_TOP),
+    ("Group shots", "landscape", "band_bottom_fraction", "Bottom edge (up from the bottom)", 0.0, 0.45, BAND_BOTTOM),
     ("Group shots", "landscape", "margin_fraction", "Margin around the group", 0.0, 0.5, None),
     ("Face finding", "framing", "eye_to_chin_multiplier", "Crown estimate (eye-to-chin ×)", 0.5, 2.5, None),
     ("Face finding", "detector", "confidence_threshold", "Face detection confidence", 0.05, 0.99, None),
@@ -265,7 +272,9 @@ TUNE_HELP = {
     "framing.preschool_headroom_fraction": "Headroom for seated preschool framing.",
     "ratio:3_5x3_5.eye_line_fraction": "Where the eyes sit in the tight square.",
     "ratio:3_5x3_5.headroom_fraction": "Space above the head in the tight square.",
-    "landscape.margin_fraction": "Space kept around the whole group in group shots.",
+    "landscape.band_top_fraction": "Team photos: where the top of the crop sits, as a share of the photo's height from the top. Set Top and Bottom both to 0 to frame around the people found instead.",
+    "landscape.band_bottom_fraction": "Team photos: where the bottom of the crop sits, as a share of the photo's height up from the bottom.",
+    "landscape.margin_fraction": "Space kept beside the team when it's too wide for the band (the crop then grows evenly). With Top and Bottom at 0, the space around the whole group.",
     "framing.eye_to_chin_multiplier": "How far above the eyes the top of the head is estimated, in eye-to-chin lengths.",
     "detector.confidence_threshold": "Lower finds more faces (including false ones); higher finds fewer.",
 }
@@ -509,6 +518,10 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
                    segmenter=None, enhance_when="before", bottom_margin=None, preschool_framing=None):
     m = (getattr(_tl, "group_manual", None) or {}).get(str(path))
     style = getattr(_tl, "framing_style", "full")
+    if not m and config.landscape_enabled and config.landscape_ratios:
+        r = _band_group(path, config, out_dir, lut, enhance_when, segmenter)
+        if r is not None:
+            return r
     if not m and style in ("knee_above", "knee_below") and preschool_framing is None:
         r = _three_quarter(path, detector, config, out_dir, lut, enhance_when, style)
         if r is not None:
@@ -522,6 +535,80 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
     post_lut = pipeline._resolve_enhance(source, lut, enhance_when)
     written = {}
     for name, box in group_boxes(m, config, source.size).items():
+        written[name] = pipeline._write_crop(source, box.as_pil(), out_dir, path.stem, name, path.suffix, config, post_lut)
+    return pipeline.ImageResult(path, pipeline.OK, None, written)
+
+
+def band_boxes(size, top_f, bottom_f, cfg, group_x=None) -> dict:
+    """Team-photo crops from a fixed band of the photo.
+
+    Each landscape size keeps the band's height and is centred on the team
+    (`group_x` = the team's left and right edge, found inside the band) or on the
+    photo. A team too wide for the band gets the crop grown evenly instead of
+    cut; it never runs off the photo.
+    """
+    from photocropper.geometry import group_crop_box, manual_crop_box
+    w, h = size
+    top = h * top_f
+    bot = max(top + 2, h * (1 - bottom_f))
+    if group_x:
+        pad = (bot - top) * cfg.landscape_margin_fraction
+        x0, x1 = max(0, group_x[0] - pad), min(w, group_x[1] + pad)
+    else:
+        x0 = x1 = w / 2
+    bbox = (int(round(x0)), int(round(top)), int(round(max(x1, x0 + 1))), int(round(bot)))
+    out = {}
+    for r in cfg.landscape_ratios:
+        box = group_crop_box(bbox, size, r.width, r.height, 0.0)
+        if box is None:  # wider than the photo allows: the biggest crop that fits, centred on the band
+            a = max(r.width, r.height) / min(r.width, r.height)
+            hh = min(h, w / a)
+            box, _ = manual_crop_box((x0 + x1) / 2, (top + bot) / 2 - hh / 2, hh, (max(r.width, r.height), min(r.width, r.height)), size)
+        out[r.name] = box
+    return out
+
+
+def _team_sides(segmenter, rgb, top, bot):
+    """Left and right edge of the team inside the band, or None.
+
+    The person finder works on a small square picture, so a whole wide photo
+    loses the people at the ends. It looks at overlapping squares across the
+    band instead; only the band is searched, so floor reflections below it and
+    banners above it don't count.
+    """
+    import numpy as np
+    w = rgb.shape[1]
+    side = max(16, bot - top)
+    strip = rgb[top:bot]
+    xs, x = [], 0
+    try:
+        while True:
+            x1 = min(w, x + side)
+            bb = segmenter.group_bbox(np.ascontiguousarray(strip[:, x:x1]))
+            if bb:
+                xs += [x + bb[0], x + bb[2]]
+            if x1 >= w:
+                break
+            x += max(1, side // 2)
+    except Exception:
+        return None
+    return (min(xs), max(xs)) if xs else None
+
+
+def _band_group(path, config, out_dir, lut, enhance_when, segmenter):
+    top_f = tune_value("landscape", "band_top_fraction", BAND_TOP)
+    bottom_f = tune_value("landscape", "band_bottom_fraction", BAND_BOTTOM)
+    if top_f <= 0 and bottom_f <= 0:
+        return None  # band off: frame around the people found
+    from photocropper import imageio
+    source = imageio.load(path)
+    if source.size[0] <= source.size[1]:
+        return None  # not a group shot
+    post_lut = pipeline._resolve_enhance(source, lut, enhance_when or "before")
+    w, h = source.size
+    gx = _team_sides(segmenter, source.as_rgb_array(), int(h * top_f), int(h * (1 - bottom_f))) if segmenter is not None else None
+    written = {}
+    for name, box in band_boxes(source.size, top_f, bottom_f, config, gx).items():
         written[name] = pipeline._write_crop(source, box.as_pil(), out_dir, path.stem, name, path.suffix, config, post_lut)
     return pipeline.ImageResult(path, pipeline.OK, None, written)
 
@@ -668,7 +755,7 @@ pipeline.apply_manual_crop = _apply_manual
 # settings and any hand placement. Same inputs -> instant answer, even after a
 # restart; change any of them and that photo is checked afresh.
 plan_store = None  # set by the server: a Catalog
-PLAN_VERSION = 3  # bump when the engine would answer differently, so saved checks are redone
+PLAN_VERSION = 4  # bump when the engine would answer differently, so saved checks are redone
 _PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
                   "landscape", "fit_to_frame", "disabled_sizes", "framing_style")
 _focus_lock = threading.Lock()

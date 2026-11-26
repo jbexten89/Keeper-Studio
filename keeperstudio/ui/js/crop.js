@@ -522,13 +522,14 @@ const Crop = {
     const start = Object.fromEntries(t.map(x => [`${x.section}.${x.key}`, x.value]));
     const open = { full: 'Full length', knee_above: '3/4 length', knee_below: '3/4 length', preschool: 'Preschool' }[(this.active() && this.styleOf(this.active().path)) || this.batchStyle()];
     const groups = [...new Set(t.map(x => x.group))];
+    const pl = this.active() && this.plans.get(this.active().path); const onGroup = !!(pl && pl.landscape);
     const fmt = v => v == null ? '' : (+v).toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
     const row = x => { const k = `${x.section}.${x.key}`, step = x.max > 1.5 ? 0.01 : 0.002;
       return `<div class="tune-row" title="${esc(x.help)}"><label>${esc(x.label)}</label><input type="range" min="${x.min}" max="${x.max}" step="${step}" value="${x.value ?? x.min}" data-tr="${k}"><input type="number" min="${x.min}" max="${x.max}" step="${step / 2}" value="${fmt(x.value)}" data-tn="${k}"></div>`; };
     const el = document.createElement('div'); el.id = 'tunePanel'; el.className = 'tune-panel';
     el.innerHTML = `<div class="tp-head"><b>Fine-tune framing</b><button class="btn sm" data-tp="close" title="Done">Done</button></div>
       <div class="tp-note">Changes apply as you go and re-check the photo on screen. Values are shares of the frame height. Hover a row for what it does.</div>
-      <div class="tp-body">${groups.map(g => `<details ${g === open || g === 'Square (tight)' ? 'open' : ''}><summary>${esc(g)}</summary>${t.filter(x => x.group === g).map(row).join('')}</details>`).join('')}</div>
+      <div class="tp-body">${groups.map(g => `<details ${(onGroup ? g === 'Group shots' : (g === open || g === 'Square (tight)')) ? 'open' : ''}><summary>${esc(g)}</summary>${t.filter(x => x.group === g).map(row).join('')}</details>`).join('')}</div>
       <div class="tp-foot"><button class="btn sm" data-tp="revert">Undo changes</button><button class="btn sm" data-tp="config">Open config.yaml</button></div>`;
     document.body.appendChild(el);
     const pending = {};
