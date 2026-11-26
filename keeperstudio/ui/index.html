@@ -727,6 +727,10 @@ textarea:focus{border-color:var(--accent)}
 .an-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
 .an-k{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:0}
 .an-k i{font-style:normal;color:var(--muted);font-size:12px;display:block}.an-k b{font-weight:500;font-size:22px;display:block;margin:2px 0;white-space:nowrap}.an-k s{text-decoration:none;color:var(--muted);font-size:12px}
+.an-row.r2b{grid-template-columns:1.4fr 1fr}
+.pk-t td.pk-bar,.pk-t th.pk-bar{width:28%;text-align:left}.pk-t .an-hb{display:block}.pk-t .an-hb .tr{height:12px}
+.pk-t td.pk-share{width:150px;white-space:nowrap}.pk-t .sh{display:inline-block;width:70px;height:8px;background:var(--raised);border-radius:3px;margin-right:8px;vertical-align:middle;overflow:hidden}.pk-t .sh i{display:block;height:100%;background:#46C77F}
+.pk-t tr.none .tr div{display:none}
 .an-row{display:grid;gap:12px}.an-row.r3{grid-template-columns:1fr 1.25fr 1fr}.an-row.r2{grid-template-columns:1fr 1fr}
 .an-card{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;min-width:0}
 .an-card h4{margin:0 0 9px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:400}
@@ -3960,7 +3964,6 @@ const Ord = {
     const P = A.products, pk = P.filter(p => p.kind === 'package'), ac = P.filter(p => p.kind === 'alacarte'), ks = P.filter(p => p.kind === 'keepsake');
     const pkN = pk.reduce((t, p) => t + p.sold, 0), mx = Math.max(1, ...pk.map(p => p.sold));
     const bar = (l, v, max, r, cls = '') => `<div class="an-hb"><span>${l}</span><div class="tr"><div class="${cls}" style="width:${max ? 100 * v / max : 0}%"></div></div><em>${r}</em></div>`;
-    const mix = '<div class="an-bars">' + pk.map(p => bar(`${esc(p.label)} <span class="dim">${fmt$(p.price)}</span>`, p.sold, mx, `${p.sold} · ${pct(p.sold, pkN)}`)).join('') + '</div>';
     let cmp;
     if (one) {
       const f = (k, v) => v == null ? '—' : k === 'money' ? fmt$(v) : k === 'pct1' ? v.toFixed(1) + '%' : Math.round(v) + '%';
@@ -3983,14 +3986,18 @@ const Ord = {
       return `<table class="an-t"><tr><th>Item</th><th>Price</th><th>Sold</th>${one ? '<th title="Sold across the whole shoot">Shoot</th>' : ''}<th>Sales</th><th>Profit each</th><th>Profit</th></tr>${rows}<tr class="tot"><td>Total</td><td></td><td>${tq}</td>${one ? `<td class="dim">${tsh}</td>` : ''}<td>${fmt$(ts)}</td><td>${ts ? Math.round(100 * tp / ts) + '%' : ''}</td><td>${fmt$(tp)}</td></tr></table>
         <div class="dim small">${envs} of ${s.n} envelopes ${what} (${pct(envs, s.n)})${envs ? ` · average ${fmt$(Math.round(sales / envs))} each when they did` : ''}</div>`;
     };
-    const pkRows = pk.filter(p => p.sold).map(p => { const l = lab(p); return `<tr><td>${esc(p.label)}</td><td>${p.sold}</td><td>${fmt$(p.price)}</td><td>${l == null ? '<span class="dim">not priced</span>' : fmt$(l)}</td><td>${each(p)}</td><td>${l == null ? '' : fmt$(p.sales - l * p.sold)}</td></tr>`; }).join('');
+    const pkProfit = p => { const l = lab(p); return l == null ? 0 : p.sales - l * p.sold; };
+    const pkTotP = pk.reduce((t, p) => t + Math.max(0, pkProfit(p)), 0), pkTotS = pk.reduce((t, p) => t + p.sales, 0);
+    const pkRows = pk.map(p => { const l = lab(p), pr = pkProfit(p);
+      return `<tr class="${p.sold ? '' : 'none'}"><td>${esc(p.label)}</td><td>${fmt$(p.price)}</td><td class="pk-bar"><div class="an-hb"><div class="tr"><div style="width:${100 * p.sold / mx}%"></div></div></div></td><td class="nw">${p.sold} · ${pct(p.sold, pkN)}</td><td>${l == null ? '<span class="dim">not priced</span>' : fmt$(l)}</td><td>${p.sold ? each(p) : ''}</td><td class="${p.sold ? mc(p.sales ? pr / p.sales : null) : ''}">${p.sold && l != null ? fmt$(pr) : ''}</td><td class="pk-share">${p.sold && l != null && pkTotP ? `<span class="sh"><i style="width:${100 * Math.max(0, pr) / pkTotP}%"></i></span>${Math.round(100 * Math.max(0, pr) / pkTotP)}%` : ''}</td></tr>`; }).join('')
+      + `<tr class="tot"><td>All packages</td><td></td><td></td><td>${pkN}</td><td></td><td>${pkTotS ? Math.round(100 * pkTotP / pkTotS) + '%' : ''}</td><td>${fmt$(pkTotP)}</td><td></td></tr>`;
     const unp = A.lab_unpriced.length ? `<div class="banner amber inline" style="margin:0">Lab cost leaves out ${esc(A.lab_unpriced.join(', '))}: no Meridian price for ${A.lab_unpriced.length > 1 ? 'them' : 'it'} yet (Prices…).</div>` : '';
     box.innerHTML = `<div class="an-body">${unp}
       <div class="an-kpis">${kp.map(k => `<div class="an-k ${k[3] || ''}"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
       <div class="an-legend"><span><i class="an-good">●</i> strong (70%+ margin, 10%+ above the shoot)</span><span><i class="an-lo">●</i> worth a look (under 50% margin, 10%+ below, still owed)</span><span><i class="an-neg">●</i> losing money</span><span class="cat"><i class="c-pk">■</i> packages <i class="c-ac">■</i> a la carte <i class="c-ks">■</i> keepsakes</span></div>
-      <div class="an-row r3"><div class="an-card c-pk"><h4>Package mix</h4>${mix}</div><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
+      <div class="an-card c-pk"><h4>Packages</h4><table class="an-t pk-t"><tr><th>Package</th><th>Price</th><th class="pk-bar">Sold</th><th></th><th>Lab cost</th><th>Profit each</th><th>Profit total</th><th>Share of profit</th></tr>${pkRows}</table></div>
+      <div class="an-row r2b"><div class="an-card">${cmp}</div><div class="an-card"><h4>Payments</h4>${pay}</div></div>
       <div class="an-row r2"><div class="an-card c-ac"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card c-ks"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
-      <div class="an-card c-pk"><h4>Profit by package</h4>${pkRows ? `<table class="an-t"><tr><th>Package</th><th>Sold</th><th>Price</th><th>Lab cost</th><th>Profit each</th><th>Profit total</th></tr>${pkRows}</table>` : '<div class="dim">No packages sold.</div>'}<div class="dim small">Amber: keeps less than half its price after lab cost.</div></div>
       <div class="an-card wi ${prefs.ordWhatIfClosed ? 'closed' : ''}" id="anWi"><h4 class="wh" data-ord="wi-toggle"><span class="chev">▾</span>What if <span class="tag">try new prices</span><span class="wmini" id="wiMini"></span><button class="btn sm wclose">${prefs.ordWhatIfClosed ? 'Show' : 'Hide'}</button></h4>
         <div class="wif"><div class="wl" id="wiT"></div>
           <div class="wr"><div class="drop"><div>Families who stop buying an item when its price goes up</div><div class="dr"><input type="range" data-wi-drop min="0" max="50" step="5" value="${this.wiDrop}"><b id="wiDropV">${this.wiDrop}%</b></div><div class="dim small">Only applies to prices you raise. Lowered prices assume the same buyers.</div></div>
