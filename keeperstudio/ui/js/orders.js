@@ -980,8 +980,11 @@ const Ord = {
     const auto = this.prepaid() && !d.paid_cents && !d.paid_method;
     const due = auto ? 0 : pr.total - (d.paid_cents || 0);
     const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="due">${fmt$(-due)} more than the total</span>` : '<span class="ok">Paid in full</span>';
-    return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span><div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
+    return `<div class="tot-sum">${this.sumHTML(pr, d, st)}</div>
+      <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label></div>
+      <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
+  sumHTML(pr, d, st) { return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`; },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
   labHTML(pr, d) {
     if (!(d.lines || []).length) return '';
@@ -1030,7 +1033,6 @@ const Ord = {
       ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
-      ${sectionHTML('o-pay', 'Payment', `<div class="pay-row">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}</div><div class="pay-row"><span class="muted">Amount paid</span><span class="tb-spacer"></span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${this.prepaid() && !d.paid_method ? 'paid in full' : '0.00'}" title="How they paid fills in the total. Type a different amount for a part payment."></div>`)}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
       ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
       ${warn}
@@ -1093,7 +1095,14 @@ const Ord = {
       toast(`${plural(r.changed, 'envelope')} updated${team.trim() ? ` · team ${esc(team.trim())}` : ''}${coach.trim() ? ` · coach ${esc(coach.trim())}` : ''}`, 4000);
     } catch (e) { toast(esc(e.message), 5000); }
   },
-  paintTotal() { const t = $('#ordTotal'); if (t && this.draft) t.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft); },
+  paintTotal() {
+    const t = $('#ordTotal'); if (!t || !this.draft) return;
+    const sum = $('.tot-sum', t);
+    if (!sum) { t.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft); return; }
+    const tmp = document.createElement('div'); tmp.innerHTML = this.totalHTML(this.price(this.draft.lines), this.draft);
+    sum.innerHTML = $('.tot-sum', tmp).innerHTML;
+    const inp = $('[data-of="paid"]', t); if (inp && document.activeElement !== inp) inp.placeholder = $('[data-of="paid"]', tmp).placeholder;
+  },
   paintState() { const s = $('#right .save-state'); if (s) { s.textContent = this.state; s.classList.toggle('err', this.err); } },
   modbar() {
     if (S.module !== 'orders') return;
@@ -1147,7 +1156,7 @@ const Ord = {
       const v = this.normImage(el.value); if (v !== el.value) { el.value = v; d[el.dataset.of] = v; this.changed(false); }
       const ph = $('#right .photo-row'); if (ph) keepScroll('#right', () => this.right());
     }
-    if (el.dataset.of === 'paid' && el.value) el.value = (d.paid_cents / 100).toFixed(2);
+    if (el.dataset.of === 'paid') { if (el.value) el.value = (d.paid_cents / 100).toFixed(2); const t = $('#ordTotal'); if (t) t.innerHTML = this.totalHTML(this.price(d.lines), d); }
     if (el.dataset.of === 'team' && d.team && !d.coach && this.d) { const o = this.d.orders.find(o => o.team === d.team && o.coach); if (o) { d.coach = o.coach; this.changed(true); } }
   },
 };

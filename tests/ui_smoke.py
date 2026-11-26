@@ -98,6 +98,10 @@ def run() -> int:
         step("Orders: pick the shoot", lambda: pg.click("[data-oshoot] >> text=Smoke Test"), 1200)
         step("Orders: open an envelope", lambda: pg.click("#modView tr[data-oid]"), 800)
         step("Orders: next envelope", lambda: pg.keyboard.press("ArrowDown"))
+        step("Orders: type a short payment", lambda: (pg.click("#ordTotal [data-of=paid]"), pg.keyboard.type("10"), pg.keyboard.press("Tab")), 900)
+        STEPS.append("Orders: the short payment shows as due")
+        if "due" not in pg.inner_text("#ordTotal .tot-sum"):
+            errors.append("Orders: typing a smaller Paid amount didn't show what's still due")
         step("Orders: preview on", lambda: pg.keyboard.press("v"))
         step("Orders: preview off", lambda: pg.keyboard.press("v"))
         step("Orders: close envelope", lambda: pg.keyboard.press("Escape"))
