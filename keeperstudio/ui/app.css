@@ -1008,3 +1008,6 @@ textarea:focus{border-color:var(--accent)}
 
 .sd-count{font-size:12.5px;color:var(--muted);margin:0 0 6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .sd-count b{color:var(--text);font-weight:600}.sd-count b.okc{color:#3CC7A0}.sd-count .warn{color:#E3A04F}.sd-count .sd-link{margin-left:auto}
+
+/* Teams list: a group photo used by two teams */
+#left .row .sub.dup{color:#E3A04F}
