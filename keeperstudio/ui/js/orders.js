@@ -244,6 +244,85 @@ const Ord = {
     if (i < 0 || j < 0 || j >= ns.length) return;
     [ns[i], ns[j]] = [ns[j], ns[i]]; this.setTeamOrder(ns);
   },
+  // ---------- Team 5x7s for the school ----------
+  async openSchool() {
+    if (!this.sid) return;
+    if (!this.crops) this.crops = (await DB.get('kv', 'orders|crops|' + this.sid).catch(() => null)) || Crop.outDir || '';
+    const load = () => api('/api/orders/school', { shoot_id: this.sid, crops_dir: this.crops });
+    let R; try { R = await load(); } catch (e) { return toast(esc(e.message)); }
+    const st = { to: R.school.email || '', subject: `${R.shoot} - team photos`, body: '', gmailOpened: false, busy: false, setup: !R.mail.has_password && false };
+    const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
+    const bodyFor = n => `Hi,\n\nAttached are the 5x7 team photos for ${R.shoot} (${plural(n, 'team')}).\n\nThank you,\nJamie Bexten Photography`;
+    const paint = card => {
+      const ok = R.rows.filter(r => r.status === 'ok').length, todo = R.rows.filter(r => r.status === 'todo').length;
+      if (!st.bodyEdited) st.body = bodyFor(ok);
+      const row = r => `<div class="sd-row ${r.status}"><span class="nm">${esc(r.name)}</span>${r.status === 'ok' ? `<span class="ok" title="${esc(r.file)}">✓</span>${R.changed.includes(r.name) ? '<span class="chg">changed since sent</span>' : ''}`
+        : r.status === 'skip' ? `<span class="muted small">skipped this year</span><button class="btn sm" data-sdskip="${esc(r.name)}">Include</button>`
+        : `<span class="warn">${esc(r.why)}</span>${r.why === 'No group photo picked' ? `<button class="btn sm" data-sdskip="${esc(r.name)}">Skip this year</button>` : ''}`}</div>`;
+      const sent = R.school.sent;
+      card.innerHTML = `<h3 class="tl-h">Team 5×7s for the school <span class="muted small">${esc(R.shoot)}</span></h3>
+        <p class="muted small tl-sub">One 5×7 (300 dpi) of every team on the team list, named by team, zipped and emailed.${sent ? ` Last sent ${esc(fmtDay(new Date(sent.at * 1000).toISOString().slice(0, 10)))} to ${esc(sent.to)} · ${plural((sent.teams || []).length, 'team')}.` : ''}</p>
+        <div class="pathrow sd-crops"><span class="path ${this.crops ? '' : 'bad'}" title="${esc(this.crops)}">${esc(this.crops || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-sdcrops>Crops folder…</button></div>
+        <div class="sd-list">${R.rows.map(row).join('') || '<div class="hint" style="padding:10px">No teams yet.</div>'}</div>
+        ${todo ? `<div class="sd-warn">${plural(todo, 'team')} ${todo === 1 ? "isn't" : "aren't"} ready - pick the group photo or crop the 5×7, or skip a team that wasn't photographed.</div>` : ''}
+        <div class="sd-mail"><label>To<input data-sdf="to" value="${esc(st.to)}" placeholder="the school's email" spellcheck="false"></label><label>Subject<input data-sdf="subject" value="${esc(st.subject)}"></label>
+          <label class="wide">Message<textarea data-sdf="body" rows="6">${esc(st.body)}</textarea></label></div>
+        ${st.setup ? `<div class="sd-setup"><b>Send from Gmail</b><p class="muted small">Google needs an <b>app password</b> for this, not your Gmail password: Google Account → Security → 2-Step Verification (must be on) → App passwords. Make one called "Keeper Studio" and paste the 16-letter code here. It's kept with Windows' own password protection, and you can delete it in Google any time.</p>
+          <div class="sd-mail"><label>Your Gmail address<input data-sdm="from" value="${esc(R.mail.from)}" placeholder="you@gmail.com" spellcheck="false"></label><label>App password${R.mail.has_password ? ' <i>(saved - type to replace)</i>' : ''}<input data-sdm="pw" type="password" placeholder="xxxx xxxx xxxx xxxx" autocomplete="off"></label></div>
+          <div class="sd-setup-btns"><button class="btn sm" data-sdmsave>Save & test</button>${R.mail.has_password ? '<button class="btn sm" data-sdmforget>Forget the app password</button>' : ''}<button class="btn sm" data-sdmclose>Done</button></div></div>` : ''}
+        <div class="sd-foot"><span class="muted small">${ok ? `Zip about ${mb(R.estimate)}${R.estimate > R.limit ? ' - <b class="due">over Gmail\'s 25 MB</b>' : ''} · ` : ''}${R.mail.has_password ? `sends from ${esc(R.mail.from)} · <button class="sd-link" data-sdsetup>change</button>` : '<button class="sd-link" data-sdsetup>Set up sending from Gmail…</button>'}</span><span class="tb-spacer"></span>
+          <button class="btn" data-close>Close</button><button class="btn" data-sdzip ${ok ? '' : 'disabled'} title="Save the zip to a folder">Save zip…</button>
+          ${st.gmailOpened ? `<button class="btn primary" data-sdmark title="Mark it sent once you've sent the Gmail message">I sent it</button>` : `<button class="btn" data-sdgmail ${ok && !todo ? '' : 'disabled'} title="Gmail opens with the message filled in; drag the zip in from the folder that opens">Open in Gmail</button>`}
+          <button class="btn primary" data-sdsend ${ok && !todo && R.mail.has_password && !st.busy ? '' : 'disabled'} title="${R.mail.has_password ? 'Send it from your Gmail now' : 'Set up sending from Gmail first'}">${st.busy ? 'Sending…' : st.confirm ? `Click again to send ${plural(ok, 'team')} to ${esc(st.to.trim())}` : 'Send to school'}</button></div>`;
+    };
+    const read = card => { for (const el of $$('[data-sdf]', card)) { if (el.dataset.sdf === 'body' && el.value !== st.body) st.bodyEdited = true; st[el.dataset.sdf] = el.value; } };
+    const refresh = async card => { try { R = await load(); } catch (e) { return toast(esc(e.message)); } paint(card); };
+    const payload = () => ({ shoot_id: this.sid, crops_dir: this.crops, to: st.to.trim(), subject: st.subject, body: st.body });
+    openModal('<div></div>', card => {
+      card.classList.add('sd-card'); paint(card);
+      card.addEventListener('change', e => { if (e.target.matches('[data-sdf=to]')) api('/api/orders/school-set', { shoot_id: this.sid, email: e.target.value.trim() }).catch(() => {}); });
+      card.addEventListener('click', async e => {
+        const t = e.target; read(card);
+        if (st.confirm && !t.closest('[data-sdsend]')) { st.confirm = false; paint(card); }
+        const sk = t.closest('[data-sdskip]');
+        if (sk) { const n = sk.dataset.sdskip, skip = new Set(R.school.skip); skip.has(n) ? skip.delete(n) : skip.add(n); await api('/api/orders/school-set', { shoot_id: this.sid, skip: [...skip] }); return refresh(card); }
+        if (t.closest('[data-sdcrops]')) { const p = await pickPath('folder', { initial: this.crops || Crop.outDir || S.root || '' }); if (p) { this.crops = p; DB.put('kv', 'orders|crops|' + this.sid, p).catch(() => {}); return refresh(card); } return; }
+        if (t.closest('[data-sdsetup]')) { st.setup = true; return paint(card); }
+        if (t.closest('[data-sdmclose]')) { st.setup = false; return paint(card); }
+        if (t.closest('[data-sdmforget]')) { R.mail = await api('/api/mail-settings', { set: true, forget: true }); return paint(card); }
+        if (t.closest('[data-sdmsave]')) {
+          const from = $('[data-sdm=from]', card).value.trim(), pw = $('[data-sdm=pw]', card).value;
+          try { R.mail = await api('/api/mail-settings', { set: true, from, password: pw }); await api('/api/mail-test', {}); toast('Gmail is set up - test sign-in worked'); st.setup = false; }
+          catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 6000); }
+          return paint(card);
+        }
+        if (t.closest('[data-sdzip]')) {
+          const p = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!p) return;
+          try { const z = await api('/api/orders/school-zip', { ...payload(), folder: p }); toast(`Saved ${plural(z.teams, 'team')} (${mb(z.bytes)}) <button class="toast-link" onclick="reveal(${esc(JSON.stringify(z.path))})">Show</button>`, 6000); }
+          catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 5000); }
+          return;
+        }
+        if (t.closest('[data-sdgmail]')) {
+          if (!/@/.test(st.to)) return toast("Type the school's email first", 3000);
+          const p = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!p) return;
+          try { const z = await api('/api/orders/school-gmail', { ...payload(), folder: p }); reveal(z.path); st.gmailOpened = true; paint(card);
+            toast(`Gmail is open with the message filled in - drag “${esc(z.path.split(/[\\/]/).pop())}” from the folder into it, send, then press <b>I sent it</b>.`, 9000); }
+          catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 5000); }
+          return;
+        }
+        if (t.closest('[data-sdmark]')) { await api('/api/orders/school-mark-sent', payload()); toast('Marked sent'); await this.refresh(); this.render(); return refresh(card); }
+        if (t.closest('[data-sdsend]')) {
+          if (!/@/.test(st.to)) return toast("Type the school's email first", 3000);
+          const ok = R.rows.filter(r => r.status === 'ok').length;
+          if (!st.confirm) { st.confirm = true; paint(card); return; }  // second click sends
+          st.confirm = false; st.busy = true; paint(card);
+          try { const r = await api('/api/orders/school-send', payload()); toast(`Sent to ${esc(r.sent.to)} - ${plural(r.zip.teams, 'team')} (${mb(r.zip.bytes)}). It's in your Gmail Sent folder.`, 6000); await this.refresh(); this.render(); }
+          catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 7000); }
+          st.busy = false; return refresh(card);
+        }
+      });
+    });
+  },
   // ---------- Team list window ----------
   async openTeamList() {
     if (!this.sid) return;
@@ -1174,6 +1253,9 @@ const Ord = {
     if (noName) todo.push(noName);
     if (T.change_cents) todo.push(`<span>Change to give (${T.change_n})</span><b class="due">${fmt$(T.change_cents)}</b>`);
     if (T.no_photo) todo.push(`<span>Need a photo</span><b class="env-gaps"><button class="linkish due" data-ord="tot-nophoto" title="Show the envelopes with no photo first">${T.no_photo}</button></b>`);
+    { const sc = this.d && this.d.school;
+      if (sc && sc.needed && !sc.sent_at) todo.push(`<span title="One 5×7 of every team, zipped and emailed to the school">School team 5×7s</span><b class="env-gaps"><button class="linkish due" data-ord="school">not sent</button></b>`);
+      else if (sc && sc.sent_at && ((sc.changed || []).length || (sc.new || []).length)) todo.push(`<span title="${esc([...(sc.changed || []), ...(sc.new || [])].join(', '))}">School team 5×7s</span><b class="env-gaps"><button class="linkish due" data-ord="school">${(sc.changed || []).length + (sc.new || []).length} changed since sent</button></b>`); }
     if (T.glasses) todo.push(`<span title="Envelopes marked Glasses: photos to fix in Retouch">Glasses to retouch</span><b class="env-gaps"><button class="linkish" data-ord="tot-glasses" title="Show the glasses envelopes first">${T.glasses}</button></b>`);
     const due = T.due_cents > 0;
     const mini = `<div class="tot-mini"><span>Sales <b>${fmt$(T.total_cents)}</b></span><span>Collected <b>${fmt$(T.paid_cents)}</b></span><span>Due <b class="${due ? 'due' : 'ok'}">${due ? fmt$(T.due_cents) : 'All paid'}</b></span>${todo.length ? `<span class="due">${todo.length} to fix</span>` : ''}<button class="linkish" data-ord="tot-full">Show all</button></div>`;
@@ -1461,6 +1543,7 @@ const Ord = {
       <div class="dd"><button class="btn sm" data-dd ${dis}>Shoot ▾</button><div class="dd-menu right">
         <button data-ord="edit-shoot" data-id="${this.sid || ''}">Edit shoot…<em>name, date, paid on picture day</em></button>
         <button data-ord="extras">School &amp; other orders…<em>free or paid prints not on an envelope</em></button>
+        <button data-ord="school">Team 5×7s for the school…<em>${this.d && this.d.school && this.d.school.sent_at ? 'sent ' + esc(fmtDay(new Date(this.d.school.sent_at * 1000).toISOString().slice(0, 10))) : 'zip every team photo and email it'}</em></button>
         <button data-ord="prices">Prices…<em>packages, prices, lab codes</em></button>
         <button data-ord="backups">Backups…<em>restore, second copy, the photo folder’s copy</em></button>
         ${HIDDEN.has('import') ? '' : `<hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button>`}</div></div>
@@ -1673,7 +1756,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'school') Ord.openSchool(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

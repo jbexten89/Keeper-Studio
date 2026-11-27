@@ -155,6 +155,14 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   typed that isn't on the list is added to it, and carries to next year.
   **List…** in the Teams header opens the whole list: edit names and coaches,
   drag to reorder, add a team, or take off one with no envelopes.
+* **Team 5×7s for the school** (Shoot ▾): checks every team on the team list
+  (group photo picked, 5×7 cropped; skip a team that wasn't photographed),
+  zips one 300-dpi 5×7 per team named by team, and emails it. *Send to school*
+  sends from Gmail with an app password (Google Account → Security → 2-Step
+  Verification → App passwords; kept with Windows' password protection);
+  *Open in Gmail* opens a filled-in message to drag the zip into, then *I sent
+  it*. The school's email carries to next year; Needs attention shows until
+  it's sent, and again if a team photo changes after.
 * **School & other orders…** (under Totals) are prints that aren't on any
   envelope: for the school, the park, teachers or a sponsor. Each item is a
   size (4x6 to 16x20) and a Meridian product (print, standout, canvas, metal…)

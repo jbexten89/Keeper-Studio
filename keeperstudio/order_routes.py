@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from . import analysis as A
@@ -12,6 +13,7 @@ from . import extras as X
 from . import meridian as M
 from . import reports as R
 from . import orders as O
+from . import school as SC
 from . import paths
 from . import shootfile as SF
 from .orderbook import OrderBook
@@ -129,7 +131,7 @@ def r_folder_import(b):
 _MUTATING = {"/api/orders/shoot/save", "/api/orders/save", "/api/orders/delete", "/api/orders/bulk", "/api/orders/bulk-pay",
              "/api/orders/restore", "/api/orders/team-photo", "/api/orders/rename-team", "/api/orders/team-order",
              "/api/orders/extra/save", "/api/orders/extra/delete", "/api/orders/extras-copy", "/api/orders/shipping",
-             "/api/orders/import-web", "/api/orders/shoot-hours", "/api/orders/team-drop", "/api/orders/team-list-save"}
+             "/api/orders/import-web", "/api/orders/shoot-hours", "/api/orders/team-drop", "/api/orders/team-list-save", "/api/orders/school-set", "/api/orders/school-send", "/api/orders/school-mark-sent", "/api/orders/school-gmail"}
 
 
 def _after_change(fn):
@@ -215,6 +217,7 @@ def r_list(b):
         "teams": [{"name": t["name"], "image": (photos.get(t["name"]) or {}).get("image", ""), "coach": t["coach"],
                    "planned": not t["live"], "count": sum(1 for o in rows if o["team"] == t["name"])} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
+        "school": _school_status(sid, photos),
         "totals": {"orders": len(rows), "family_cents": fam_total, "extras": ex, "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
                    "change_cents": sum(o["summary"].get("change_cents", 0) for o in rows),
                    "change_n": sum(1 for o in rows if o["summary"].get("change_cents")),
@@ -239,6 +242,106 @@ def r_team_list(b):
 def r_team_list_save(b):
     book.save_team_list(int(b["shoot_id"]), b.get("teams") or [])
     return {"ok": True}
+
+
+# ------------------------------------------------ team 5x7s for the school --
+def _school_rows(sid: int, crops: str) -> list[dict]:
+    st = book.school(sid)
+    return SC.check(book.team_list(sid), _team_photos(sid), crops, st["skip"])
+
+
+def _school_status(sid: int, photos: dict) -> dict:
+    """For Totals: have the team 5x7s gone to the school, and has a team photo changed since?"""
+    st = book.school(sid)
+    sent = st.get("sent") or None
+    imgs = {t: (v or {}).get("image", "") for t, v in photos.items()}
+    out = {"needed": any(imgs.values()), "sent_at": sent and sent.get("at"), "teams": len(sent.get("teams", [])) if sent else 0}
+    if sent:
+        was = {t["name"]: t.get("image", "") for t in sent.get("teams", [])}
+        out["changed"] = [t for t, img in imgs.items() if img and t in was and was[t] != img]
+        out["new"] = [t for t, img in imgs.items() if img and t not in was and t not in st["skip"]]
+    return out
+
+
+def r_school(b):
+    sid, crops = int(b["shoot_id"]), str(b.get("crops_dir") or "")
+    st, rows = book.school(sid), _school_rows(sid, str(b.get("crops_dir") or ""))
+    sent = st.get("sent") or None
+    changed = []
+    if sent:
+        was = {t["name"]: t.get("image", "") for t in sent.get("teams", [])}
+        changed = [r["name"] for r in rows if r["status"] == "ok" and was.get(r["name"]) != r["image"]]
+    sh = book.shoot(sid) or {}
+    return {"school": st, "rows": rows, "changed": changed, "mail": SC.mail_settings(), "shoot": sh.get("name", ""),
+            "estimate": sum(1 for r in rows if r["status"] == "ok") * 1_400_000, "limit": SC.GMAIL_LIMIT}
+
+
+def r_school_set(b):
+    sid, patch = int(b["shoot_id"]), {}
+    if "email" in b:
+        patch["email"] = str(b["email"] or "").strip()
+    if "skip" in b:
+        patch["skip"] = [str(x) for x in b.get("skip") or []]
+    return {"school": book.set_school(sid, patch)}
+
+
+def _school_zip(sid: int, crops: str, out: Path) -> tuple[dict, list[dict]]:
+    rows = _school_rows(sid, crops)
+    todo = [r["name"] for r in rows if r["status"] == "todo"]
+    if todo:
+        raise ValueError(f"{len(todo)} team{'s' if len(todo) > 1 else ''} not ready: {', '.join(todo[:3])}{'…' if len(todo) > 3 else ''}")
+    if not any(r["status"] == "ok" for r in rows):
+        raise ValueError("No team photos to send.")
+    return SC.make_zip(rows, out), rows
+
+
+def _zip_name(sid: int) -> str:
+    return SC.safe_name(f"{(book.shoot(sid) or {}).get('name', 'Shoot')} - Team photos") + ".zip"
+
+
+def _mark_sent(sid: int, rows: list[dict], to: str, how: str) -> dict:
+    sent = {"at": time.time(), "to": to, "how": how,
+            "teams": [{"name": r["name"], "image": r["image"]} for r in rows if r["status"] == "ok"]}
+    book.set_school(sid, {"sent": sent, "email": to})
+    return sent
+
+
+def r_school_zip(b):
+    sid = int(b["shoot_id"])
+    z, _ = _school_zip(sid, str(b.get("crops_dir") or ""), Path(b["folder"]) / _zip_name(sid))
+    return z
+
+
+def r_school_send(b):
+    sid, to = int(b["shoot_id"]), str(b.get("to") or "")
+    z, rows = _school_zip(sid, str(b.get("crops_dir") or ""), paths.data_dir() / "school" / _zip_name(sid))
+    SC.send(to, str(b.get("subject") or ""), str(b.get("body") or ""), Path(z["path"]))
+    return {"sent": _mark_sent(sid, rows, to, "app"), "zip": z}
+
+
+def r_school_gmail(b):
+    """Gmail opens a filled-in message; the zip is saved and its folder opened, to drag in."""
+    import webbrowser
+    sid = int(b["shoot_id"])
+    z, _ = _school_zip(sid, str(b.get("crops_dir") or ""), Path(b["folder"]) / _zip_name(sid))
+    webbrowser.open(SC.gmail_compose_url(str(b.get("to") or ""), str(b.get("subject") or ""), str(b.get("body") or "")))
+    book.set_school(sid, {"email": str(b.get("to") or "").strip()})
+    return z
+
+
+def r_school_mark_sent(b):
+    sid = int(b["shoot_id"])
+    return {"sent": _mark_sent(sid, _school_rows(sid, str(b.get("crops_dir") or "")), str(b.get("to") or ""), "gmail")}
+
+
+def r_mail_settings(b):
+    if b.get("set"):
+        return SC.save_mail(b.get("from"), b.get("password") or None, bool(b.get("forget")))
+    return SC.mail_settings()
+
+
+def r_mail_test(b):
+    return SC.test_login()
 
 
 def r_team_drop(b):
@@ -647,7 +750,9 @@ ROUTES = {
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
     "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk, "/api/orders/bulk-pay": r_bulk_pay,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
-    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/team-list": r_team_list, "/api/orders/team-list-save": r_team_list_save, "/api/orders/price": r_price,
+    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/school": r_school, "/api/orders/school-set": r_school_set,
+    "/api/orders/school-zip": r_school_zip, "/api/orders/school-send": r_school_send, "/api/orders/school-gmail": r_school_gmail,
+    "/api/orders/school-mark-sent": r_school_mark_sent, "/api/mail-settings": r_mail_settings, "/api/mail-test": r_mail_test, "/api/orders/team-list": r_team_list, "/api/orders/team-list-save": r_team_list_save, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,

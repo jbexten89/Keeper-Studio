@@ -105,6 +105,8 @@ class OrderBook:
             self._db.execute("ALTER TABLE shoots ADD COLUMN uid TEXT NOT NULL DEFAULT ''")
         if "folder" not in cols:  # the shoot's photo folder, where its orders file is kept
             self._db.execute("ALTER TABLE shoots ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
+        if "school" not in cols:  # team 5x7s for the school: {"email", "skip": [...], "sent": {...}} (JSON)
+            self._db.execute("ALTER TABLE shoots ADD COLUMN school TEXT NOT NULL DEFAULT ''")
         if "team_list" not in cols:  # the shoot's teams with their coaches, carried from last year: JSON, '' = not filled in yet
             self._db.execute("ALTER TABLE shoots ADD COLUMN team_list TEXT NOT NULL DEFAULT ''")
         if "hours" not in cols:  # time spent on the shoot, by part: {"shoot": 3.5, "edit": 6, ...} (JSON)
@@ -154,7 +156,7 @@ class OrderBook:
             self._db.execute("UPDATE shoots SET folder=? WHERE id=?", (str(folder or ""), int(sid)))
             self._db.commit()
 
-    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed", "hours", "team_list")
+    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed", "hours", "team_list", "school")
 
     HOUR_PARTS = ("shoot", "edit", "lab", "delivery")
 
@@ -444,6 +446,43 @@ class OrderBook:
                              (json.dumps([{"name": n, "coach": c} for n, c, _ in rows]),
                               json.dumps([n for n, _, _ in rows]), int(sid)))
             self._db.commit()
+
+    def prev_shoot(self, sid: int) -> dict | None:
+        """The last earlier shoot of the same name, years aside."""
+        with self._lock:
+            r = self._db.execute("SELECT id, name, date, created FROM shoots WHERE id=?", (int(sid),)).fetchone()
+            if not r:
+                return None
+            key, prev = self.league(r["name"]), None
+            if not key:
+                return None
+            for x in self._db.execute("SELECT id, name, date, created FROM shoots WHERE id<>?", (int(sid),)).fetchall():
+                if self.league(x["name"]) != key:
+                    continue
+                earlier = x["date"] < r["date"] if (x["date"] and r["date"]) else x["created"] < r["created"]
+                if earlier and (prev is None or (x["date"] or "", x["created"]) > (prev["date"] or "", prev["created"])):
+                    prev = x
+        return dict(prev) if prev else None
+
+    def school(self, sid: int) -> dict:
+        """Team 5x7s for the school: its email (carried from last year), teams skipped, and when they were sent."""
+        with self._lock:
+            d = self._raw(sid, "school", None)
+        if d is None:
+            prev = self.prev_shoot(sid)
+            with self._lock:
+                pd = self._raw(prev["id"], "school", {}) if prev else {}
+            d = {"email": pd.get("email", ""), "skip": [], "sent": None}
+            self.set_school(sid, d)
+        return {"email": d.get("email", ""), "skip": d.get("skip") or [], "sent": d.get("sent")}
+
+    def set_school(self, sid: int, patch: dict) -> dict:
+        with self._lock:
+            d = self._raw(sid, "school", {}) or {}
+            d.update({k: v for k, v in patch.items() if k in ("email", "skip", "sent")})
+            self._db.execute("UPDATE shoots SET school=? WHERE id=?", (json.dumps(d), int(sid)))
+            self._db.commit()
+        return d
 
     def next_shoot_name(self, sid: int) -> str:
         """'Winter Sports 2027' for 'Winter Sports 2026': the shoot that will start with this list."""
