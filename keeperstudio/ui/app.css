@@ -538,7 +538,7 @@ kbd{font-size:10px}
 .banner .banner-act{margin-left:auto;background:#03111E;color:#fff;border-color:#03111E}
 .help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
 /* Framing card keeps one height, so the size list below never moves while stepping through photos */
-#right .sec[data-sec=c-status]:not(.closed) > .body{height:198px;overflow-y:auto;scrollbar-width:thin}
+#right .sec[data-sec=c-status]:not(.closed) > .body{min-height:268px;overflow:visible}
 /* ---------- Orders ---------- */
 #modView[data-mod=orders]{display:flex;flex-direction:column;overflow:hidden}
 .ord-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel-2)}
