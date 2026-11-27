@@ -273,7 +273,7 @@ def r_school(b):
         changed = [r["name"] for r in rows if r["status"] == "ok" and was.get(r["name"]) != r["image"]]
     sh = book.shoot(sid) or {}
     return {"school": st, "rows": rows, "changed": changed, "mail": SC.mail_settings(), "shoot": sh.get("name", ""),
-            "estimate": sum(1 for r in rows if r["status"] == "ok") * 1_400_000, "limit": SC.GMAIL_LIMIT}
+            "estimate": sum(1 for r in rows if r["status"] == "ok") * 1_400_000, "limit": SC.SEND_LIMIT}
 
 
 def r_school_set(b):
@@ -285,14 +285,14 @@ def r_school_set(b):
     return {"school": book.set_school(sid, patch)}
 
 
-def _school_zip(sid: int, crops: str, out: Path) -> tuple[dict, list[dict]]:
+def _school_ready(sid: int, crops: str) -> list[dict]:
     rows = _school_rows(sid, crops)
     todo = [r["name"] for r in rows if r["status"] == "todo"]
     if todo:
         raise ValueError(f"{len(todo)} team{'s' if len(todo) > 1 else ''} not ready: {', '.join(todo[:3])}{'…' if len(todo) > 3 else ''}")
     if not any(r["status"] == "ok" for r in rows):
         raise ValueError("No team photos to send.")
-    return SC.make_zip(rows, out), rows
+    return rows
 
 
 def _zip_name(sid: int) -> str:
@@ -308,22 +308,24 @@ def _mark_sent(sid: int, rows: list[dict], to: str, how: str) -> dict:
 
 def r_school_zip(b):
     sid = int(b["shoot_id"])
-    z, _ = _school_zip(sid, str(b.get("crops_dir") or ""), Path(b["folder"]) / _zip_name(sid))
-    return z
+    rows = _school_ready(sid, str(b.get("crops_dir") or ""))
+    return SC.make_zip(rows, Path(b["folder"]) / _zip_name(sid))
 
 
 def r_school_send(b):
     sid, to = int(b["shoot_id"]), str(b.get("to") or "")
-    z, rows = _school_zip(sid, str(b.get("crops_dir") or ""), paths.data_dir() / "school" / _zip_name(sid))
-    SC.send(to, str(b.get("subject") or ""), str(b.get("body") or ""), Path(z["path"]))
-    return {"sent": _mark_sent(sid, rows, to, "app"), "zip": z}
+    rows = _school_ready(sid, str(b.get("crops_dir") or ""))
+    data, n = SC.zip_for_email(rows)  # built in memory: nothing on disk to be locked
+    SC.send(to, str(b.get("subject") or ""), str(b.get("body") or ""), data, _zip_name(sid))
+    return {"sent": _mark_sent(sid, rows, to, "app"), "zip": {"bytes": len(data), "teams": n}}
 
 
 def r_school_gmail(b):
     """Gmail opens a filled-in message; the zip is saved and its folder opened, to drag in."""
     import webbrowser
     sid = int(b["shoot_id"])
-    z, _ = _school_zip(sid, str(b.get("crops_dir") or ""), Path(b["folder"]) / _zip_name(sid))
+    rows = _school_ready(sid, str(b.get("crops_dir") or ""))
+    z = SC.make_zip(rows, Path(b["folder"]) / _zip_name(sid), for_email=True)
     webbrowser.open(SC.gmail_compose_url(str(b.get("to") or ""), str(b.get("subject") or ""), str(b.get("body") or "")))
     book.set_school(sid, {"email": str(b.get("to") or "").strip()})
     return z

@@ -52,13 +52,14 @@ def check(team_list: list[dict], team_photos: dict[str, str], crops_dir: str, sk
     return out
 
 
-def make_zip(rows: list[dict], out: Path) -> dict:
-    """The ready teams' 5x7s at 300 dpi, named '01 Team name.jpg' in team order."""
+SEND_LIMIT = 18 * 1024 * 1024  # Gmail's 25 MB counts the email itself; an attachment grows a third when sent
+
+
+def zip_bytes(rows: list[dict], quality: int = 92) -> tuple[bytes, int]:
+    """The ready teams' 5x7s at 300 dpi, named '01 Team name.jpg' in team order, as a zip in memory."""
     from PIL import Image, ImageOps
-    out.parent.mkdir(parents=True, exist_ok=True)
-    tmp = out.with_suffix(".part")
-    n = 0
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_STORED) as z:  # JPEGs don't shrink in a zip
+    out, n = BytesIO(), 0
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_STORED) as z:  # JPEGs don't shrink in a zip
         for r in rows:
             if r["status"] != "ok":
                 continue
@@ -68,10 +69,42 @@ def make_zip(rows: list[dict], out: Path) -> dict:
                 size = SIZE if im.width >= im.height else (SIZE[1], SIZE[0])
                 im = im.resize(size, Image.LANCZOS) if im.size != size else im
                 buf = BytesIO()
-                im.save(buf, "JPEG", quality=92, dpi=(300, 300), optimize=True)
+                im.save(buf, "JPEG", quality=quality, dpi=(300, 300), optimize=True)
             z.writestr(f"{n:02d} {safe_name(r['name'])}.jpg", buf.getvalue())
-    os.replace(tmp, out)
-    return {"path": str(out), "bytes": out.stat().st_size, "teams": n}
+    return out.getvalue(), n
+
+
+def zip_for_email(rows: list[dict]) -> tuple[bytes, int]:
+    """Small enough for Gmail: the JPEG quality steps down only if it has to."""
+    for q in (92, 88, 84, 80):
+        data, n = zip_bytes(rows, q)
+        if len(data) <= SEND_LIMIT:
+            return data, n
+    raise ValueError(f"The team photos come to {len(data) / 1048576:.0f} MB, too big for one Gmail message. Use Save zip… and send it in two emails.")
+
+
+def write_file(data: bytes, out: Path) -> None:
+    """Write via a temporary file; Windows can hold a new file for a moment (virus scan), so retry."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(f".{out.stem}.{os.getpid()}.{int(time.time() * 1000)}.part")
+    tmp.write_bytes(data)
+    for i in range(20):
+        try:
+            os.replace(tmp, out)
+            return
+        except PermissionError:
+            time.sleep(0.25)
+    try:
+        tmp.unlink()
+    except OSError:
+        pass
+    raise ValueError(f"Couldn't save {out.name} - is it open somewhere? Close it and try again.")
+
+
+def make_zip(rows: list[dict], out: Path, for_email: bool = False) -> dict:
+    data, n = zip_for_email(rows) if for_email else zip_bytes(rows)
+    write_file(data, out)
+    return {"path": str(out), "bytes": len(data), "teams": n}
 
 
 # ---------------------------------------------------------- the Gmail login --
@@ -177,17 +210,17 @@ def test_login() -> dict:
     return {"ok": True, "from": user}
 
 
-def send(to: str, subject: str, body: str, attachment: Path) -> dict:
+def send(to: str, subject: str, body: str, data: bytes, filename: str) -> dict:
     to = [a.strip() for a in re.split(r"[,;]", to or "") if a.strip()]
     if not to or not all(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", a) for a in to):
         raise ValueError("Type the school's email address.")
-    if attachment.stat().st_size > GMAIL_LIMIT:
-        raise ValueError("The zip is over Gmail's 25 MB limit.")
+    if len(data) > SEND_LIMIT:
+        raise ValueError("The zip is too big for one Gmail message.")
     s, user = _smtp()
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = user, ", ".join(to), subject
     msg.set_content(body)
-    msg.add_attachment(attachment.read_bytes(), maintype="application", subtype="zip", filename=attachment.name)
+    msg.add_attachment(data, maintype="application", subtype="zip", filename=filename)
     try:
         s.send_message(msg)
     finally:

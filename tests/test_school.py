@@ -52,17 +52,31 @@ class SchoolTest(unittest.TestCase):
             self.assertFalse(SC.save_mail(forget=True)["has_password"])
 
     def test_send_attaches_the_zip(self):
-        z = self.root / "t.zip"; z.write_bytes(b"PK" + b"0" * 100)
         with mock.patch("keeperstudio.paths.data_dir", return_value=self.root), mock.patch("smtplib.SMTP_SSL") as smtp:
             SC.save_mail("me@gmail.com", "abcdefghijklmnop")
-            r = SC.send("ad@school.org", "Winter Sports 2026 - team photos", "Hi", z)
+            r = SC.send("ad@school.org", "Winter Sports 2026 - team photos", "Hi", b"PK" + b"0" * 100, "t.zip")
             smtp.return_value.login.assert_called_with("me@gmail.com", "abcdefghijklmnop")
             msg = smtp.return_value.send_message.call_args[0][0]
             self.assertEqual(msg["To"], "ad@school.org")
             self.assertEqual([p.get_filename() for p in msg.iter_attachments()], ["t.zip"])
             self.assertEqual(r["to"], ["ad@school.org"])
             with self.assertRaises(ValueError):
-                SC.send("not an address", "s", "b", z)
+                SC.send("not an address", "s", "b", b"PK", "t.zip")
+
+    def test_email_zip_steps_quality_down_to_fit(self):
+        rows = SC.check(self.teams[:2], self.photos, str(self.root / "crops"), [])
+        full, _ = SC.zip_bytes(rows, 92)
+        with mock.patch.object(SC, "SEND_LIMIT", len(full) - 1):
+            data, n = SC.zip_for_email(rows)
+        self.assertLess(len(data), len(full)); self.assertEqual(n, 2)
+        with mock.patch.object(SC, "SEND_LIMIT", 10), self.assertRaises(ValueError):
+            SC.zip_for_email(rows)
+
+    def test_saving_over_an_existing_zip(self):
+        out = self.root / "z" / "a.zip"
+        SC.write_file(b"one", out); SC.write_file(b"two", out)
+        self.assertEqual(out.read_bytes(), b"two")
+        self.assertEqual([p.name for p in out.parent.iterdir()], ["a.zip"])
 
     def test_gmail_compose_link(self):
         u = SC.gmail_compose_url("ad@school.org", "Winter Sports 2026 - team photos", "Hi")

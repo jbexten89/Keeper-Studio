@@ -986,5 +986,5 @@ textarea:focus{border-color:var(--accent)}
 .sd-mail input,.sd-mail textarea{background:#0E1013;border:1px solid var(--border);border-radius:5px;color:var(--text);font:inherit;font-size:13px;padding:5px 8px;resize:vertical}
 .sd-setup{margin-top:12px;padding:10px 12px;border:1px solid rgba(46,155,255,.35);border-radius:8px;background:rgba(46,155,255,.06)}
 .sd-setup p{margin:4px 0 0}.sd-setup-btns{display:flex;gap:8px;margin-top:10px}
-.sd-foot{display:flex;align-items:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.sd-foot{display:flex;align-items:center;gap:8px;margin-top:14px}.sd-foot>.muted{flex:1;min-width:0}.sd-foot .btn{flex:none}
 .sd-link{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:12px;cursor:pointer}.sd-link:hover{text-decoration:underline}
