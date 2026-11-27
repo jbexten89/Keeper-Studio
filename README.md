@@ -147,6 +147,11 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   team in the Teams list, or use its ↑ ↓, to rearrange; A–Z sorts them. That
   order is used everywhere: the envelope list, lab and Meridian orders, the
   pull sheet, the shoot summary and Analysis.
+* **Centering lines (team photos):** the colored-lines button next to the grid
+  in Straighten (hover, hold L, or click to keep on) draws six colored pairs
+  5–30% in from both sides of the group framing, plus the middle. Line the
+  team's outer edges up on the same color; while adjusting, the arrows move
+  0.1% (Shift 1%).
 * **Team list:** a new shoot starts with every team (and its coach) from the
   last shoot of the same name - "Winter Sports 2026" from "Winter Sports
   2025" - in the same order, so the Team box is a pick list and picking a team

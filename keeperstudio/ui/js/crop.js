@@ -147,7 +147,7 @@ const Crop = {
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
-        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-circle" id="adjCircle" hidden></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
+        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div class="center-lines" id="cropLines" hidden></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-circle" id="adjCircle" hidden></div><div class="center-lines" id="adjLines" hidden></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
         <div class="crop-canvas cmp" id="cropCmp" hidden><img id="cropCmpImg" alt="" draggable="false"><svg id="cropCmpSvg" preserveAspectRatio="none"></svg><span class="cmp-tag" id="cmpTagR"></span></div>
         <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div><div class="crop-job" id="cropJob" hidden></div></div>`;
       this.bindAdjust();
@@ -214,6 +214,7 @@ const Crop = {
       });
     }
     svg.innerHTML = shapes; $('#cropLabels').innerHTML = labels;
+    this.syncLines();
     if (cmp) { const s2 = $('#cropCmpSvg'); s2.setAttribute('viewBox', `0 0 ${W} ${H}`); s2.innerHTML = shapes; }
     this.layoutAdjust();
     // HUD
@@ -252,6 +253,28 @@ const Crop = {
   // The grid shows while straightening, while the grid button is hovered or G is held,
   // and stays on while the grid button is locked (clicked).
   gridLock: false, gridPeek: false, gridKey: false,
+  // Centering lines for team photos: pairs of colored lines the same distance in from
+  // both sides of the group framing; line the team's outer edges up on one color.
+  linesLock: false, linesPeek: false, linesKey: false,
+  LINE_COLORS: ['#FF5C5C', '#FF9F43', '#F7D154', '#4CD07D', '#3FD0E0', '#B58CFF'],
+  linesOn() { return this.linesLock || this.linesPeek || this.linesKey; },
+  linesHTML() {
+    let h = '';
+    this.LINE_COLORS.forEach((c, i) => { const pct = (i + 1) * 5;
+      for (const side of ['left', 'right']) h += `<span class="cl-line" style="${side}:${pct}%;--c:${c}"></span><span class="cl-num" style="${side}:calc(${pct}% + 3px);--c:${c}">${pct}</span>`; });
+    return h + '<span class="cl-line mid"></span>';
+  },
+  syncLines() {
+    const on = this.linesOn(), p = this.active(), plan = p && this.plans.get(p.path);
+    const a = $('#adjLines'); if (a) { a.hidden = !(on && this.adjusting && this.group); if (!a.hidden && !a.firstChild) a.innerHTML = this.linesHTML(); }
+    const c = $('#cropLines');
+    if (c) {
+      const land = on && !this.adjusting && plan && plan.landscape && plan.boxes ? plan.boxes.filter(b => b.kind === 'landscape').sort((x, y) => y.box[2] - x.box[2])[0] : null;
+      c.hidden = !land;
+      if (land && this.W) { const [x, y, w, h] = land.box; Object.assign(c.style, { left: x / this.W * 100 + '%', top: y / this.H * 100 + '%', width: w / this.W * 100 + '%', height: h / this.H * 100 + '%' }); if (!c.firstChild) c.innerHTML = this.linesHTML(); }
+    }
+    const b = $('#linesBtn'); if (b) { b.classList.toggle('on', this.linesLock); b.classList.toggle('peek', !this.linesLock && (this.linesPeek || this.linesKey)); }
+  },
   syncGrid() {
     const g = $('#cropGrid'); if (g) g.hidden = !(this.live != null || this.gridLock || this.gridPeek || this.gridKey);
     const b = $('#gridBtn'); if (b) { b.classList.toggle('on', this.gridLock); b.classList.toggle('peek', !this.gridLock && (this.gridPeek || this.gridKey)); }
@@ -317,7 +340,8 @@ const Crop = {
   // arrow keys: 0.25% of the photo per press, 2.5% with Shift; + / − resize around the centre
   moveAdjust(dx, dy, big) {
     const a = this.adjusting; if (!a) return;
-    const step = Math.max(1, this.H * (big ? 0.025 : 0.0025)), w = a.height * (this.A || 0.8);
+    const fine = this.group && this.linesOn();  // lining up on the centering lines: 0.1% (Shift 1%)
+    const step = Math.max(1, (fine ? this.W : this.H) * (big ? (fine ? 0.01 : 0.025) : (fine ? 0.001 : 0.0025))), w = a.height * (this.A || 0.8);
     this.adjusting = { center_x: clamp(a.center_x + dx * step, w / 2, this.W - w / 2), top: clamp(a.top + dy * step, 0, this.H - a.height), height: a.height };
     this.layoutAdjust();
   },
@@ -359,6 +383,7 @@ const Crop = {
     const tag = $('#adjTag'); if (tag) tag.textContent = this.target === 'square' ? `${prettySize(this.targetName)} framing` : this.group ? 'Group framing — keep the whole team inside' : '8 × 10 framing';
     Object.assign($('#adjBox').style, { left: l / this.W * 100 + '%', top: a.top / this.H * 100 + '%', width: w / this.W * 100 + '%', height: a.height / this.H * 100 + '%' });
     // placing the square: always show the 3" circle that a round print keeps
+    this.syncLines();
     const ci = $('#adjCircle'), inch = this.target === 'square' ? this.squareInches(this.targetName) : null;
     if (ci) { ci.hidden = !(inch && inch > this.CIRCLE_IN); if (!ci.hidden) ci.style.setProperty('--d', (this.CIRCLE_IN / inch * 100) + '%'); }
     if (tag) tag.textContent += inch && inch > this.CIRCLE_IN ? ` · ${this.CIRCLE_IN}″ circle` : '';
@@ -508,7 +533,7 @@ const Crop = {
     const nOn = this.sizes.filter(z => !off.has(z.name)).length, allOn = nOn === this.sizes.length;
     const master = `<div class="size-row master"><button class="chk ${allOn ? 'on' : nOn ? 'some' : ''}" data-sizeall="${allOn ? 'off' : 'on'}" title="${allOn ? 'Turn every size off' : 'Turn every size on'}"></button><span class="sz-name">All sizes</span><span class="sz-dim">${nOn} of ${this.sizes.length} on</span></div>`;
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
-    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><button class="btn sm icon grid-btn" id="gridBtn" data-crop="gridlock" title="Hover (or hold G) to see the grid - click to keep it on"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="12" height="12" rx="1.5"/><path d="M5 1v12M9 1v12M1 5h12M1 9h12"/></svg></button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
+    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><button class="btn sm icon grid-btn" id="gridBtn" data-crop="gridlock" title="Hover (or hold G) to see the grid - click to keep it on"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="12" height="12" rx="1.5"/><path d="M5 1v12M9 1v12M1 5h12M1 9h12"/></svg></button>${plan.landscape ? `<button class="btn sm icon grid-btn lines-btn" id="linesBtn" data-crop="lineslock" title="Centering lines: hover (or hold L) to see them - click to keep them on. Line the team's outer edges up on the same color."><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke-width="1.6"><path d="M2 1v12M12 1v12" stroke="#FF5C5C"/><path d="M4.5 1v12M9.5 1v12" stroke="#4CD07D"/><path d="M7 1v12" stroke="currentColor" stroke-dasharray="2 2" stroke-width="1"/></svg></button>` : ''}<b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
       <div class="straight-act" id="straightAct" hidden><span class="sa-txt"></span><button class="btn sm primary" data-crop="rot-apply" title="Save this angle and re-check the framing (Enter)">Apply</button><button class="btn sm" data-crop="rot-cancel" title="Put it back (Esc)">Cancel</button></div>` : '<div class="hint">Select a photo to straighten it.</div>';
     if (p && plan && plan.landscape) {
       status += `<div class="style-row team" title="Team photos always use the group framing: how much of the photo's height is shown is set in Fine-tune framing › Group shots."><span>Style</span><b>Team photo</b><button class="btn sm" data-crop="tunables" title="Set how much of the photo's height team photos show">Fine-tune…</button></div>`;
@@ -526,6 +551,9 @@ const Crop = {
     this.paintStraight();
     const gb = $('#gridBtn');
     if (gb) { gb.onmouseenter = () => { this.gridPeek = true; this.syncGrid(); }; gb.onmouseleave = () => { this.gridPeek = false; this.syncGrid(); }; }
+    const lb = $('#linesBtn');
+    if (lb) { lb.onmouseenter = () => { this.linesPeek = true; this.syncLines(); }; lb.onmouseleave = () => { this.linesPeek = false; this.syncLines(); }; }
+    this.syncLines();
     this.syncGrid();
   },
   modbar() {
@@ -666,6 +694,14 @@ const Crop = {
   },
   closeTune() { const el = $('#tunePanel'); if (el) el.remove(); },
   key(e, k) {
+    if (k === 'l' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (!this.linesKey) {
+        this.linesKey = true; this.syncLines();
+        const up = ev => { if ((ev.key || '').toLowerCase() === 'l' || ev.type === 'blur') { this.linesKey = false; this.syncLines(); window.removeEventListener('keyup', up); window.removeEventListener('blur', up); } };
+        window.addEventListener('keyup', up); window.addEventListener('blur', up);
+      }
+      return true;
+    }
     if (this.adjusting) {
       if (e.key === 'Escape') { this.cancelAdjust(); return true; }
       if (e.key === 'Enter') { this.applyAdjust(); return true; }
