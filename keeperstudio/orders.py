@@ -74,9 +74,9 @@ class Product:
                      summary=", ".join(content_label(s, q) for s, q in self.contents.items()))
         elif self.type == "alacarte":
             d.update(with_package=self.with_package, size=self.size, unit=self.unit, team=self.team,
-                     unit_label=f"{self.unit} — {self.label}", short=short_label(self))
+                     unit_label=f"{self.unit} - {self.label}", short=short_label(self))
         else:
-            d.update(unit=self.unit, pack=self.pack, crop=self.crop, unit_label=f"{self.unit} — {self.label}",
+            d.update(unit=self.unit, pack=self.pack, crop=self.crop, unit_label=f"{self.unit} - {self.label}",
                      short=short_label(self))
         return d
 
@@ -106,7 +106,7 @@ class Catalog:
         p = self.get(pid)
         if not p:
             return pid
-        return p.label if p.type == "package" else f"{p.unit} — {p.label}"
+        return p.label if p.type == "package" else f"{p.unit} - {p.label}"
 
     def to_json(self) -> dict:
         return {"products": [p.to_json() for p in self.products], "source": self.source,
@@ -122,7 +122,7 @@ def short_label(p: Product) -> str:
 
 def content_label(size: str, qty: int) -> str:
     s = PRINT_SIZES.get(size, {"label": size, "plural": size})
-    return f"{qty} — {s['label'] if qty == 1 else s['plural']}"
+    return f"{qty} - {s['label'] if qty == 1 else s['plural']}"
 
 
 def load_catalog(path: Path | None) -> Catalog:
