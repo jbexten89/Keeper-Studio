@@ -864,3 +864,4 @@ textarea:focus{border-color:var(--accent)}
 .an-wi-pane .be div{margin:6px 0;font-size:12px;color:var(--muted)}.an-wi-pane .be b{font-weight:500;color:var(--accent)}
 .an-wi-pane .wbtn{margin-top:10px}
 .an-wi-pane .an-t th{white-space:nowrap;font-size:11.5px}.an-wi-pane .an-t td:first-child{max-width:84px}
+.otbl td.o-thc.off{height:auto}.otbl .o-thc.off{width:22px}
