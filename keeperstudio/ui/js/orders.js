@@ -117,6 +117,15 @@ const Ord = {
       const L = list(), i = L.findIndex(o => o.id === cur), o = L[i] || this.d.orders.find(x => x.id === cur); if (!o) return closeModal();
       card.innerHTML = `<div class="ef-bar"><button class="btn sm" data-efstep="-1" ${i > 0 ? '' : 'disabled'} title="Previous envelope (←)">←</button><span class="muted small">${i + 1} of ${L.length}</span><button class="btn sm" data-efstep="1" ${i < L.length - 1 ? '' : 'disabled'} title="Next envelope (→)">→</button>
         <span class="tb-spacer"></span><button class="btn sm" data-efedit>Edit</button><button class="btn sm" data-efpdf>PDF</button><button class="btn sm" data-close>Close</button></div><div class="ef-scroll">${this.formHTML(o)}</div>`;
+      fit(card);
+    };
+    // the whole page fits the window: scaled down (never up) to the room there is
+    const fit = card => {
+      const sc = $('.ef-scroll', card), pg = $('.ef-page', card); if (!sc || !pg) return;
+      pg.style.zoom = 1;
+      const s = Math.min(1, (sc.clientHeight - 24) / pg.offsetHeight, (sc.clientWidth - 24) / pg.offsetWidth);
+      pg.style.zoom = s > 0 ? s : 1;
+      for (const im of $$('img', pg)) if (!im.complete) im.addEventListener('load', () => fit(card), { once: true });
     };
     const step = (card, d) => { const L = list(), i = L.findIndex(o => o.id === cur); if (L[i + d]) { cur = L[i + d].id; paint(card); } };
     let onKey = null;
@@ -135,6 +144,8 @@ const Ord = {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(card, e.key === 'ArrowRight' ? 1 : -1); }
       };
       document.addEventListener('keydown', onKey, true);
+      const onResize = () => { if (!card.isConnected || $('#modal').classList.contains('hidden')) return removeEventListener('resize', onResize); fit(card); };
+      addEventListener('resize', onResize);
     });
   },
   // Digital envelopes: each envelope drawn like the paper order form (ids: just those envelopes)

@@ -1013,9 +1013,9 @@ textarea:focus{border-color:var(--accent)}
 #left .row .sub.dup{color:#E3A04F}
 
 /* Form view: an envelope drawn like the paper order form */
-.modal-card.ef-card{width:min(900px,96vw);max-height:94vh;display:flex;flex-direction:column;padding:12px 14px}
+.modal-card.ef-card{width:min(900px,96vw);height:96vh;max-height:96vh;display:flex;flex-direction:column;padding:10px 14px}
 .ef-bar{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-.ef-scroll{overflow:auto;background:#3a3d44;border-radius:6px;padding:16px}
+.ef-scroll{flex:1;min-height:0;overflow:auto;background:#3a3d44;border-radius:6px;padding:12px;display:flex;align-items:flex-start;justify-content:center}
 .ef-page{width:816px;max-width:100%;margin:0 auto;background:#fff;color:#111;position:relative;padding:22px 52px 24px;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif}
 .ef-logo{text-align:center}.ef-logo img{height:96px}
 .ef-strip{display:flex;align-items:center;gap:12px;margin:8px -52px 12px;padding:6px 52px;background:#E8F2FF;border-top:2px solid #2F9BFF;border-bottom:2px solid #2F9BFF}
