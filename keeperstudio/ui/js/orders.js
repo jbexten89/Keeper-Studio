@@ -1403,6 +1403,29 @@ const Ord = {
   },
   // The totals row sits in its own bar under the list (not over it), lined up with the columns above.
   // Hovering a row's thumbnail shows it bigger (a click opens the full Preview window).
+  // Hovering a row's order shows a small card of what's in it; a click opens the Form view.
+  orderHover(el) {
+    let pop = $('#ordPop');
+    if (!el) { if (pop) pop.hidden = true; return; }
+    const o = this.d && this.d.orders.find(x => x.id === +el.dataset.id); if (!o) return;
+    if (!pop) { pop = document.createElement('div'); pop.id = 'ordPop'; pop.className = 'ord-pop'; document.body.appendChild(pop); }
+    const s = o.summary || {}, stem = o.edited || o.image || '', ph = stem ? this.photoFor(stem) : null;
+    const q = {}; for (const l of o.lines || []) q[l.product_id] = (q[l.product_id] || 0) + (+l.qty || 0);
+    const hasPkg = (o.lines || []).some(l => (this.prod(l.product_id) || {}).type === 'package');
+    const items = Object.entries(q).map(([id, n]) => { const p = this.prod(id); if (!p) return '';
+      const each = p.type === 'alacarte' && hasPkg ? p.with_package : p.price;
+      return `<li><span class="q">${n}</span><span class="n">${esc(p.type === 'package' ? p.label : (p.short || p.label))}</span>${fmt$(each * n)}</li>`; }).join('');
+    const how = s.paid_auto ? 'Picture day' : (!o.paid_method || o.paid_method === 'none') ? 'Not paid' : o.paid_method[0].toUpperCase() + o.paid_method.slice(1);
+    const handed = s.handed_cents ?? s.paid_cents ?? 0;
+    const tag = s.change_cents ? `Change ${fmt$(s.change_cents)}` : s.due_cents ? `Owes ${fmt$(s.due_cents)}` : '';
+    pop.innerHTML = `<div class="h">${ph ? `<img src="${thumbUrl(ph.path, 200)}" alt="">` : ''}<div><b>${esc(stem || 'No photo picked')}</b><span>Envelope ${esc(o.envelope || '-')}${o.athlete ? ' · ' + esc(o.athlete) : ''}</span></div></div>
+      <ul>${items}</ul><div class="tt"><span>Total <b>${fmt$(s.total_cents)}</b></span><span>${handed ? `Paid ${esc(how.toLowerCase())} ${fmt$(handed)}` : esc(how)}${tag ? ` · <span class="tag">${tag}</span>` : ''}</span></div><div class="hint">Click for the full form</div>`;
+    pop.hidden = false;
+    const r = el.getBoundingClientRect(), W = 330, H = pop.offsetHeight || 200;
+    let x = r.right + 10; if (x + W > innerWidth - 8) x = r.left - W - 10;
+    let y = r.top + r.height / 2 - H / 2; y = Math.max(8, Math.min(innerHeight - H - 8, y));
+    pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  },
   thumbHover(img) {
     let pop = $('#othPop');
     if (!img) { if (pop) pop.hidden = true; return; }
@@ -1415,7 +1438,7 @@ const Ord = {
     pop.style.left = x + 'px'; pop.style.top = y + 'px';
   },
   pinTotals(box) {
-    this.thumbHover(null);  // the rows were just redrawn
+    this.thumbHover(null); this.orderHover(null);  // the rows were just redrawn
     const bar = $('#ordTotBar'); if (!bar) return;
     // the row stays in the list's table, collapsed, so the columns are still sized to fit it
     const tf = $('tfoot:not(.ghost)', box);
@@ -1428,9 +1451,10 @@ const Ord = {
     bar.scrollLeft = box.scrollLeft;
     if (!box._totWired) {
       box._totWired = true;
-      box.addEventListener('mouseover', e => { const i = e.target.closest && e.target.closest('img.o-th'); if (i) this.thumbHover(i); });
+      box.addEventListener('mouseover', e => { const i = e.target.closest && e.target.closest('img.o-th'); if (i) this.thumbHover(i); const oc = e.target.closest && e.target.closest('.oc'); if (oc) this.orderHover(oc); });
+      box.addEventListener('mouseout', e => { const oc = e.target.closest && e.target.closest('.oc'); if (oc && !(e.relatedTarget && oc.contains(e.relatedTarget))) this.orderHover(null); });
       box.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('img.o-th')) this.thumbHover(null); });
-      box.addEventListener('scroll', () => this.thumbHover(null), { passive: true });
+      box.addEventListener('scroll', () => { this.thumbHover(null); this.orderHover(null); }, { passive: true });
       box.addEventListener('scroll', () => { const b = $('#ordTotBar'); if (b) b.scrollLeft = box.scrollLeft; }, { passive: true });
       new ResizeObserver(() => { if ($('#ordTotBar') && $('table', box)) this.pinTotals(box); }).observe(box);
     }
@@ -1458,8 +1482,8 @@ const Ord = {
     const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
     const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.change_cents > 0 ? `<td class="amt due" title="Paid ${fmt$(s.handed_cents)}: give back ${fmt$(s.change_cents)} change">Change ${fmt$(s.change_cents)}</td>` : s.short_cents > 0 ? `<td class="amt ok" title="Came up ${fmt$(s.short_cents)} short and you accepted it">Paid <span class="dim">−${fmt$(s.short_cents)}</span></td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
     const on = this.multi.size > 1 ? this.multi.has(o.id) : o.id === this.sel;
-    return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}<button class="ef-rowbtn" data-ord="row-form" data-id="${o.id}" title="See this envelope as the order form">▤</button></td><td>${o.athlete ? esc(o.athlete) : o.summary && (o.summary.due_cents > 0 || o.summary.short_cents > 0) ? '<span class="due" title="Owes or paid short — type who it is">(no name)</span>' : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
-      <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td>${this.photoCells(o, pic)}<td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td><td class="amt dim" title="Meridian's estimated cost${s.lab_unpriced && s.lab_unpriced.length ? ' (some items not priced)' : ''}">${s.lab_cents ? fmt$(s.lab_cents) : '—'}</td>${this.profitCells(s)}${due}</tr>`;
+    return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : o.summary && (o.summary.due_cents > 0 || o.summary.short_cents > 0) ? '<span class="due" title="Owes or paid short — type who it is">(no name)</span>' : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
+      <td class="ord-cell">${ord ? `<span class="oc" data-ord="row-form" data-id="${o.id}"><span class="oc-t">${esc(ord)}</span><span class="oc-i" title="See this envelope as the order form">▤</span></span>` : '<span class="dim">—</span>'}</td>${this.photoCells(o, pic)}<td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td><td class="amt dim" title="Meridian's estimated cost${s.lab_unpriced && s.lab_unpriced.length ? ' (some items not priced)' : ''}">${s.lab_cents ? fmt$(s.lab_cents) : '—'}</td>${this.profitCells(s)}${due}</tr>`;
   },
   // Thumbnails in the envelope list (right of the photo #): on unless switched off in the header.
   thumbs() { return prefs.ordThumbs !== false; },
@@ -1842,7 +1866,7 @@ function bindModuleEvents() {
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.paintRows(); return; }
       const tb = t.closest('[data-othumb]'); if (tb) { Ord.thumbHover(null);  Ord.select(+tb.dataset.othumb).then(() => { if (!(prefs.ordPv && prefs.ordPv.open)) Ord.pvToggle(); else Ord.pvPaint(); }); return; }
-      const rf = t.closest('[data-ord=row-form]'); if (rf) { Ord.openForm(+rf.dataset.id); return; }
+      const rf = t.closest('[data-ord=row-form]'); if (rf) { Ord.orderHover(null); Ord.openForm(+rf.dataset.id); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
       const bp = t.closest('[data-bulkpay]'); if (bp) { e.stopPropagation(); return Ord.bulkPay(bp.dataset.bulkpay); }

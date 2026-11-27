@@ -158,7 +158,7 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   address/phone, team and coach lines, and a strip with the envelope number,
   photo number (big, with the photo), envelope, total and what was paid
   (Owes / Change due in amber). For your records; Address is a field on the
-  envelope under Parent & notes. **Form** on an envelope (or ▤ on its row)
+  envelope under Parent & notes. **Form** on an envelope (or click its order in the list; hover the order for a quick card)
   shows the same page in the app, always up to date; ← → step through the
   list as it's sorted and filtered, Edit goes back to the fields, PDF saves it.
 * **Team list:** a new shoot starts with every team (and its coach) from the
