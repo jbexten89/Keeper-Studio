@@ -152,6 +152,12 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   5–30% in from both sides of the group framing, plus the middle. Line the
   team's outer edges up on the same color; while adjusting, the arrows move
   0.1% (Shift 1%).
+* **Digital envelopes:** Export ▾ → *Envelopes (PDF)*, or *PDF* on one envelope,
+  draws each envelope like the paper order form, with your logo: the
+  packages and a la carte boxes with the choices filled in, the name, parent,
+  address/phone, team and coach lines, and a strip with the envelope number,
+  photo, total and what was paid (Owes / Change due in amber). For your
+  records; Address is a field on the envelope under Parent & notes.
 * **Team list:** a new shoot starts with every team (and its coach) from the
   last shoot of the same name - "Winter Sports 2026" from "Winter Sports
   2025" - in the same order, so the Team box is a pick list and picking a team

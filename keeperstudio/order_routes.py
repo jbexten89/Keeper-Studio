@@ -665,11 +665,8 @@ def meridian_settings() -> dict:
     return {**M.DEFAULT_SETTINGS, **{k: v for k, v in got.items() if k in M.DEFAULT_SETTINGS}}
 
 
-def r_matching_pdf(b):
-    """Matching sheets: one page per team, each envelope's photo, number and contents, in stuffing order."""
-    sid = int(b["shoot_id"])
-    sh = book.shoot(sid) or {}
-    folder = str(b.get("folder") or sh.get("folder") or "")
+def _photo_finder(folder: str):
+    """stem -> the photo's path in the shoot's folder (or None), and whether any photos were found."""
     index: dict[str, Path] = {}
     if folder and Path(folder).is_dir():
         for root, dirs, files in os.walk(folder):
@@ -678,7 +675,26 @@ def r_matching_pdf(b):
                 stem, ext = os.path.splitext(f)
                 if ext.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".hif"):
                     index.setdefault(stem.lower(), Path(root) / f)
-    find = lambda stem: index.get(O.frame_stem(stem).lower()) if stem else None
+    return (lambda stem: index.get(O.frame_stem(stem).lower()) if stem else None), bool(index)
+
+
+def r_envelopes_pdf(b):
+    """Digital envelopes: each envelope drawn like the paper order form, one page each (or just the ids given)."""
+    sid = int(b["shoot_id"])
+    sh = book.shoot(sid) or {}
+    find, found = _photo_finder(str(b.get("folder") or sh.get("folder") or ""))
+    ids = {int(i) for i in b.get("ids") or []}
+    rows = [o for o in book.orders(sid) if not ids or o["id"] in ids]
+    path = R.envelopes_pdf(sh, rows, catalog(), find, Path(b["path"]))
+    return {"path": str(path), "photos_found": found, "pages": len(rows)}
+
+
+def r_matching_pdf(b):
+    """Matching sheets: one page per team, each envelope's photo, number and contents, in stuffing order."""
+    sid = int(b["shoot_id"])
+    sh = book.shoot(sid) or {}
+    find, found = _photo_finder(str(b.get("folder") or sh.get("folder") or ""))
+    index = found
     path = R.matching_pdf(sh, book.orders(sid), catalog(), book.extras(sid), _team_photos(sid), find, Path(b["path"]))
     return {"path": str(path), "photos_found": bool(index)}
 
@@ -752,7 +768,7 @@ ROUTES = {
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
     "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk, "/api/orders/bulk-pay": r_bulk_pay,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
-    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/school": r_school, "/api/orders/school-set": r_school_set,
+    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/envelopes-pdf": r_envelopes_pdf, "/api/orders/school": r_school, "/api/orders/school-set": r_school_set,
     "/api/orders/school-zip": r_school_zip, "/api/orders/school-send": r_school_send, "/api/orders/school-gmail": r_school_gmail,
     "/api/orders/school-mark-sent": r_school_mark_sent, "/api/mail-settings": r_mail_settings, "/api/mail-test": r_mail_test, "/api/orders/team-list": r_team_list, "/api/orders/team-list-save": r_team_list_save, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,

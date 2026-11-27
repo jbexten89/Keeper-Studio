@@ -73,7 +73,7 @@ CREATE INDEX IF NOT EXISTS extra_orders_shoot ON extra_orders(shoot_id);
 """
 EXTRA_FIELDS = ("kind", "customer", "contact", "items", "paid_method", "paid_cents", "check_no", "notes")
 
-ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "phone", "email", "glasses", "frames",
+ORDER_FIELDS = ("envelope", "athlete", "team", "coach", "parent", "address", "phone", "email", "glasses", "frames",
                 "image", "edited", "notes", "paid_method", "paid_cents", "accepted_cents", "lines", "web_order")
 PAID_METHODS = ("", "cash", "check", "venmo", "card", "other", "none")  # "none": owes it all, even on a prepaid shoot; "card" kept for old envelopes
 
@@ -116,6 +116,8 @@ class OrderBook:
         for r in self._db.execute("SELECT id FROM shoots WHERE uid=''").fetchall():
             self._db.execute("UPDATE shoots SET uid=? WHERE id=?", (uuid.uuid4().hex, r["id"]))
         ocols = {r["name"] for r in self._db.execute("PRAGMA table_info(orders)")}
+        if "address" not in ocols:  # the order form's ADDRESS line (phone has its own field)
+            self._db.execute("ALTER TABLE orders ADD COLUMN address TEXT NOT NULL DEFAULT ''")
         if "accepted_cents" not in ocols:  # came up short and the shortfall was let go
             self._db.execute("ALTER TABLE orders ADD COLUMN accepted_cents INTEGER NOT NULL DEFAULT 0")
 

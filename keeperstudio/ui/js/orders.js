@@ -76,6 +76,20 @@ const Ord = {
       toast(`Saved ${esc(baseName(r.path))}${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
     } catch (e) { toast(esc(e.message), 5000); }
   },
+  // Digital envelopes: each envelope drawn like the paper order form (ids: just those envelopes)
+  async envelopesPdf(ids) {
+    const s = this.shoot(); if (!s) return;
+    const one = ids && ids.length === 1 ? this.d.orders.find(o => o.id === ids[0]) : null;
+    const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+    const name = one ? `${sanitize(s.name || 'Shoot')} - envelope ${sanitize(one.envelope || one.id)}.pdf` : `${sanitize(s.name || 'Shoot')} - envelopes.pdf`;
+    const p = await pickPath('save', { initial: dir, filename: name, types: ['PDF (*.pdf)'] }); if (!p) return;
+    toast('Making envelope PDF…', 2000);
+    try {
+      const r = await api('/api/orders/envelopes-pdf', { shoot_id: this.sid, path: p, folder: S.root || '', ids: ids || [] });
+      DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
+      toast(`Saved ${esc(baseName(r.path))} (${plural(r.pages, 'page')})${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
+    } catch (e) { toast(esc(e.message), 5000); }
+  },
   async backups() {
     let L; try { L = await api('/api/orders/backups', {}); } catch (e) { return toast(esc(e.message)); }
     const s = this.shoot();
@@ -548,7 +562,7 @@ const Ord = {
     const d = this.draft; if (!d || !this.sid) return;
     if (!d.id && !d.athlete.trim() && !d.lines.length) { this.state = ''; this.paintState(); return; }  // nothing typed yet
     if (this._saving) { this._again = true; return this._saving; }
-    const body = {}; for (const k of ['id', 'envelope', 'athlete', 'team', 'coach', 'parent', 'phone', 'email', 'glasses', 'frames', 'image', 'edited', 'notes', 'paid_method', 'paid_cents', 'accepted_cents', 'lines']) if (k in d) body[k] = d[k];
+    const body = {}; for (const k of ['id', 'envelope', 'athlete', 'team', 'coach', 'parent', 'address', 'phone', 'email', 'glasses', 'frames', 'image', 'edited', 'notes', 'paid_method', 'paid_cents', 'accepted_cents', 'lines']) if (k in d) body[k] = d[k];
     this._saving = (async () => {
       try {
         const o = (await api('/api/orders/save', { shoot_id: this.sid, order: body })).order;
@@ -1425,7 +1439,7 @@ const Ord = {
     const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="chg">Give ${fmt$(-due)} change</span>` : short ? `<span class="short">Paid ${fmt$(pr.total - short)} · accepted ${fmt$(short)} short</span>` : '<span class="ok">Paid in full</span>';
     return `<div class="tot-sum">${this.sumHTML(pr, d, st)}</div>
       <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label>${due < 0 ? `<button class="btn sm" data-ord="change-given" title="You handed back the change: record the payment as the total">Change given</button>` : ''}${due > 0 && d.paid_cents ? `<button class="btn sm" data-ord="short-accept" title="Let the ${fmt$(due)} go: the envelope counts as paid, and its total becomes what they paid">Accept ${fmt$(due)} short</button>` : ''}${short && due <= 0 ? `<button class="btn sm" data-ord="short-undo" title="They still owe the ${fmt$(short)}">Undo</button>` : ''}</div>
-      <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
+      <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}${d.id ? '<button class="btn sm" data-ord="envelope-pdf" title="This envelope drawn like the order form (PDF), for your records">PDF</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
   sumHTML(pr, d, st) { return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`; },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
@@ -1481,7 +1495,7 @@ const Ord = {
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}
-      ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
+      ${sectionHTML('o-contact', 'Parent & notes', `<div class="of-grid">${fld('parent', 'Parent')}${fld('phone', 'Phone')}${fld('address', 'Address', true)}${fld('email', 'Email', true)}<label class="fld wide"><span>Notes</span><textarea data-of="notes" rows="2">${esc(d.notes)}</textarea></label></div>`)}
       ${warn}
       <datalist id="ordTeams">${(this.d ? this.d.teams : []).map(t => `<option value="${esc(t.name)}">`).join('')}</datalist>
       <datalist id="ordCoaches">${(this.d ? this.d.coaches : []).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
@@ -1571,6 +1585,7 @@ const Ord = {
       <div class="dd"><button class="btn sm" data-dd ${dis}>Export ▾</button><div class="dd-menu right">
         <button data-ord="summary">Shoot summary<em>totals, teams, payments, what sold, who owes</em></button>
         <button data-ord="matching">Matching sheets (PDF)<em>each envelope’s photo, number and contents, by team</em></button>
+        <button data-ord="envelopes-pdf">Envelopes (PDF)<em>every envelope drawn like the order form, for your records</em></button>
         <button data-oexp="pull">Pull sheet<em>one row per athlete, to stuff envelopes from</em></button>
         <button data-oexp="crop">Crop list<em>only the sizes families bought</em></button>
         <hr><button data-oexp="items">Orders CSV<em>one row per item, for the books</em></button>
@@ -1777,7 +1792,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'school') Ord.openSchool(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'envelopes-pdf') Ord.envelopesPdf(); else if (a === 'envelope-pdf') { if (Ord.draft && Ord.draft.id) Ord.envelopesPdf([Ord.draft.id]); } else if (a === 'school') Ord.openSchool(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

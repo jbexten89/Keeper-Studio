@@ -590,3 +590,172 @@ def matching_pdf(shoot: dict, orders: list[dict], catalog, extras: list[dict], t
                             topMargin=0.5 * inch, bottomMargin=0.7 * inch, title=f"{shoot.get('name') or 'Shoot'} — matching sheets")
     doc.build(story or [P("No envelopes yet.")], onFirstPage=foot, onLaterPages=foot)
     return path
+
+
+# ------------------------------------------------------- digital envelopes --
+# A record of each envelope drawn like the paper order form: the same packages
+# and a la carte boxes with the family's choices filled in, the name lines at the
+# bottom, and a strip with the envelope number, photo, total and payment.
+
+BUSINESS_LINES = ("www.jbextenphotography.com · 114 Hogan Ln · Bryan, Ohio 43506 · 419-551-2103 · jbexten89@gmail.com")
+_SIZE_WORDS = {"memory-mate": "MEMORY MATE", "wallet": "WALLETS"}
+
+
+def _logo_path() -> Path | None:
+    from . import paths
+    for base in (paths.bundle_dir(), Path(__file__).resolve().parent.parent):
+        p = base / "assets" / "logo.jpg"
+        if p.is_file():
+            return p
+    return None
+
+
+def envelopes_pdf(shoot: dict, orders: list[dict], catalog, find_photo, path: Path) -> Path:
+    """One letter page per envelope, sorted by team then envelope number."""
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas as rl_canvas
+
+    from .library import thumbnail
+    from .orders import _env_num, order_summary, paid_label
+
+    path = Path(path)
+    if path.suffix.lower() != ".pdf":
+        path = path.with_suffix(".pdf")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    W, H = letter
+    M = 42
+    INK, BLUE, MUTED, LIGHT = colors.HexColor("#111111"), colors.HexColor("#1A63C9"), colors.HexColor("#777777"), colors.HexColor("#EEF6FF")
+    AMBER = colors.HexColor("#E3A04F")
+    logo = _logo_path()
+    logo_r = ImageReader(str(logo)) if logo else None
+    day = shoot.get("date") or ""
+    try:
+        day = dt.date.fromisoformat(day).strftime("%b %d, %Y").replace(" 0", " ")
+    except ValueError:
+        pass
+    pkgs = [p for p in catalog.products if p.type == "package"]
+    alc = [p for p in catalog.products if p.type == "alacarte"]
+    misc = [p for p in catalog.products if p.type == "misc"]
+    c = rl_canvas.Canvas(str(path), pagesize=letter)
+    c.setTitle(f"Envelopes - {shoot.get('name', '')}")
+    rows = sorted(orders, key=lambda o: (int(o.get("team_rank", 10_000)), str(o.get("team") or "").lower(), _env_num(o.get("envelope"))))
+
+    def blank(x, y, qty, w=26):
+        c.setStrokeColor(INK); c.setLineWidth(.7); c.line(x, y - 2, x + w, y - 2)
+        if qty:
+            c.setFillColor(BLUE); c.setFont("Helvetica-Bold", 11); c.drawCentredString(x + w / 2, y, str(qty))
+        c.setFillColor(INK)
+
+    for o in rows:
+        s = order_summary(o, catalog)
+        q = {}
+        for l in o.get("lines") or []:
+            q[l["product_id"]] = q.get(l["product_id"], 0) + int(l.get("qty") or 0)
+        has_pkg = any(q.get(p.id) for p in pkgs)
+        y = H - 30
+        if logo_r:  # the logo, centred
+            iw, ih = logo_r.getSize(); lh = 74; lw = iw * lh / ih
+            c.drawImage(logo_r, (W - lw) / 2, y - lh, lw, lh, mask="auto")
+        y -= 84
+        # the strip: envelope, photo, total, payment
+        c.setFillColor(colors.HexColor("#E8F2FF")); c.setStrokeColor(colors.HexColor("#2F9BFF")); c.setLineWidth(1.2)
+        c.rect(0, y - 46, W, 46, fill=1, stroke=0); c.line(0, y, W, y); c.line(0, y - 46, W, y - 46)
+        stem = o.get("edited") or o.get("image") or ""
+        px = M
+        ph = find_photo(stem) if stem else None
+        if ph:
+            try:
+                im = ImageReader(io.BytesIO(thumbnail(str(ph), 200))); iw, ih = im.getSize(); th = 38; tw = iw * th / ih
+                c.drawImage(im, px, y - 42, tw, th); px += tw + 10
+            except Exception:  # noqa: BLE001 - a missing thumbnail never stops the page
+                pass
+        c.setFillColor(INK); c.setFont("Helvetica-Bold", 12); c.drawString(px, y - 18, f"Envelope {o.get('envelope') or '-'}")
+        c.setFont("Helvetica", 9.5)
+        c.drawString(px + c.stringWidth(f"Envelope {o.get('envelope') or '-'}", "Helvetica-Bold", 12) + 6, y - 18, f"· Photo {stem or '-'}")
+        c.drawString(px, y - 33, " · ".join(x for x in [o.get("team") or "", shoot.get("name") or ""] if x))
+        c.setFont("Helvetica", 9.5); c.drawRightString(W - M, y - 18, f"Total {_money(s['total_cents'])}")
+        how = paid_label(o, s)
+        pay = f"Paid {how.lower()} {_money(s.get('handed_cents', s['paid_cents']))}" if s.get("handed_cents") or s["paid_cents"] else how
+        tag = f"Change due {_money(s['change_cents'])}" if s.get("change_cents") else f"Owes {_money(s['due_cents'])}" if s["due_cents"] else ""
+        if tag:
+            tw = c.stringWidth(tag, "Helvetica-Bold", 9.5) + 12
+            c.setFillColor(AMBER); c.roundRect(W - M - tw, y - 38, tw, 14, 3, fill=1, stroke=0)
+            c.setFillColor(colors.HexColor("#1A1208")); c.setFont("Helvetica-Bold", 9.5); c.drawRightString(W - M - 6, y - 34, tag)
+            c.setFillColor(INK); c.setFont("Helvetica", 9.5); c.drawRightString(W - M - tw - 6, y - 34, pay)
+        else:
+            c.drawRightString(W - M, y - 34, pay)
+        y -= 64
+        c.setFont("Helvetica", 9); c.setFillColor(INK)
+        c.drawCentredString(W / 2, y, "PAYMENT DUE DAY OF SHOOT.  CASH/CHECKS ACCEPTABLE.  PLEASE PLACE AN X OR QTY BY CHOICE.")
+        c.drawCentredString(W / 2, y - 12, "CHECKS PAYABLE TO: Jamie Bexten Photography")
+        y -= 34
+        # packages in two columns, as on the form
+        half = len(pkgs) // 2  # A-C on the left, D-G on the right, as on the form
+        cols = [pkgs[:half], pkgs[half:]]
+        bottom = y
+        for ci, col in enumerate(cols):
+            cx, cy = M + 30 + ci * 250, y
+            for p in col:
+                n = q.get(p.id, 0)
+                lines = [f"{v} - {_SIZE_WORDS.get(k, k)}" for k, v in p.contents.items()]
+                hgt = 14 + 11.5 * len(lines)
+                if n:
+                    c.setFillColor(LIGHT); c.roundRect(cx - 4, cy - hgt + 4, 200, hgt + 6, 4, fill=1, stroke=0); c.setFillColor(INK)
+                blank(cx, cy, n)
+                c.setFont("Helvetica-Bold", 10.5); c.drawString(cx + 32, cy, f"{p.label.upper()} - {_money(p.price)}")
+                c.setFont("Helvetica", 9.5)
+                for i, t in enumerate(lines):
+                    c.drawString(cx + 32, cy - 13 - 11.5 * i, t)
+                cy -= hgt + 10
+            bottom = min(bottom, cy)
+        y = bottom - 2
+        c.setFont("Helvetica", 9); c.drawString(M + 30, y, "Memory Mate: (Team 5x7 & Individual 5x7)")
+        y -= 20
+        c.setFont("Helvetica-Bold", 10); c.drawCentredString(W / 2, y, "Save on a la carte items with the purchase of a PACKAGE")
+        y -= 10
+        # the a la carte box: without package | with package | miscellaneous
+        bh = 22 + 15 * max(len(alc), len(misc))
+        c.setLineWidth(1); c.rect(M, y - bh, W - 2 * M, bh)
+        colw = (W - 2 * M) / 3
+        heads = [("Without PACKAGE Purchase", alc, False), ("With PACKAGE Purchase", alc, True), ("Miscellaneous", misc, None)]
+        for hi, (title, items, withp) in enumerate(heads):
+            x0 = M + 8 + hi * colw
+            c.setFont("Helvetica-BoldOblique" if withp is not None else "Helvetica-Bold", 9.5); c.drawString(x0, y - 14, title)
+            c.setLineWidth(.6); c.line(x0, y - 16, x0 + c.stringWidth(title, "Helvetica-Bold", 9.5), y - 16)
+            for i, p in enumerate(items):
+                ly = y - 31 - 15 * i
+                n = q.get(p.id, 0) if (withp is None or withp == has_pkg) else 0
+                if n:
+                    c.setFillColor(LIGHT); c.rect(x0 - 3, ly - 4, colw - 12, 14, fill=1, stroke=0); c.setFillColor(INK)
+                blank(x0, ly, n, 20)
+                word = p.label.upper()
+                if re.match(r"^\d", p.label):
+                    word = word.replace("X", "x")  # 8x10, as printed on the form
+                label = f"{p.unit} - {word}"
+                c.setFont("Helvetica", 9); c.drawString(x0 + 26, ly, label)
+                price = p.price if withp is None or not withp else p.with_package
+                c.drawRightString(x0 + colw - 18, ly, _money(price))
+        y -= bh + 26
+        # the name lines
+        fields = [("NAME", o.get("athlete")), ("PARENTS NAME", o.get("parent")), ("ADDRESS / PHONE", " · ".join(x for x in [o.get("address") or "", o.get("phone") or ""] if x)),
+                  ("TEAM NAME", o.get("team")), ("COACH'S NAME", o.get("coach"))]
+        for label, val in fields:
+            c.setFont("Helvetica-Bold", 12); c.setFillColor(INK); c.drawString(M + 30, y, label)
+            if val:
+                c.setFont("Helvetica-Bold", 11.5); c.setFillColor(BLUE); c.drawString(M + 175, y, str(val)[:70])
+            c.setStrokeColor(INK); c.setLineWidth(.7); c.line(M + 30, y - 5, W - M - 30, y - 5)
+            y -= 22
+        if o.get("notes") or o.get("glasses"):
+            c.setFont("Helvetica", 9.5); c.setFillColor(MUTED)
+            c.drawString(M + 30, y - 2, ("Glasses. " if o.get("glasses") else "") + (o.get("notes") or "")[:120])
+        # picture day up the left edge, and the address line
+        c.saveState(); c.translate(24, 300); c.rotate(90); c.setFont("Helvetica-Bold", 10); c.setFillColor(INK)
+        c.drawString(0, 0, f"PICTURE DAY: {day}"); c.restoreState()
+        c.setFont("Helvetica", 8.5); c.setFillColor(INK); c.drawCentredString(W / 2, 30, BUSINESS_LINES)
+        c.showPage()
+    if not rows:
+        c.setFont("Helvetica", 12); c.drawString(M, H - 80, "No envelopes in this shoot yet."); c.showPage()
+    c.save()
+    return path
