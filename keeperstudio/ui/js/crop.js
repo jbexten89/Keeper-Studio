@@ -382,8 +382,13 @@ const Crop = {
     const row = (k) => { const st = STATUS_INFO[k]; return `<div class="row st-row-${st.cls} ${S.filter.crop === k ? 'on' : ''}" data-cropfilter="${k}"><span class="st-dot ${st.cls}"></span><span class="lbl">${st.label}</span><span class="cnt">${c[k]}</span></div>`; };
     let html = sectionHTML('c-scope', 'Photos to crop', `<div class="pad" title="${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.">${segHTML('cropScope', this.scope, [['all', `Filmstrip · ${all}`], ['selected', `Selected · ${sel}`]])}
 </div>`);
-    html += sectionHTML('c-check', 'Framing check', `${['ok', 'shortened', 'manual', 'review', 'unchecked'].map(row).join('')}
-`);
+    // Ready is the number that answers "can it print?"; shortened and placed by hand are details of it.
+    const ready = c.ok + c.shortened + c.manual, total = ready + c.review + c.unchecked;
+    const sub = k => { const st = STATUS_INFO[k]; return `<div class="row st-sub ${S.filter.crop === k ? 'on' : ''}" data-cropfilter="${k}"><span class="arw">↳</span><span class="st-dot ${st.cls}"></span><span class="lbl">${k === 'shortened' ? 'shortened to fit' : 'placed by hand'}</span><span class="cnt">${c[k]}</span></div>`; };
+    const quiet = k => { const st = STATUS_INFO[k]; return `<div class="row st-row-${st.cls} ${c[k] ? '' : 'zero'} ${S.filter.crop === k ? 'on' : ''}" data-cropfilter="${k}"><span class="st-dot ${c[k] ? st.cls : 'none'}"></span><span class="lbl">${st.label}</span><span class="cnt">${c[k]}</span></div>`; };
+    html += sectionHTML('c-check', 'Framing check', `<div class="row st-row-ok ${S.filter.crop === 'ready' ? 'on' : ''}" data-cropfilter="ready" title="Framed as planned, shortened to fit, or placed by hand: all of these print"><span class="st-dot ok"></span><span class="lbl">Ready to print</span><span class="cnt">${ready}</span></div>
+      ${c.shortened ? sub('shortened') : ''}${c.manual ? sub('manual') : ''}${quiet('review')}${quiet('unchecked')}
+      <div class="st-total"><span>Total</span><b>${total}</b></div>`);
     const s = this.settings;
     if (s) {
       const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);

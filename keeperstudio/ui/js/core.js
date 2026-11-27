@@ -177,7 +177,7 @@ function matchRules(p, r) {
   if (r.rating && m.rating < r.rating) return false;
   if (r.label && r.label !== 'any') { if (r.label === 'none' ? !!m.label : m.label !== r.label) return false; }
   if (r.text && !p.name.toLowerCase().includes(r.text.toLowerCase())) return false;
-  if (r.crop && r.crop !== 'any' && ((Crop.status.get(p.path) || {}).status || 'unchecked') !== r.crop) return false;
+  if (r.crop && r.crop !== 'any') { const st = (Crop.status.get(p.path) || {}).status || 'unchecked'; if (r.crop === 'ready' ? !READY.has(st) : st !== r.crop) return false; }
   if (r.cstyle && r.cstyle !== 'any' && (Crop.styleOf(p.path) || 'batch') !== r.cstyle) return false;
   return true;
 }
@@ -1187,7 +1187,7 @@ function buildFilterBar() {
     <label>Rating <select id="fRating"><option value="0">Any</option>${[1, 2, 3, 4, 5].map(i => `<option value="${i}">≥ ${'★'.repeat(i)}</option>`).join('')}</select></label>
     <label>Label <select id="fLabel"><option value="any">Any</option><option value="none">No label</option>${LABELS.map(l => `<option value="${l}">${LABEL_NAMES[l]}</option>`).join('')}</select></label>
     <label>Source <select id="fSource"></select></label>
-    <label>Crop <select id="fCrop"><option value="any">Any</option><option value="ok">Ready to print</option><option value="shortened">Shortened</option><option value="manual">Placed by hand</option><option value="review">Needs review</option><option value="unchecked">Not checked</option></select></label>
+    <label>Crop <select id="fCrop"><option value="any">Any</option><option value="ready">Ready to print</option><option value="ok">Framed as planned</option><option value="shortened">Shortened</option><option value="manual">Placed by hand</option><option value="review">Needs review</option><option value="unchecked">Not checked</option></select></label>
     <input id="fText" type="search" placeholder="Search filename…" autocomplete="off">
     <button id="fReset" class="btn sm">Reset</button>
     <span id="fCount" class="fb-count"></span>`;
@@ -1729,7 +1729,10 @@ const OCCASIONAL = new Set(['composite', 'cutout']);
 const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
+// Ready to print = framed as planned, shortened to fit, or placed by hand: all three print.
+const READY = new Set(['ok', 'shortened', 'manual']);
 const STATUS_INFO = {
+  ready: { label: 'Ready to print (all)', cls: 'ok', icon: '✓' },
   ok: { label: 'Ready to print', cls: 'ok', icon: '✓' },
   shortened: { label: 'Shortened to fit', cls: 'short', icon: '↕' },
   manual: { label: 'Placed by hand', cls: 'manual', icon: '✋' },

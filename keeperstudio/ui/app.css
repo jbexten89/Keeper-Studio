@@ -901,3 +901,9 @@ textarea:focus{border-color:var(--accent)}
 .tot-an{display:block;margin:8px 12px 2px;font-size:12px;background:none!important;border:0!important;padding:0!important;color:var(--accent)!important;cursor:pointer}.tot-an:hover{text-decoration:underline}
 .ship-lab{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}.ship-lab .ship-in{width:80px}
 .sec.mini .tot-todo,.sec.mini .tot-ok,.sec.mini .tot-an{display:none}
+
+/* Framing check: Ready is the total that prints; shortened / by hand are details under it */
+.row.st-sub{padding-left:26px;font-size:12px;color:var(--dim)}.row.st-sub .lbl{color:var(--dim)}.row.st-sub .cnt{color:var(--dim)}
+.row.st-sub .arw{color:var(--dim);font-size:11px;margin-right:-2px}.row.st-sub .st-dot{width:7px;height:7px}
+.row.zero .lbl,.row.zero .cnt{color:var(--dim)}
+.st-total{display:flex;margin:4px 12px 2px;padding:5px 2px 0;border-top:1px solid var(--border);font-size:12.5px;color:var(--muted)}.st-total b{margin-left:auto;color:var(--text);font-weight:600}
