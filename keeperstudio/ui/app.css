@@ -930,3 +930,7 @@ textarea:focus{border-color:var(--accent)}
 .style-row.team b{color:var(--text);font-weight:600}
 .style-row.team .btn{margin-left:auto}
 .style-row.team .dim{color:var(--muted)}
+
+/* Print sizes: what a size on/off just did */
+.size-note{display:flex;align-items:center;gap:8px;margin:4px 12px 6px;padding:6px 8px;border-radius:6px;background:rgba(46,155,255,.1);border:1px solid rgba(46,155,255,.35);font-size:12px;color:var(--text)}
+.size-note span{flex:1}

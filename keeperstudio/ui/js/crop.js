@@ -97,10 +97,21 @@ const Crop = {
     if (S.module === 'crop') { renderView(); renderRight(); renderLeft(); schedule(R_CELLS); this.ensurePlan(); }
   },
   async saveSettings(patch) {
+    const onlySizes = Object.keys(patch).length === 1 && 'disabled_sizes' in patch;
+    const before = new Set(this.settings.disabled_sizes || []);
     Object.assign(this.settings, patch);
     try { await api('/api/crop/settings', { settings: this.settings }); } catch (e) { toast(esc(e.message)); }
     this.plans.clear();
-    for (const [k, v] of [...this.status]) if (v.src === 'check') this.status.delete(k);
+    if (onlySizes) {
+      // sizes on/off only changes which files are written: every check is kept
+      const after = new Set(patch.disabled_sizes || []);
+      const turnedOff = [...after].filter(n => !before.has(n)), turnedOn = [...before].filter(n => !after.has(n));
+      const name = l => l.length === 1 ? prettySize(l[0]) : plural(l.length, 'size');
+      const parts = [turnedOff.length ? `${name(turnedOff)} off` : '', turnedOn.length ? `${name(turnedOn)} on` : ''].filter(Boolean);
+      this.sizeNote = parts.length ? { text: `${parts.join(', ')} for every photo - other sizes unchanged`, undo: [...before], path: S.active } : null;
+    } else {
+      for (const [k, v] of [...this.status]) if (v.src === 'check') this.status.delete(k);
+    }
     renderAll(); this.loadKnown();
   },
   active() { return S.byId.get(S.active) || null; },
@@ -502,7 +513,7 @@ const Crop = {
     const rs = this.restyled && !this.job ? this.restyled.paths.filter(k => !this.status.has(k)) : [];
     const note = !rs.length ? '' : `<div class="restyle-note"><b>Style changed on ${plural(rs.length, 'photo')}</b>Their framing hasn’t been checked with ${esc(this.restyled.name)} yet. Nothing runs until you click.<div class="btn-row"><button class="btn sm" data-crop="recheck">Re-check the ${rs.length}</button><button class="btn sm ghost" data-crop="recheck-x" title="Leave them for now">Not now</button></div></div>`;
     const html = sectionHTML('c-status', 'Framing', status) + note + sectionHTML('c-straight', 'Straighten', straight)
-      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
+      + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${this.sizeNote && this.sizeNote.path === S.active ? `<div class="size-note"><span>${esc(this.sizeNote.text)}</span><button class="btn sm" data-crop="size-undo">Undo</button></div>` : ''}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
       ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
     this.paintStraight();

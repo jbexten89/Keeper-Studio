@@ -228,7 +228,7 @@ def run_config(settings: dict):
         cfg,
         ratios=ratios,
         landscape_ratios=land,
-        landscape_enabled=bool(land),  # team photos always get group framing; the group sizes in Print sizes turn it off
+        landscape_enabled=True,  # landscape = team photo, always; with every group size off it makes no prints
         orders_folder=(cfg.orders_folder or "Orders") if settings.get("orders") else None,
         fit_to_frame=bool(settings.get("fit_to_frame", True)),
     )
@@ -521,7 +521,7 @@ def _process_image(path, detector, config, out_dir, lut=None, pose_detector=None
                    segmenter=None, enhance_when="before", bottom_margin=None, preschool_framing=None):
     m = (getattr(_tl, "group_manual", None) or {}).get(str(path))
     style = getattr(_tl, "framing_style", "full")
-    if not m and config.landscape_enabled and config.landscape_ratios:
+    if not m and config.landscape_enabled:
         r = _band_group(path, config, out_dir, lut, enhance_when, segmenter)
         if r is not None:
             return r
@@ -715,8 +715,31 @@ pipeline.apply_manual_crop = _apply_manual
 # restart; change any of them and that photo is checked afresh.
 plan_store = None  # set by the server: a Catalog
 PLAN_VERSION = 5  # bump when the engine would answer differently, so saved checks are redone
+# Which sizes are switched on isn't part of a check: every size is always worked
+# out, and the ones switched off are left out when the check is handed back, so
+# turning a size on or off never throws saved checks away.
 _PLAN_SETTINGS = ("preschool", "balance_feet", "bottom_margin", "enhance", "enhance_when",
-                  "landscape", "fit_to_frame", "disabled_sizes", "framing_style")
+                  "fit_to_frame", "framing_style")
+
+
+def _all_sizes(settings: dict) -> dict:
+    return {**settings, "disabled_sizes": []}
+
+
+def for_sizes(result: dict, settings: dict) -> dict:
+    """A check with the sizes that are switched off left out."""
+    off = set(settings.get("disabled_sizes") or [])
+    if not off or not isinstance(result, dict) or result.get("stale") or result.get("error"):
+        return result
+    try:
+        if all(r.name in off for r in config().ratios):
+            return {"path": result.get("path"), "error": "Every portrait size is switched off. Turn at least one on."}
+    except Exception:
+        pass
+    out = dict(result)
+    out["boxes"] = [b for b in result.get("boxes") or [] if b.get("name") == "needed" or b.get("name") not in off]
+    out["missing"] = [n for n in result.get("missing") or [] if n not in off]
+    return out
 _focus_lock = threading.Lock()
 _latest_focus = 0
 
@@ -788,7 +811,7 @@ def plans_known(items: list[tuple[str, dict, dict | None]]) -> dict:
         key = _plan_key(path, settings, manual)
         hit = plan_store.get("plans", key) if key else None
         if hit:
-            out[path] = hit
+            out[path] = for_sizes(hit, settings)
     return out
 
 
@@ -804,7 +827,7 @@ def plan_cached(path: str, settings: dict, manual: dict | None = None, seq: int 
     if key and plan_store is not None:
         hit = plan_store.get("plans", key)
         if hit:
-            return hit
+            return for_sizes(hit, settings)
     if seq:
         with _focus_lock:
             if focus and seq > _latest_focus:
@@ -812,13 +835,13 @@ def plan_cached(path: str, settings: dict, manual: dict | None = None, seq: int 
     with _engine_lock:
         if seq and seq < _latest_focus and not (focus and seq == _latest_focus):
             return {"path": path, "stale": True}
-        result = plan(path, settings, manual)
+        result = plan(path, _all_sizes(settings), manual)
     if key and plan_store is not None:
         try:
             plan_store.put("plans", key, result)
         except Exception:
             pass
-    return result
+    return for_sizes(result, settings)
 
 
 def plan(path: str, settings: dict, manual: dict | None = None) -> dict:
