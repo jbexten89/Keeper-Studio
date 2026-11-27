@@ -1153,7 +1153,20 @@ const Ord = {
     if (nr && this._flashNew) { this._flashNew = false; nr.scrollIntoView({ block: 'nearest' }); nr.classList.add('flash'); }
   },
   // The totals row sits in its own bar under the list (not over it), lined up with the columns above.
+  // Hovering a row's thumbnail shows it bigger (a click opens the full Preview window).
+  thumbHover(img) {
+    let pop = $('#othPop');
+    if (!img) { if (pop) pop.hidden = true; return; }
+    if (!pop) { pop = document.createElement('div'); pop.id = 'othPop'; pop.className = 'oth-pop'; document.body.appendChild(pop); }
+    pop.innerHTML = `<img src="${img.src}" alt=""><span>${esc((img.title || '').split(' — ')[0])}</span>`;
+    pop.hidden = false;
+    const r = img.getBoundingClientRect(), W = 200, H = 268;
+    let x = r.right + 10; if (x + W > innerWidth - 8) x = r.left - W - 10;
+    let y = r.top + r.height / 2 - H / 2; y = Math.max(8, Math.min(innerHeight - H - 8, y));
+    pop.style.left = x + 'px'; pop.style.top = y + 'px';
+  },
   pinTotals(box) {
+    this.thumbHover(null);  // the rows were just redrawn
     const bar = $('#ordTotBar'); if (!bar) return;
     // the row stays in the list's table, collapsed, so the columns are still sized to fit it
     const tf = $('tfoot:not(.ghost)', box);
@@ -1166,6 +1179,9 @@ const Ord = {
     bar.scrollLeft = box.scrollLeft;
     if (!box._totWired) {
       box._totWired = true;
+      box.addEventListener('mouseover', e => { const i = e.target.closest && e.target.closest('img.o-th'); if (i) this.thumbHover(i); });
+      box.addEventListener('mouseout', e => { if (e.target.closest && e.target.closest('img.o-th')) this.thumbHover(null); });
+      box.addEventListener('scroll', () => this.thumbHover(null), { passive: true });
       box.addEventListener('scroll', () => { const b = $('#ordTotBar'); if (b) b.scrollLeft = box.scrollLeft; }, { passive: true });
       new ResizeObserver(() => { if ($('#ordTotBar') && $('table', box)) this.pinTotals(box); }).observe(box);
     }
@@ -1567,7 +1583,7 @@ function bindModuleEvents() {
       const pk = t.closest('[data-opkg]'); if (pk) { const q = Ord.qty(pk.dataset.opkg); Ord.setQty(pk.dataset.opkg, e.shiftKey ? q + 1 : q ? 0 : 1); return; }
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.paintRows(); return; }
-      const tb = t.closest('[data-othumb]'); if (tb) { Ord.select(+tb.dataset.othumb).then(() => { if (!(prefs.ordPv && prefs.ordPv.open)) Ord.pvToggle(); else Ord.pvPaint(); }); return; }
+      const tb = t.closest('[data-othumb]'); if (tb) { Ord.thumbHover(null);  Ord.select(+tb.dataset.othumb).then(() => { if (!(prefs.ordPv && prefs.ordPv.open)) Ord.pvToggle(); else Ord.pvPaint(); }); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
       const bp = t.closest('[data-bulkpay]'); if (bp) { e.stopPropagation(); return Ord.bulkPay(bp.dataset.bulkpay); }
