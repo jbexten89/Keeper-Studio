@@ -153,6 +153,8 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   fills in its coach. Those teams show dimmed ("From last year · no envelopes
   yet") until an envelope uses them; ✕ takes one off for the year. A team
   typed that isn't on the list is added to it, and carries to next year.
+  **List…** in the Teams header opens the whole list: edit names and coaches,
+  drag to reorder, add a team, or take off one with no envelopes.
 * **School & other orders…** (under Totals) are prints that aren't on any
   envelope: for the school, the park, teachers or a sponsor. Each item is a
   size (4x6 to 16x20) and a Meridian product (print, standout, canvas, metal…)

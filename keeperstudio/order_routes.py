@@ -129,7 +129,7 @@ def r_folder_import(b):
 _MUTATING = {"/api/orders/shoot/save", "/api/orders/save", "/api/orders/delete", "/api/orders/bulk", "/api/orders/bulk-pay",
              "/api/orders/restore", "/api/orders/team-photo", "/api/orders/rename-team", "/api/orders/team-order",
              "/api/orders/extra/save", "/api/orders/extra/delete", "/api/orders/extras-copy", "/api/orders/shipping",
-             "/api/orders/import-web", "/api/orders/shoot-hours", "/api/orders/team-drop"}
+             "/api/orders/import-web", "/api/orders/shoot-hours", "/api/orders/team-drop", "/api/orders/team-list-save"}
 
 
 def _after_change(fn):
@@ -227,6 +227,18 @@ def r_list(b):
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
     }
+
+
+def r_team_list(b):
+    sid = int(b["shoot_id"])
+    rows = book.orders(sid)
+    return {"teams": [{**t, "count": sum(1 for o in rows if o["team"] == t["name"])} for t in book.team_list(sid)],
+            "next": book.next_shoot_name(sid)}
+
+
+def r_team_list_save(b):
+    book.save_team_list(int(b["shoot_id"]), b.get("teams") or [])
+    return {"ok": True}
 
 
 def r_team_drop(b):
@@ -635,7 +647,7 @@ ROUTES = {
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
     "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk, "/api/orders/bulk-pay": r_bulk_pay,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
-    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/price": r_price,
+    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/team-list": r_team_list, "/api/orders/team-list-save": r_team_list_save, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,

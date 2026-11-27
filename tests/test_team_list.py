@@ -46,6 +46,23 @@ class TeamListTest(unittest.TestCase):
         self.book.rename_team(self.sid, "HS Wrestling", "HS Boys Wrestling")
         self.assertIn("HS Boys Wrestling", [t["name"] for t in self.book.team_list(self.sid)])
 
+    def test_team_list_window_saves_order_coaches_renames(self):
+        self.book.save_order(self.sid, {"envelope": "1", "athlete": "", "team": "HS Wrestling", "lines": []})
+        self.book.save_team_list(self.sid, [
+            {"name": "HS Boys Wrestling", "coach": "Kim", "was": "HS Wrestling"},
+            {"name": "HS Varsity Boys", "coach": "Smith", "was": "HS Varsity Boys"},
+            {"name": "HS 9th Boys Basketball", "coach": "Lee", "was": ""},
+            {"name": "", "coach": "", "was": ""}])
+        tl = self.book.team_list(self.sid)
+        self.assertEqual([t["name"] for t in tl], ["HS Boys Wrestling", "HS Varsity Boys", "HS 9th Boys Basketball"])
+        self.assertEqual(tl[0]["coach"], "Kim")
+        self.assertEqual(self.book.orders(self.sid)[0]["team"], "HS Boys Wrestling")
+        with self.assertRaises(ValueError):  # a team in use can't be left out
+            self.book.save_team_list(self.sid, [{"name": "HS Varsity Boys", "coach": "", "was": "HS Varsity Boys"}])
+        with self.assertRaises(ValueError):
+            self.book.save_team_list(self.sid, [{"name": "A", "was": ""}, {"name": "a", "was": ""}])
+        self.assertEqual(self.book.next_shoot_name(self.sid), "Winter Sports 2027")
+
     def test_league_ignores_the_year(self):
         self.assertEqual(OrderBook.league("Winter Sports 2026"), OrderBook.league("Winter Sports 2025"))
 

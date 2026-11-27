@@ -368,7 +368,7 @@ class OrderBook:
             if n not in names and (n in live or any(t["name"] == n for t in planned)):
                 names.append(n)
         pc = {t["name"]: t.get("coach", "") for t in planned}
-        return [{"name": n, "coach": coach.get(n) or pc.get(n, ""), "live": n in live} for n in names]
+        return [{"name": n, "coach": pc.get(n) or coach.get(n, ""), "live": n in live} for n in names]
 
     def seed_teams(self, sid: int) -> None:
         """Once per shoot: start its team list from the last shoot of the same league."""
@@ -415,6 +415,44 @@ class OrderBook:
                 return
             self._db.execute("UPDATE shoots SET team_list=? WHERE id=?", (json.dumps(pl), int(sid)))
             self._db.commit()
+
+    def save_team_list(self, sid: int, teams: list[dict]) -> None:
+        """The Team list window: [{name, coach, was}] in order. `was` is the name it
+        had when the window opened ('' for a new row); a changed name renames the
+        team on its envelopes. A team left out must have no envelopes or group photo."""
+        rows, seen = [], set()
+        for t in teams or []:
+            name, coach, was = (str(t.get(k) or "").strip() for k in ("name", "coach", "was"))
+            if not name:
+                if was:
+                    raise ValueError(f"{was} needs a name.")
+                continue
+            if name.lower() in seen:
+                raise ValueError(f"{name} is in the list twice.")
+            seen.add(name.lower())
+            rows.append((name, coach, was))
+        live = set(self.team_order(sid))
+        kept = {was for _, _, was in rows if was}
+        gone = [n for n in live if n not in kept and n not in {r[0] for r in rows}]
+        if gone:
+            raise ValueError(f"{gone[0]} has envelopes or a group photo, so it can't be taken off.")
+        for name, _, was in rows:
+            if was and was != name and was in live:
+                self.rename_team(sid, was, name)
+        with self._lock:
+            self._db.execute("UPDATE shoots SET team_list=?, team_order=? WHERE id=?",
+                             (json.dumps([{"name": n, "coach": c} for n, c, _ in rows]),
+                              json.dumps([n for n, _, _ in rows]), int(sid)))
+            self._db.commit()
+
+    def next_shoot_name(self, sid: int) -> str:
+        """'Winter Sports 2027' for 'Winter Sports 2026': the shoot that will start with this list."""
+        import re
+        with self._lock:
+            r = self._db.execute("SELECT name FROM shoots WHERE id=?", (int(sid),)).fetchone()
+        n = r["name"] if r else ""
+        m = re.search(r"\b((?:19|20)\d\d)\b", n)
+        return n[:m.start()] + str(int(m.group(1)) + 1) + n[m.end():] if m else ""
 
     def drop_team(self, sid: int, name: str) -> None:
         """Take a team off this shoot's list: only one with no envelope and no group photo."""

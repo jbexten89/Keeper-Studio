@@ -955,3 +955,19 @@ textarea:focus{border-color:var(--accent)}
 /* Teams carried from last year with no envelopes yet */
 .row.planned .lbl{color:var(--muted)}
 .row.planned .cnt{opacity:.45}
+
+/* Team list window */
+.modal-card.tl-card{width:min(780px,94vw)}
+.tl-h{margin:0 0 2px}.tl-h .muted{font-weight:400;margin-left:8px}.tl-sub{margin:0 0 10px}
+.tl-scroll{max-height:62vh;overflow:auto}
+.tl-t{width:100%;border-collapse:collapse;font-size:13px}
+.tl-t th{text-align:left;font-weight:500;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;padding:4px 6px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel)}
+.tl-t th.n,.tl-t td.n{text-align:right}
+.tl-t td{padding:3px 6px;border-bottom:1px solid rgba(255,255,255,.04)}
+.tl-t td.h{color:var(--muted);cursor:grab;width:16px;user-select:none}
+.tl-t td.n{color:var(--muted);width:80px;font-variant-numeric:tabular-nums}
+.tl-t input{width:100%;background:#0E1013;border:1px solid var(--border);border-radius:5px;color:var(--text);font:inherit;padding:4px 7px}
+.tl-t tr.unused input{color:var(--muted)}
+.tl-t td.x{width:28px}.tl-t td.x button{background:none;border:0;color:var(--muted);cursor:pointer;font-size:13px}.tl-t td.x button:hover{color:var(--text)}
+.tl-t tr.dragging{opacity:.4}.tl-t tr.drop-above td{box-shadow:inset 0 2px 0 var(--accent)}
+.tl-foot{display:flex;align-items:center;gap:8px;margin-top:14px}
