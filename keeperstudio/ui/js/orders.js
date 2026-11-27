@@ -282,7 +282,9 @@ const Ord = {
       card.classList.add('sd-card'); paint(card);
       card.addEventListener('change', e => { if (e.target.matches('[data-sdf=to]')) api('/api/orders/school-set', { shoot_id: this.sid, email: e.target.value.trim() }).catch(() => {}); });
       card.addEventListener('click', async e => {
-        const t = e.target; read(card);
+        const t = e.target;
+        if (t.closest('[data-close]')) return closeModal();  // the window is redrawn, so Close is wired here
+        read(card);
         if (st.confirm && !t.closest('[data-sdsend]')) { st.confirm = false; paint(card); }
         const sk = t.closest('[data-sdskip]');
         if (sk) { const n = sk.dataset.sdskip, skip = new Set(R.school.skip); skip.has(n) ? skip.delete(n) : skip.add(n); await api('/api/orders/school-set', { shoot_id: this.sid, skip: [...skip] }); return refresh(card); }
