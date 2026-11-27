@@ -1477,12 +1477,12 @@ async function runExport(o, card, dest) {
 /* ================= Modal, toast, help ================= */
 function openModal(html, onMount) {
   const m = $('#modal'); const card = $('.modal-card', m);
-  card.classList.remove('report'); card.innerHTML = html; m.classList.remove('hidden');
+  card.className = 'modal-card'; card.innerHTML = html; m.classList.remove('hidden');  // each window starts plain: no size class left over from the last one
   $$('[data-close]', card).forEach(b => b.addEventListener('click', () => { if (b.hasAttribute('data-close')) closeModal(); }));
   onMount && onMount(card);
   const f = $('[autofocus]', card); if (f) { f.focus(); f.select && f.select(); }
 }
-function closeModal() { if (S.exporting) return; $('#modal').classList.add('hidden'); $('.modal-card').innerHTML = ''; $('.modal-card').classList.remove('report'); }
+function closeModal() { if (S.exporting) return; $('#modal').classList.add('hidden'); $('.modal-card').innerHTML = ''; $('.modal-card').className = 'modal-card'; }
 const modalOpen = () => !$('#modal').classList.contains('hidden');
 function confirmDialog(title, sub, okLabel, onOk) {
   openModal(`<h3>${esc(title)}</h3><p class="muted">${esc(sub)}</p><div class="m-actions"><button class="btn" data-close>Cancel</button><button class="btn danger" data-ok>${esc(okLabel)}</button></div>`,
