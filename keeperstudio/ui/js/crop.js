@@ -474,13 +474,16 @@ const Crop = {
     let status = '<div class="hint">Select a photo to check its framing.</div>';
     if (p && plan && !plan.error) {
       const st = STATUS_INFO[plan.status];
-      status = `<div class="status-card ${st.cls}"><div class="sc-head"><span class="st-dot ${st.cls}"></span><b>${plan.status === 'review' ? 'Needs review' : st.label}</b></div>
-        ${plan.status === 'review' ? `<div class="sc-label">${esc(plan.label)}</div>` : ''}
-        ${plan.reason ? `<details data-reason ${this.detailsOpen ? 'open' : ''}><summary>Details</summary><pre>${esc(plan.reason)}</pre></details>` : ''}
-        ${plan.status === 'shortened' ? '<div class="hint tight">The ideal frame ran off the photo, so the bottom edge sits a little higher than usual. Worth a glance.</div>' : ''}
-        ${plan.missing && plan.missing.length ? `<div class="miss-note"><b>${plan.missing.map(prettySize).join(', ')} won’t be made</b> — its tight framing couldn’t be placed automatically on this photo (more than one face found, or it runs off the edge). Press <kbd>S</kbd> to place it by hand.</div>` : ''}
-        <div class="btn-row"><button class="btn sm" data-crop="adjust">${plan.landscape ? 'Adjust group framing' : 'Adjust framing'} <kbd>A</kbd></button>${!plan.landscape && this.tightSize() && plan.status !== 'review' ? `<button class="btn sm" data-crop="square">Place ${prettySize(this.tightSize().name)} <kbd>S</kbd></button>` : ''}${plan.landscape && plan.status !== 'manual' ? '<span class="muted small">Group shot</span>' : ''}
-        ${this.manual.has(p.path) ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div></div>`;
+      // Compact: one status line, at most one short line under it (the full story behind Details), buttons in one row.
+      const tight = this.tightSize(), miss = plan.missing && plan.missing.length ? plan.missing.map(prettySize).join(', ') : '';
+      const short = plan.status === 'review' ? esc(plan.label) : plan.status === 'shortened' ? 'Bottom edge raised to fit' : miss ? `${esc(miss)} not placed - press <kbd>S</kbd>` : '';
+      const more = [plan.status === 'shortened' ? 'The ideal frame ran off the photo, so the bottom edge sits a little higher than usual. Worth a glance.' : '',
+        miss ? `${miss} won’t be made: its tight framing couldn’t be placed automatically on this photo (more than one face found, or it runs off the edge). Press S to place it by hand.` : '',
+        plan.reason || ''].filter(Boolean);
+      status = `<div class="status-card compact ${st.cls}"><div class="sc-head"><span class="st-dot ${st.cls}"></span><b>${plan.status === 'review' ? 'Needs review' : st.label}</b>${plan.landscape ? '<span class="muted small sc-kind">Group shot</span>' : ''}</div>
+        ${short || more.length ? `<div class="sc-line">${short}${more.length ? `${short ? ' · ' : ''}<button class="sc-more" data-crop="details">${this.detailsOpen ? 'Hide details' : 'Details'}</button>` : ''}</div>` : ''}
+        ${more.length && this.detailsOpen ? `<div class="sc-details">${more.map(x => `<p>${esc(x)}</p>`).join('')}</div>` : ''}
+        <div class="btn-row one"><button class="btn sm" data-crop="adjust" title="${plan.landscape ? 'Adjust the group framing' : 'Adjust the framing'} (A)">${plan.landscape ? 'Adjust group' : 'Adjust'} <kbd>A</kbd></button>${!plan.landscape && tight && plan.status !== 'review' ? `<button class="btn sm" data-crop="square" title="Place the ${prettySize(tight.name)} by hand (S)">${prettySize(tight.name)} <kbd>S</kbd></button>` : ''}${this.manual.has(p.path) ? '<button class="btn sm" data-crop="reset" title="Back to automatic framing">Reset</button>' : ''}</div></div>`;
     } else if (p && plan && plan.error) status = `<div class="status-card review"><div class="sc-head"><span class="st-dot review"></span><b>${/switched off/.test(plan.error) ? 'No sizes switched on' : 'Couldn’t check this photo'}</b></div><div class="sc-label">${esc(plan.error.replace(/^\w+Error: /, ''))}</div></div>`;
     else if (p && this._lastCard && this._lastCard.path === p.path) {
       // re-checking the same photo (a size or setting changed): keep its card in place, dimmed
@@ -512,7 +515,7 @@ const Crop = {
     } else if (p) {
       const own = this.styleOf(p.path), nSel = S.selected.size > 1 && S.selected.has(p.id) ? S.selected.size : 1;
       status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Every other photo uses the Shoot style on the left."><span>Style</span>
-        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as shoot (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${own ? `<span class="style-tag inline">${STYLE_TAGS[own]}</span>` : ''}${nSel > 1 ? `<em>Changes all ${nSel} selected photos</em>` : ''}</div>`;
+        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as shoot (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${own ? `<span class="style-tag inline">${STYLE_TAGS[own]}</span>` : ''}${nSel > 1 ? `<em title="Changes all ${nSel} selected photos">${nSel}</em>` : ''}</div>`;
     }
     const rs = this.restyled && !this.job ? this.restyled.paths.filter(k => !this.status.has(k)) : [];
     const note = !rs.length ? '' : `<div class="restyle-note"><b>Style changed on ${plural(rs.length, 'photo')}</b>Their framing hasn’t been checked with ${esc(this.restyled.name)} yet. Nothing runs until you click.<div class="btn-row"><button class="btn sm" data-crop="recheck">Re-check the ${rs.length}</button><button class="btn sm ghost" data-crop="recheck-x" title="Leave them for now">Not now</button></div></div>`;

@@ -501,10 +501,10 @@ kbd{font-size:10px}
 .chk.some{background:#0C0D10;border-color:var(--accent)}
 .chk.some::after{content:'';position:absolute;left:3px;top:6px;width:7px;height:2px;background:var(--accent)}
 .job-time{margin-left:auto;color:var(--muted);font-size:12px;font-weight:400}
-.style-row{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:0 12px 10px;font-size:12px;color:var(--muted)}
+.style-row{display:flex;align-items:center;gap:8px;margin:0 12px 10px;font-size:12px;color:var(--muted)}
 .style-row select{flex:1;min-width:0;background:#0E1013;color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 6px;font:inherit;font-size:12px}
 .style-row select.own{border-color:var(--accent);color:var(--accent)}
-.style-row em{font-style:normal;color:var(--accent);white-space:nowrap;flex-basis:100%;padding-left:38px;font-size:11.5px}
+.style-row em{font-style:normal;color:var(--accent);white-space:nowrap;font-size:11.5px}
 .own-note{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;padding:6px 8px;border-radius:6px;background:rgba(46,155,255,.1);color:var(--accent);font-size:12px}
 .tune-panel{position:fixed;left:12px;top:56px;bottom:150px;width:300px;z-index:60;display:flex;flex-direction:column;background:#111317;border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.6)}
 .tp-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border)}
@@ -538,7 +538,7 @@ kbd{font-size:10px}
 .banner .banner-act{margin-left:auto;background:#03111E;color:#fff;border-color:#03111E}
 .help-ver{margin-left:10px;font-size:12px;font-weight:400;color:var(--muted);letter-spacing:0}
 /* Framing card keeps one height, so the size list below never moves while stepping through photos */
-#right .sec[data-sec=c-status]:not(.closed) > .body{min-height:286px;overflow:visible}
+#right .sec[data-sec=c-status]:not(.closed) > .body{min-height:156px;overflow:visible}
 /* ---------- Orders ---------- */
 #modView[data-mod=orders]{display:flex;flex-direction:column;overflow:hidden}
 .ord-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel-2)}
@@ -988,3 +988,12 @@ textarea:focus{border-color:var(--accent)}
 .sd-setup p{margin:4px 0 0}.sd-setup-btns{display:flex;gap:8px;margin-top:10px}
 .sd-foot{display:flex;align-items:center;gap:8px;margin-top:14px}.sd-foot>.muted{flex:1;min-width:0}.sd-foot .btn{flex:none}
 .sd-link{background:none;border:0;padding:0;color:var(--accent);font:inherit;font-size:12px;cursor:pointer}.sd-link:hover{text-decoration:underline}
+
+/* Compact Framing card: status, one short line (Details opens the rest), buttons in one row */
+.status-card.compact .sc-head{display:flex;align-items:center;gap:8px}.status-card.compact .sc-kind{margin-left:auto}
+.status-card.compact .sc-line{font-size:12px;color:var(--muted);margin:3px 0 0 17px}
+.status-card.compact .sc-line kbd{font-size:10px}
+.sc-more{background:none;border:0;padding:0;color:var(--accent);font:inherit;cursor:pointer}.sc-more:hover{text-decoration:underline}
+.sc-details{font-size:12px;color:var(--muted);margin:6px 0 0 17px;white-space:pre-wrap}.sc-details p{margin:0 0 4px}
+.status-card.compact .btn-row.one{display:flex;gap:6px;flex-wrap:nowrap;margin-top:9px}
+.status-card.compact .btn-row.one .btn{white-space:nowrap;padding:3px 8px}
