@@ -405,7 +405,7 @@ const Crop = {
   },
   left() {
     const all = S.view.length, sel = S.selected.size;
-    const list = scopeList(this.scope); const c = this.counts(S.photos.length ? sourcePhotos().filter(p => matchRules(p, { ...S.filter, crop: 'any' })) : []);
+    const list = scopeList(this.scope); const cst = cropShowTest(S.cropShow); const c = this.counts(S.photos.length ? sourcePhotos().filter(p => matchRules(p, { ...S.filter, crop: 'any' }) && (!cst || cst(p))) : []);
     const row = (k) => { const st = STATUS_INFO[k]; return `<div class="row st-row-${st.cls} ${S.filter.crop === k ? 'on' : ''}" data-cropfilter="${k}"><span class="st-dot ${st.cls}"></span><span class="lbl">${st.label}</span><span class="cnt">${c[k]}</span></div>`; };
     let html = sectionHTML('c-scope', 'Photos to crop', `<div class="pad" title="${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.">${segHTML('cropScope', this.scope, [['all', `Filmstrip · ${all}`], ['selected', `Selected · ${sel}`]])}
 </div>`);
@@ -511,7 +511,7 @@ const Crop = {
   },
   modbar() {
     const p = this.active(); const m = p && this.manual.has(p.path);
-    $('#modbar').innerHTML = `<span class="muted small">Select</span><div class="seg crop-pick"><button data-crop="pick-both" title="Select every Pick (P) and team photo (T) in the folder, to crop and export them">Picks + teams</button><button data-crop="pick-picks" title="Select every Pick (P) that isn't a team photo">Picks</button><button data-crop="pick-teams" title="Select every team photo (T)">Teams</button></div><div class="tb-sep"></div>
+    $('#modbar').innerHTML = `<span class="muted small">Show</span><div class="seg crop-pick"><button data-crop="pick-all" class="${S.cropShow === 'all' ? 'on' : ''}" title="Every photo in the folder">All</button><button class="${S.cropShow === 'both' ? 'on' : ''}" data-crop="pick-both" title="Show and select every Pick (P) and team photo (T), to crop and export them">Picks + teams</button><button class="${S.cropShow === 'picks' ? 'on' : ''}" data-crop="pick-picks" title="Show and select every Pick (P) that isn't a team photo">Picks</button><button class="${S.cropShow === 'teams' ? 'on' : ''}" data-crop="pick-teams" title="Show and select every team photo (T)">Teams</button></div>${(() => { const n = S.cropShow === 'both' || S.cropShow === 'picks' ? this.unpickedOrdered().length : 0; return n ? `<button class="unpicked-note" data-crop="show-unpicked" title="Envelopes whose photo isn't marked Pick (P), so it isn't shown or exported">${plural(n, 'ordered photo')} not marked Pick - Show</button>` : ''; })()}<div class="tb-sep"></div>
       <button class="toggle ${this.overlay ? 'on' : ''}" data-crop="overlay" title="Show crop boxes (O)">Crop boxes</button>
       <button class="toggle ${this.compare ? 'on' : ''}" data-crop="compare" title="Original and color preset side by side (C)">Color side by side <kbd>C</kbd></button>
       <div class="tb-spacer"></div><span class="muted small">← → step through photos · A adjust framing · P / X flag · 1–5 rate</span>`;
@@ -520,18 +520,43 @@ const Crop = {
   /* ---------- actions ---------- */
   // Everything that gets printed: one Pick per kid plus the team photos.
   // which: 'both' (Picks and team photos), 'picks' (Picks that aren't team photos) or 'teams'.
+  // Show buttons: filter the filmstrip to Picks / team photos and select them all
+  // (export and Check framing use the selection). All shows the whole folder again.
   selectPicksTeam(which = 'both') {
-    const isT = p => !!getMeta(p.key).team, isP = p => getMeta(p.key).flag === 1;
-    const want = which === 'teams' ? isT : which === 'picks' ? (p => isP(p) && !isT(p)) : (p => isP(p) || isT(p));
-    const ids = S.photos.filter(want).map(p => p.id);
+    if (which === 'all') {
+      const keep = S.active; S.cropShow = 'all'; recomputeView();
+      if (keep != null) { S.selected = new Set([keep]); S.anchor = keep; }
+      renderAll(); ensureVisible(); return;
+    }
+    const test = cropShowTest(which), isT = p => !!getMeta(p.key).team;
+    const ids = S.photos.filter(test).map(p => p.id);
     if (!ids.length) return toast(which === 'teams' ? 'No team photos (T) in this folder yet' : which === 'picks' ? 'No Picks (P) in this folder yet' : 'No Picks (P) or team photos (T) in this folder yet', 3500);
-    const nTeam = ids.filter(id => isT(S.byId.get(id))).length;
+    S.cropShow = which; recomputeView();
+    const inView = S.view.map(p => p.id);
+    S.selected = new Set(inView); S.active = inView[0] ?? null; S.anchor = S.active; this.scope = 'all';  // the filmstrip = what's shown, so stepping with the arrows never shrinks the export
+    renderAll(); ensureVisible();
+    const nTeam = inView.filter(id => isT(S.byId.get(id))).length;
+    const unchecked = inView.filter(id => !this.status.has(S.byId.get(id).path)).length;
+    const what = which === 'teams' ? plural(nTeam, 'team photo') : which === 'picks' ? plural(inView.length, 'pick') : `${plural(inView.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')}`;
+    toast(`Showing ${what}.${unchecked ? ` ${plural(unchecked, 'photo')} not checked yet - press Check framing when you're ready.` : ' Export prints makes just these.'}`, 4500);
+  },
+  // envelopes whose photo is in the folder but isn't marked Pick (P): those kids would be missed
+  unpickedOrdered() {
+    const d = typeof Ord !== 'undefined' && Ord.d; if (!d || !d.orders) return [];
+    const out = new Set();
+    for (const o of d.orders) {
+      const pic = o.edited || o.image; if (!pic || !o.lines || !o.lines.length) continue;
+      const p = Ord.photoFor(pic); if (!p) continue;
+      const m = getMeta(p.key); if (m.flag !== 1 && !m.team) out.add(p.id);
+    }
+    return [...out];
+  },
+  showUnpicked() {
+    const ids = this.unpickedOrdered(); if (!ids.length) return;
+    S.cropShow = 'all'; recomputeView();
     S.selected = new Set(ids); S.active = ids[0]; S.anchor = ids[0]; this.scope = 'selected';
-    refreshSelection(); renderLeft();
-    // Framing is never checked on its own: Check framing starts it.
-    const unchecked = ids.filter(id => !this.status.has(S.byId.get(id).path)).length;
-    const what = which === 'teams' ? plural(nTeam, 'team photo') : which === 'picks' ? plural(ids.length, 'pick') : `${plural(ids.length - nTeam, 'pick')} and ${plural(nTeam, 'team photo')}`;
-    toast(`${what} selected.${unchecked ? ` ${plural(unchecked, 'photo')} not checked yet — press Check framing when you're ready.` : ' Crop will export just these.'}`, 5000);
+    renderAll(); ensureVisible();
+    toast(`${plural(ids.length, 'photo')} selected that have an order but aren't marked Pick - press P to mark them.`, 5000);
   },
   async setOut(path, custom) {
     this.outDir = path; this.outCustom = custom;

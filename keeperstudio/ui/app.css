@@ -920,3 +920,8 @@ textarea:focus{border-color:var(--accent)}
 .grid-btn{margin-left:2px}
 .grid-btn.peek{border-color:var(--accent);color:var(--accent)}
 .grid-btn.on{border-color:var(--accent);color:var(--accent);background:rgba(46,155,255,.16)}
+
+/* Crop Show buttons filter the filmstrip */
+.crop-pick button.on{background:rgba(46,155,255,.16);color:var(--accent)}
+.film-show{color:var(--accent)}
+.unpicked-note{margin-left:8px;background:#E3A04F;color:#14110C;border:0;border-radius:5px;padding:3px 8px;font:inherit;font-size:12px;font-weight:600;cursor:pointer}

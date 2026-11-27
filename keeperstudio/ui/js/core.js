@@ -101,6 +101,7 @@ const S = {
   mode: 'grid', cols: 1,
   source: { type: 'all' },
   filter: { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' },
+  cropShow: 'all',  // Crop's Show buttons: all / both (Picks + teams) / picks / teams
   sort: prefs.sort || 'capture', sortDir: prefs.sortDir || 1,
   thumbSize: prefs.thumbSize || 190,
   filmH: Math.min(320, Math.max(84, prefs.filmH || 124)),
@@ -201,8 +202,16 @@ function sourceName() {
   if (s.type === 'folder') return 'Folder: ' + s.id.split('/').pop();
   const c = getColl(s.id); return c ? (c.id === QUICK ? 'Quick Collection' : 'Collection: ' + c.name) : 'Collection';
 }
+// Crop's Show buttons filter the filmstrip: Picks (P) and team photos (T)
+function cropShowTest(w) {
+  if (!w || w === 'all') return null;
+  const isT = p => !!getMeta(p.key).team, isP = p => getMeta(p.key).flag === 1;
+  return w === 'teams' ? isT : w === 'picks' ? (p => isP(p) && !isT(p)) : (p => isP(p) || isT(p));
+}
+const CROP_SHOW_NAMES = { both: 'Picks + teams', picks: 'Picks', teams: 'Teams' };
 function recomputeView() {
-  const arr = sourcePhotos().filter(p => matchRules(p, S.filter)).sort(sorter());
+  const cs = S.module === 'crop' ? cropShowTest(S.cropShow) : null;
+  const arr = sourcePhotos().filter(p => matchRules(p, S.filter) && (!cs || cs(p))).sort(sorter());
   S.view = arr;
   S.viewIndex = new Map(arr.map((p, i) => [p.id, i]));
   for (const id of [...S.selected]) if (!S.viewIndex.has(id)) S.selected.delete(id);
@@ -847,7 +856,7 @@ function renderFilmBar() {
   if (!S.panels.film) return;
   const p = S.byId.get(S.active);
   $('#filmBar').innerHTML = S.photos.length
-    ? `<b>${esc(sourceName())}</b><span class="sep">/</span><span>${plural(S.view.length, 'photo')}</span><span class="sep">/</span><span>${S.selected.size} selected</span>${p ? `<span class="sep">/</span><span>${esc(p.name)}</span>` : ''}`
+    ? `<b>${esc(sourceName())}</b><span class="sep">/</span>${S.module === 'crop' && S.cropShow !== 'all' ? `<span class="film-show">${CROP_SHOW_NAMES[S.cropShow]} · ${S.view.length} of ${S.photos.length}</span>` : `<span>${plural(S.view.length, 'photo')}</span>`}<span class="sep">/</span><span>${S.selected.size} selected</span>${p ? `<span class="sep">/</span><span>${esc(p.name)}</span>` : ''}`
     : '<span>No photos loaded</span>';
 }
 
@@ -1746,7 +1755,9 @@ function setModule(m) {
   setTimeout(() => Ord.pvPaint());
   if (Crop.adjusting) Crop.cancelAdjust(true);
   Crop.closeTune();
+  const wasFiltered = S.module === 'crop' && S.cropShow !== 'all';
   S.module = m;
+  if (wasFiltered) { S.cropShow = 'all'; recomputeView(); }
   if (m !== 'library' && S.active == null && S.view.length) { S.active = S.view[0].id; S.selected = new Set([S.active]); S.anchor = S.active; }
   renderAll(); ensureVisible();
   const mod = Mods.get(m); if (mod && mod.enter) mod.enter();
