@@ -37,7 +37,9 @@ COLUMNS = ["order_name", "account_email", "color_correction", "delivery", "item_
            "crop", "crop_focus", "caption", "notes"]
 DEFAULT_SETTINGS = {"account_email": "", "delivery": "ship", "color_correction": "no", "finish": "Matte",
                     # file names start with team order + envelope number, so the prints come back in stuffing order
-                    "envelope_order": "yes"}
+                    "envelope_order": "yes",
+                    # Meridian's fixed shipping price, filled in for each shoot that ships
+                    "ship_amount": ""}
 
 _products: dict | None = None
 

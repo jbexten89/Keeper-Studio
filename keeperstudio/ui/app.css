@@ -654,7 +654,7 @@ textarea:focus{border-color:var(--accent)}
 .mer-head{display:flex;gap:12px;align-items:baseline;margin:0 0 10px}.mer-head b{font-size:14px;font-weight:600}
 .mer-row{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
 .mer-row .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
-.mer-row input{width:260px}
+.mer-row input{width:240px}
 .mer-res{margin:12px 0 0;padding:10px 12px;border-radius:6px;background:var(--panel-2)}
 .mer-res.ok .mer-top b{color:#3CC77F}.mer-res.bad .mer-top b{color:var(--amber)}
 .mer-top{display:flex;gap:12px;align-items:center;margin:0 0 4px}.mer-top span{color:var(--muted)}
@@ -939,3 +939,15 @@ textarea:focus{border-color:var(--accent)}
 .adj-circle{position:absolute;inset:0;pointer-events:none;--d:85.7%;
   background:radial-gradient(circle closest-side, transparent calc(var(--d) - 1px), rgba(5,6,8,.45) var(--d))}
 .adj-circle::after{content:'';position:absolute;left:50%;top:50%;width:var(--d);height:var(--d);transform:translate(-50%,-50%);border-radius:50%;border:1.5px dashed #fff}
+
+/* Lab order: shipping beside Delivery; the older lab folder tucked away */
+.deliv-row{display:flex;align-items:center;gap:8px}
+.ship-fld{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted)}
+.mer-row .ship-fld .ship-in{width:72px;text-align:right}
+.other-send{margin:10px 0 14px;border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+.other-send summary{padding:9px 12px;cursor:pointer;color:var(--text);font-size:13px;list-style:none}
+.other-send summary::-webkit-details-marker{display:none}
+.other-send summary::before{content:'▸ ';color:var(--muted)}.other-send[open] summary::before{content:'▾ '}
+.other-send summary span{color:var(--muted);font-size:12px;margin-left:8px}
+.os-body{padding:0 12px 12px}.os-body p{margin:0 0 8px;color:var(--muted);font-size:12px}
+.os-row{display:flex;align-items:center;gap:16px}

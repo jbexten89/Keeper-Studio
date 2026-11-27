@@ -587,6 +587,7 @@ const Ord = {
     if (!this.crops) this.crops = (await DB.get('kv', 'orders|crops|' + this.sid).catch(() => null)) || Crop.outDir || '';
     try { this.lab = await api('/api/orders/lab-plan', { shoot_id: this.sid, crops_dir: this.crops }); } catch (e) { toast(esc(e.message)); }
     if (S.module === 'orders' && this.view === 'lab') renderView();
+    this.syncShipping();
   },
   async pickCrops() {
     const p = await pickPath('folder', { initial: this.crops || Crop.outDir || S.root || '' }); if (!p) return;
@@ -602,6 +603,15 @@ const Ord = {
       toast(`${plural(r.copied, 'file')} copied${r.missing.length ? ` · ${r.missing.length} missing, listed in lab-order.csv` : ''} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.out_dir))})">Show</button>`, 8000);
     } catch (e) { toast(esc(e.message), 6000); }
     this.building = false; renderView();
+  },
+  // Shipping is a fixed price: a shoot that ships gets the remembered amount; Pickup is $0
+  async syncShipping(force) {
+    if (!this.sid || !this.d) return;
+    const m = (this.lab && this.lab.meridian) || {}, cur = this.d.totals.shipping_cents || 0;
+    let want = force;
+    if (want == null) { if ((m.delivery || 'ship') !== 'ship' || cur) return; want = Math.round(parseFloat(m.ship_amount || '0') * 100) || 0; if (!want) return; }
+    if (want === cur) return;
+    try { await api('/api/orders/shipping', { shoot_id: this.sid, amount: (want / 100).toFixed(2) }); await this.refresh(); renderLeft(); if (S.module === 'orders' && this.view === 'lab') renderView(); } catch {}
   },
   async merSet(k, v) {
     try { const r = await api('/api/orders/meridian-settings', { [k]: v }); if (this.lab) this.lab.meridian = r.settings; } catch (e) { toast(esc(e.message)); }
@@ -662,7 +672,7 @@ const Ord = {
       </div>`;
     return `<div class="mer"><div class="mer-head"><b>Meridian bulk order</b><span class="muted small">One folder with a CSV, for Meridian’s bulk upload. Every print is the file Crop cut, sent as is.</span></div>
       <div class="mer-row"><label class="fld">Meridian account email<input type="email" data-mer="account_email" value="${esc(m.account_email || '')}" placeholder="you@example.com" spellcheck="false"></label>
-        <div class="fld"><span>Delivery</span>${segHTML('merDelivery', m.delivery || 'ship', [['ship', 'Ship'], ['pickup', 'Pickup']])}</div>
+        <div class="fld"><span>Delivery${(m.delivery || 'ship') === 'ship' ? ' · shipping' : ''}</span><div class="deliv-row">${segHTML('merDelivery', m.delivery || 'ship', [['ship', 'Ship'], ['pickup', 'Pickup']])}${(m.delivery || 'ship') === 'ship' ? `<label class="ship-fld" title="Meridian's shipping for this order. It's remembered for the next shoot; Analysis takes it off what you keep.">$<input class="ship-in" data-oship inputmode="decimal" value="${this.d && this.d.totals.shipping_cents ? (this.d.totals.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00"></label>` : ''}</div></div>
         <div class="tb-spacer"></div>
         ${switchHTML('merEnvOrder', m.envelope_order !== 'no', 'Files in envelope order', 'File names start with the team’s place and the envelope number (03-7thBoys_E047_IMG_5031_5x7.jpg), so the lab prints and packs them in the order you stuff envelopes. Turn off to send the plain names.')}
         <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
@@ -1254,10 +1264,12 @@ const Ord = {
     const prints = L.groups.reduce((a, g) => a + g.qty, 0);
     v.innerHTML = `<div class="ord-scroll"><div class="lab">
       ${this.merHTML(L, found)}
-      <div class="lab-ctrl"><div class="pathrow"><span class="path ${L.crops_dir && !L.crops_exists ? 'bad' : ''}" title="${esc(L.crops_dir)}">${esc(L.crops_dir || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-ord="lab-crops">Crops folder…</button></div>
-        <label class="ship-lab" title="What Meridian charged to ship this shoot's order. Type it in from the invoice; Analysis takes it off what you keep.">Shipping $<input class="ship-in" data-oship value="${this.d && this.d.totals.shipping_cents ? (this.d.totals.shipping_cents / 100).toFixed(2) : ''}" placeholder="0.00" inputmode="decimal" spellcheck="false"></label>
+      <details class="other-send" ${this.otherOpen ? 'open' : ''} data-othersend><summary>Other ways to send <span>Meridian website · ROES</span></summary>
+        <div class="os-body"><p>Copies the print files into one folder per size, plus lab-order.csv with the quantities.</p><div class="os-row">
         ${switchHTML('oneper', this.onePer, 'One file per print', 'For the Meridian website: two 4x6s become two files, so a whole size folder uploads with every quantity at 1. Off: one file each, with quantities in lab-order.csv (for ROES).')}
-        <button class="btn primary" data-ord="lab-build" ${this.building || !L.crops_exists || !found ? 'disabled' : ''}>${this.building ? 'Building…' : 'Build lab folder…'}</button></div>
+        <button class="btn primary" data-ord="lab-build" ${this.building || !L.crops_exists || !found ? 'disabled' : ''}>${this.building ? 'Building…' : 'Build lab folder…'}</button></div></div></details>
+      <div class="lab-ctrl"><div class="pathrow"><span class="path ${L.crops_dir && !L.crops_exists ? 'bad' : ''}" title="${esc(L.crops_dir)}">${esc(L.crops_dir || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-ord="lab-crops">Crops folder…</button></div>
+</div>
       ${L.crops_dir && !L.crops_exists ? `<div class="banner amber inline">That crops folder isn’t there any more — choose where Crop exported this shoot.</div>` : ''}
       ${noPic.length ? `<div class="banner amber inline">No photo picked yet for ${esc(noPic.slice(0, 5).join(', '))}${noPic.length > 5 ? ` and ${noPic.length - 5} more` : ''}</div>` : ''}
       <div class="lab-sum"><span><b>${prints}</b>to print</span><span><b>${need}</b>files</span>${L.crops_exists ? `<span><b>${found}</b>found</span><span><b>${need - found}</b>not cropped yet</span>` : ''}</div>
@@ -1550,7 +1562,7 @@ function bindModuleEvents() {
       else if (name === 'cutView') { Cut.view = v; renderView(); }
       else if (name === 'ordView') Ord.setView(v);
       else if (name === 'anScope') { Ord.anScope = v; renderView(); }
-      else if (name === 'merDelivery') Ord.merSet('delivery', v);
+      else if (name === 'merDelivery') { Ord.merSet('delivery', v).then(() => Ord.syncShipping(v === 'pickup' ? 0 : null)); }
       else if (name === 'ordPay' && Ord.draft) { const d = Ord.draft; d.paid_method = v; d.accepted_cents = 0; d.paid_cents = v && v !== 'none' ? Ord.price(d.lines).total : 0; Ord.changed(true); if (v === 'none' || (!v && !Ord.prepaid())) Ord.askName(); }
       else if (name === 'rtStep') Ret.setStep(v);
       else if (name === 'rtMode') { Ret.brush.erase = v === 'erase'; Ret.right(); }
@@ -1671,10 +1683,16 @@ function bindModuleEvents() {
   $('#modView').addEventListener('input', e => { const i = e.target.closest('[data-oq]'); if (i && S.module === 'orders') { Ord.q = i.value; Ord.paintRows(); } });
   document.addEventListener('change', async e => {
     if (!(e.target.matches && e.target.matches('[data-oship]')) || !Ord.sid) return;
-    try { await api('/api/orders/shipping', { shoot_id: Ord.sid, amount: e.target.value.trim() }); await Ord.refresh(); renderLeft(); }
+    try {
+      const amt = e.target.value.trim();
+      await api('/api/orders/shipping', { shoot_id: Ord.sid, amount: amt }); await Ord.refresh(); renderLeft();
+      const c = Ord.d ? Ord.d.totals.shipping_cents || 0 : 0; Ord.merSet('ship_amount', c ? (c / 100).toFixed(2) : '');  // remembered for the next shoot
+    }
     catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 3500); renderLeft(); }
   });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-oship]')) e.target.blur(); }, true);
+  document.addEventListener('toggle', e => { if (e.target.matches && e.target.matches('[data-othersend]')) { Ord.otherOpen = e.target.open; DB.put('kv', 'labOtherOpen', Ord.otherOpen).catch(() => {}); } }, true);
+  DB.get('kv', 'labOtherOpen').then(v => { Ord.otherOpen = !!v; }).catch(() => {});
   document.addEventListener('change', e => { if (e.target.matches && e.target.matches('[data-wi]')) Ord.wiSet(e.target.dataset.wi, e.target.value); });
   document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.matches && e.target.matches('[data-wi]')) { e.preventDefault(); e.target.blur(); } }, true);
   document.addEventListener('input', e => { if (e.target.matches && e.target.matches('[data-wi-drop]')) { Ord.wiDrop = +e.target.value; Ord.wiPaint(); } });

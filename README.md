@@ -98,9 +98,12 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   on, so *Export prints* runs on just those.
 * **Lab order:** lists every file the lab prints and how many, grouped by size,
   and ticks off the ones already in the crops folder. *Build lab folder…*
-  copies just those files into one folder per size plus `lab-order.csv`.
-  With *One file per print* on, two 4x6s become two files, so a whole size
-  folder uploads to the Meridian website with every quantity at 1.
+  copies just those files into one folder per size plus `lab-order.csv`
+  (under *Other ways to send*, for the Meridian website or ROES). With *One
+  file per print* on, two 4x6s become two files, so a whole size folder
+  uploads to the Meridian website with every quantity at 1. Shipping sits
+  beside Ship / Pickup in the Meridian box: type Meridian's price once and
+  every shoot that ships gets it; Pickup is $0.
 * **Analysis:** four numbers up top (Sales, You keep, Average order, Still
   owed), compared with the same league's last shoot when there is one
   ("Fall Sports 2025" for "Fall Sports 2026"), then **What stands out**: a few
