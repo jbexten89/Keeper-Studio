@@ -153,11 +153,10 @@ landscape:
   # Proper spacing around the group, as a fraction of the group's size, added
   # where the frame allows (the crop always contains the whole group first).
   margin_fraction: 0.08
-  # Team photos are framed by a fixed band of the photo: the top edge this
-  # share of the height down from the top, the bottom edge this share up from
-  # the bottom; centred on the team. Both 0 = frame around the people found.
-  band_top_fraction: 0.17
-  band_bottom_fraction: 0.21
+  # Team photos: how much of the photo's height the crop shows (1.0 = all of
+  # it, top to bottom), centred on the middle of the photo. Each group size
+  # keeps this height and takes its width from its own shape.
+  visible_fraction: 0.86
   ratios:
     - name: 20x16       # a 16x20 shot landscape (5:4)
       width: 20
