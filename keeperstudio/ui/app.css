@@ -820,3 +820,20 @@ textarea:focus{border-color:var(--accent)}
 .otbl .o-th{width:26px;height:32px;object-fit:cover;border-radius:3px;display:block;border:1px solid var(--border-2);background:#1a1d22;cursor:zoom-in}
 .otbl .o-th.none{cursor:default}
 .otbl .o-thtog{font-size:12px;color:var(--dim)}
+
+/* Crop: framing status card at the top of the left pane */
+.fs-card{margin:10px 10px 4px;padding:10px 12px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel-2)}
+.fs-card .fs-t{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
+.fs-card .fs-dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:none}
+.fs-card.run{border-color:rgba(46,155,255,.55);background:rgba(46,155,255,.08)}.fs-card.run .fs-dot{background:var(--accent);box-shadow:0 0 8px var(--glow)}
+.fs-card.done .fs-dot{background:#46A758}
+.fs-card .fs-s{color:var(--muted);font-size:12px;margin-top:4px}.fs-card .fs-s b{color:var(--text);font-weight:600}.fs-card .am{color:var(--amber)}
+.fs-card .fs-bar{height:5px;background:#1b1f25;border-radius:3px;margin:8px 0 6px;overflow:hidden}.fs-card .fs-bar i{display:block;height:100%;background:var(--accent);transition:width .3s}
+.fs-card .fs-bar.busy i{width:30%!important;animation:fsBusy 1.2s ease-in-out infinite alternate}
+@keyframes fsBusy{from{margin-left:0}to{margin-left:70%}}
+.fs-card .fs-btns{display:flex;gap:6px;margin-top:8px}
+.btn.amber{background:var(--amber);border-color:var(--amber);color:#1a1206;font-weight:600}
+.restyle-note{margin:8px 12px 10px;padding:10px 12px;border-radius:8px;background:var(--amber);color:#1a1206;font-size:12.5px}
+.restyle-note b{display:block;font-size:13px;margin-bottom:3px}
+.restyle-note .btn{background:#1a1206;color:#f3e3cc;border-color:#1a1206}.restyle-note .btn.ghost{background:transparent;color:#1a1206;border-color:rgba(26,18,6,.4)}
+.restyle-note .btn-row{margin-top:8px}

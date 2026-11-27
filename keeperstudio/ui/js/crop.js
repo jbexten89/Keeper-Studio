@@ -44,6 +44,8 @@ const Crop = {
     }
     try { if (v) await DB.putMany('styles', ps.map(p => [p.path, v])); else await Promise.all(ps.map(p => DB.del('styles', p.path))); } catch (e) { toast(esc(e.message)); }
     toast(`${plural(ps.length, 'photo')}: ${v ? this.STYLE_NAMES[v] : 'batch style'}`);
+    // their old framing check no longer applies: offer one click to check just these again
+    if (ps.length > 1) this.restyled = { paths: ps.map(p => p.path), name: v ? this.STYLE_NAMES[v] : 'the batch style' };
     renderAll(); this.ensurePlan();
   },
   styleRows() {
@@ -353,6 +355,27 @@ const Crop = {
     for (const p of list) c[(this.status.get(p.path) || {}).status || 'unchecked']++;
     return c;
   },
+  // One place that always says whether framing is running: nothing running / running / done.
+  // Framing for many photos only ever starts from a button.
+  cardHTML(list) {
+    const js = this.job && this.jobState && !this.jobState.finished ? this.jobState : null;
+    if (js) {
+      const f = js.total ? js.done / js.total : 0, verb = this.jobKind === 'analyze' ? 'Checking framing…' : 'Exporting prints…';
+      return `<div class="fs-card run"><div class="fs-t"><span class="fs-dot"></span>${verb}</div><div class="fs-bar ${!js.done ? 'busy' : ''}"><i style="width:${(f * 100).toFixed(1)}%"></i></div>
+        <div class="fs-s">${js.total ? `<b>${js.done} of ${js.total}</b>` : ''}${js.eta ? ` · about ${fmtDur(js.eta)} left` : !js.done ? ` · ${esc(js.message || 'starting…')}` : ''}</div>
+        <div class="fs-btns"><button class="btn sm" data-cancel-job="${js.id}">Stop</button></div></div>`;
+    }
+    const checked = list.filter(p => this.status.has(p.path)).length, review = this.counts(list).review;
+    const L = this.lastCheck;
+    if (list.length && checked === list.length && L) {
+      return `<div class="fs-card done"><div class="fs-t"><span class="fs-dot"></span>${L.stopped ? 'Framing check stopped' : 'Framing checked'}</div>
+        <div class="fs-s"><b>${list.length}</b> checked${L.secs >= 1 ? ` in ${fmtDur(L.secs)}` : ''}${review ? ` · <span class="am">${review} need review</span>` : ' · none need review'}</div>
+        <div class="fs-btns">${review ? `<button class="btn sm amber" data-cropfilter="review">Show the ${review}</button>` : ''}<button class="btn sm" data-crop="analyze">Check again</button></div></div>`;
+    }
+    return `<div class="fs-card"><div class="fs-t"><span class="fs-dot"></span>Framing: nothing running</div>
+      <div class="fs-s"><b>${list.length}</b> ${list.length === 1 ? 'photo' : 'photos'} to crop · <b>${checked}</b> checked${review ? ` · <span class="am">${review} need review</span>` : ''}</div>
+      <div class="fs-btns"><button class="btn sm primary" data-crop="analyze" ${list.length ? '' : 'disabled'}>Check framing (${list.length})</button></div></div>`;
+  },
   left() {
     const all = S.view.length, sel = S.selected.size;
     const list = scopeList(this.scope); const c = this.counts(S.photos.length ? sourcePhotos().filter(p => matchRules(p, { ...S.filter, crop: 'any' })) : []);
@@ -360,8 +383,7 @@ const Crop = {
     let html = sectionHTML('c-scope', 'Photos to crop', `<div class="pad" title="${esc(sourceName())}${S.filter.flag !== 'any' || S.filter.rating || S.filter.label !== 'any' || S.filter.text ? ' (filtered)' : ''}. Pick your keepers in Library, then crop them here.">${segHTML('cropScope', this.scope, [['all', `Filmstrip · ${all}`], ['selected', `Selected · ${sel}`]])}
 </div>`);
     html += sectionHTML('c-check', 'Framing check', `${['ok', 'shortened', 'manual', 'review', 'unchecked'].map(row).join('')}
-      <div class="pad"><button class="btn wide" data-crop="analyze" ${this.job ? 'disabled' : ''}>Check framing on ${plural(list.length, 'photo')}</button>
-      </div>`);
+`);
     const s = this.settings;
     if (s) {
       const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
@@ -384,14 +406,14 @@ const Crop = {
     if (S.filter.cstyle && S.filter.cstyle !== 'any') html = `<div class="filter-note">Showing only <b>${S.filter.cstyle === 'batch' ? 'same as left side' : esc(this.STYLE_NAMES[S.filter.cstyle])}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-stylefilter="any">Show all</button></div>` + html;
     if (S.filter.crop && S.filter.crop !== 'any') html = `<div class="filter-note">Showing only <b>${esc(STATUS_INFO[S.filter.crop].label)}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-cropfilter="any">Show all</button></div>` + html;
     let foot = '';
-    if (this.job && this.jobState && !this.jobState.finished) foot = progressHTML(this.jobState, this.jobKind === 'analyze' ? 'Checking framing' : 'Exporting prints');
-    else if (this.result) {
+    if (this.result && !this.job) {
       const r = this.result;
       foot = `<div class="job-card done"><div class="job-top"><b>${r.cancelled ? 'Export stopped' : 'Prints exported'}</b>${r.seconds != null ? `<span class="job-time">in ${fmtDur(r.seconds)}</span>` : ''}</div>
         <div class="res-grid"><span class="st-dot ok"></span>${r.cropped} cropped<span class="st-dot short"></span>${r.shortened} shortened<span class="st-dot review"></span>${r.review} need review</div>
         ${r.skipped_non_jpeg && r.skipped_non_jpeg.length ? `<div class="hint tight">${plural(r.skipped_non_jpeg.length, 'non-JPEG photo')} skipped.</div>` : ''}
         <div class="btn-row"><button class="btn sm" data-crop="open-out">Open folder</button>${r.sheets && r.sheets.length ? '<button class="btn sm" data-crop="sheets">Contact sheets</button>' : ''}${r.review ? '<button class="btn sm" data-cropfilter="review">Show review</button>' : ''}</div></div>`;
     }
+    html = this.cardHTML(list) + html;
     $('#left').innerHTML = `<div class="scroll">${html}</div><div class="left-foot col">${foot}
       <button class="btn primary big" data-crop="export" ${this.job || !list.length ? 'disabled' : ''}>Export prints (${list.length})</button></div>`;
   },
@@ -438,7 +460,9 @@ const Crop = {
       status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Batch uses the Framing style set on the left."><span>Style</span>
         <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as left side (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${own ? `<span class="style-tag inline">${STYLE_TAGS[own]}</span>` : ''}${nSel > 1 ? `<em>${nSel} selected</em>` : ''}</div>`;
     }
-    const html = sectionHTML('c-status', 'Framing', status) + sectionHTML('c-straight', 'Straighten', straight)
+    const rs = this.restyled && !this.job ? this.restyled.paths.filter(k => !this.status.has(k)) : [];
+    const note = !rs.length ? '' : `<div class="restyle-note"><b>Style changed on ${plural(rs.length, 'photo')}</b>Their framing hasn’t been checked with ${esc(this.restyled.name)} yet. Nothing runs until you click.<div class="btn-row"><button class="btn sm" data-crop="recheck">Re-check the ${rs.length}</button><button class="btn sm ghost" data-crop="recheck-x" title="Leave them for now">Not now</button></div></div>`;
+    const html = sectionHTML('c-status', 'Framing', status) + note + sectionHTML('c-straight', 'Straighten', straight)
       + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
       ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
@@ -473,8 +497,9 @@ const Crop = {
     if (S.root) { if (custom) DB.put('kv', 'cropout|' + S.root, path).catch(() => {}); else DB.del('kv', 'cropout|' + S.root).catch(() => {}); }
     renderRight();
   },
-  async analyze() {
-    const list = scopeList(this.scope); if (!list.length || this.job) return;
+  async analyze(only) {
+    const list = only ? only.map(k => S.byPath.get(k)).filter(Boolean) : scopeList(this.scope); if (!list.length || this.job) return;
+    const t0 = Date.now(); if (only) this.restyled = null;
     const manual = {}; list.forEach(p => { if (this.manual.has(p.path)) manual[p.path] = this.manual.get(p.path); });
     let id; try { id = (await api('/api/crop/analyze', { paths: list.map(p => p.path), manual })).job; } catch (e) { return toast(esc(e.message)); }
     this.job = id; this.jobKind = 'analyze'; this.jobState = { id, total: list.length, done: 0, busy: true, message: 'Loading face detector…' };
@@ -489,6 +514,7 @@ const Crop = {
     this.job = null; this.jobState = null; renderAll();
     if (fin.error) return toast('Framing check failed: ' + esc(fin.error));
     const c = this.counts(list);
+    this.lastCheck = { n: list.length, secs: (Date.now() - t0) / 1000, review: c.review, stopped: !!(fin.result && fin.result.cancelled) }; renderLeft();
     toast(`Checked ${plural(list.length, 'photo')} · ${c.review} need review`, 3500);
   },
   async exportPrints() {

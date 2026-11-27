@@ -1335,7 +1335,7 @@ function bindModuleEvents() {
     const c = t.closest('[data-crop]');
     if (c) {
       const a = c.dataset.crop;
-      if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze(); else if (a === 'pick-both' || a === 'pick-picks' || a === 'pick-teams') Crop.selectPicksTeam(a.slice(5));
+      if (a === 'export') Crop.exportPrints(); else if (a === 'analyze') Crop.analyze(); else if (a === 'recheck') Crop.analyze(Crop.restyled ? Crop.restyled.paths.filter(k => !Crop.status.has(k)) : null); else if (a === 'recheck-x') { Crop.restyled = null; renderRight(); } else if (a === 'pick-both' || a === 'pick-picks' || a === 'pick-teams') Crop.selectPicksTeam(a.slice(5));
       else if (a === 'compare') Crop.toggleCompare(); else if (a === 'clear-styles') Crop.clearStyles();
       else if (a === 'adjust') Crop.startAdjust(); else if (a === 'square') Crop.startSquare(); else if (a === 'reset') Crop.resetManual();
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
