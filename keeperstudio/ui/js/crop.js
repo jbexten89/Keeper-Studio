@@ -90,6 +90,8 @@ const Crop = {
           this.plans.set(path, plan);
           this.status.set(path, { status: plan.status, label: plan.label, reason: plan.reason, src: 'check' });
         }
+        // a photo placed by hand stays "Placed by hand" even when its saved check is out of date (a new build, new settings)
+        for (const path of Object.keys(manual)) if (!r.plans || !r.plans[path]) { const st = this.status.get(path); if (!st || st.status !== 'manual') this.status.set(path, { status: 'manual', label: 'Placed by hand', reason: null, src: 'manual' }); }
       } catch {}
     }
     if (S.module === 'crop') { renderView(); renderRight(); renderLeft(); schedule(R_CELLS); this.ensurePlan(); }

@@ -170,9 +170,12 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
 
 ## Where things live
 
-* `config.yaml`, `models\`, `luts\`: beside the app, editable. In Crop,
-  **Framing settings…** edits the main framing numbers and keeps the file's
-  comments; a backup is saved as `config.yaml.bak`.
+* `models\`, `luts\` and the app's own `config.yaml`: beside the app, replaced
+  by each new build. The settings Keeper Studio actually uses are your copy,
+  `%LOCALAPPDATA%\KeeperStudio\config.yaml`, made from the app's file. Fine-tune
+  framing values are also saved in `framing-settings.json` and put back on every
+  new build's copy, so updating never resets them. A backup is saved as
+  `config.yaml.bak`. `changes.log` there notes when a hand placement is removed.
 * Flags, ratings, collections, hand-placed crops and settings:
   `%LOCALAPPDATA%\KeeperStudio\catalog.sqlite3`, along with the thumbnail cache.
   They survive app updates.

@@ -356,8 +356,16 @@ def read_tunables() -> list[dict]:
     return out
 
 
-def write_tunables(values: dict) -> None:
-    p = paths.config_path()
+def write_tunables(values: dict, remember: bool = True, path=None) -> None:
+    if remember:  # kept on their own too, so a new build's settings file gets them back
+        f = paths.data_dir() / "framing-settings.json"
+        try:
+            saved = json.loads(f.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            saved = {}
+        saved.update({k: v for k, v in values.items() if v is not None})
+        f.write_text(json.dumps(saved, indent=1), encoding="utf-8")
+    p = path or paths.config_path()
     text = p.read_text(encoding="utf-8")
     lines = text.splitlines()
     for _group, section, key, _label, lo, hi, _default in TUNABLES:

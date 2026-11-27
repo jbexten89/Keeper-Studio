@@ -7,6 +7,7 @@ token, so other web pages open on the machine cannot reach it.
 from __future__ import annotations
 
 import json
+import time
 import os
 import secrets
 import subprocess
@@ -239,7 +240,20 @@ def r_db_put(b):
 
 def r_db_del(b):
     catalog.delete(b["store"], b["key"])
+    if b.get("store") == "manual":  # a trail of removed hand placements, to find out why one went missing
+        _note(f"hand placement removed: {b.get('key')} ({b.get('why') or 'reset or straightened'})")
     return {"ok": True}
+
+
+def _note(line: str) -> None:
+    try:
+        f = paths.data_dir() / "changes.log"
+        if f.exists() and f.stat().st_size > 512_000:
+            f.replace(f.with_suffix(".old.log"))
+        with f.open("a", encoding="utf-8") as fh:
+            fh.write(time.strftime("%Y-%m-%d %H:%M:%S ") + line + "\n")
+    except OSError:
+        pass
 
 
 def r_dialog(b):
