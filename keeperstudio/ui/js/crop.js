@@ -511,11 +511,10 @@ const Crop = {
   },
   modbar() {
     const p = this.active(); const m = p && this.manual.has(p.path);
-    $('#modbar').innerHTML = `<span class="muted small">Select</span><div class="seg crop-pick"><button data-crop="pick-both" title="Select every Pick (P) and team photo (T) in the folder, to crop and export them">Picks + teams</button><button data-crop="pick-picks" title="Select every Pick (P) that isn't a team photo">Picks</button><button data-crop="pick-teams" title="Select every team photo (T)">Teams</button></div><div class="tb-sep"></div><div class="tb-group"><button class="btn sm" data-crop="adjust" ${p ? '' : 'disabled'}>Adjust framing <kbd>A</kbd></button>
-      ${m ? '<button class="btn sm" data-crop="reset">Reset to automatic</button>' : ''}</div><div class="tb-sep"></div>
+    $('#modbar').innerHTML = `<span class="muted small">Select</span><div class="seg crop-pick"><button data-crop="pick-both" title="Select every Pick (P) and team photo (T) in the folder, to crop and export them">Picks + teams</button><button data-crop="pick-picks" title="Select every Pick (P) that isn't a team photo">Picks</button><button data-crop="pick-teams" title="Select every team photo (T)">Teams</button></div><div class="tb-sep"></div>
       <button class="toggle ${this.overlay ? 'on' : ''}" data-crop="overlay" title="Show crop boxes (O)">Crop boxes</button>
       <button class="toggle ${this.compare ? 'on' : ''}" data-crop="compare" title="Original and color preset side by side (C)">Color side by side <kbd>C</kbd></button>
-      <div class="tb-spacer"></div><span class="muted small">← → step through photos · P / X flag · 1–5 rate</span>`;
+      <div class="tb-spacer"></div><span class="muted small">← → step through photos · A adjust framing · P / X flag · 1–5 rate</span>`;
   },
 
   /* ---------- actions ---------- */
