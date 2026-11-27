@@ -228,7 +228,7 @@ def run_config(settings: dict):
         cfg,
         ratios=ratios,
         landscape_ratios=land,
-        landscape_enabled=bool(settings.get("landscape")) and bool(land),
+        landscape_enabled=bool(land),  # team photos always get group framing; the group sizes in Print sizes turn it off
         orders_folder=(cfg.orders_folder or "Orders") if settings.get("orders") else None,
         fit_to_frame=bool(settings.get("fit_to_frame", True)),
     )

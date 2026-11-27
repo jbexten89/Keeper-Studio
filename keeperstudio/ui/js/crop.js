@@ -426,7 +426,6 @@ const Crop = {
         ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
         ${s.balance_feet && !s.preschool && !tq ? `<div class="slider-row" title="Space under the feet"><span>Margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
         ${switchHTML('fit_to_frame', s.fit_to_frame, 'Shorten to fit', 'When the ideal frame runs off the photo, shorten it instead of sending the photo to review')}
-        ${switchHTML('landscape', s.landscape, 'Crop group shots', 'Landscape photos are cropped to the landscape sizes around the whole group')}
         <div class="pad"><button class="btn sm wide" data-crop="tunables">Fine-tune framing…</button></div>`)
       + sectionHTML('c-color', 'Color', `${switchHTML('enhance', s.enhance, 'Apply color preset', s.preschool ? 'Uses the preschool preset' : 'Uses the standard preset')}
         <div class="pad ${s.enhance ? '' : 'disabled'}">${segHTML('enhanceWhen', s.enhance_when, [['before', 'Before cropping'], ['after', 'After cropping']])}</div>`)
