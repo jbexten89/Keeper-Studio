@@ -263,6 +263,7 @@ const Ord = {
       card.innerHTML = `<h3 class="tl-h">Team 5×7s for the school <span class="muted small">${esc(R.shoot)}</span></h3>
         <p class="muted small tl-sub">One 5×7 (300 dpi) of every team on the team list, named by team, zipped and emailed.${sent ? ` Last sent ${esc(fmtDay(new Date(sent.at * 1000).toISOString().slice(0, 10)))} to ${esc(sent.to)} · ${plural((sent.teams || []).length, 'team')}.` : ''}</p>
         <div class="pathrow sd-crops"><span class="path ${this.crops ? '' : 'bad'}" title="${esc(this.crops)}">${esc(this.crops || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-sdcrops>Crops folder…</button></div>
+        <div class="pathrow sd-crops"><span class="path" title="Where Save zip and Open in Gmail put the zip">${st.zipDir ? 'Zip goes in ' + esc(st.zipDir) : 'Zip folder: asked the first time you save'}</span><button class="btn sm" data-sdzipdir>Zip folder…</button></div>
         <div class="sd-list">${R.rows.map(row).join('') || '<div class="hint" style="padding:10px">No teams yet.</div>'}</div>
         ${todo ? `<div class="sd-warn">${plural(todo, 'team')} ${todo === 1 ? "isn't" : "aren't"} ready - pick the group photo or crop the 5×7, or skip a team that wasn't photographed.</div>` : ''}
         <div class="sd-mail"><label>To<input data-sdf="to" value="${esc(st.to)}" placeholder="the school's email" spellcheck="false"></label><label>Subject<input data-sdf="subject" value="${esc(st.subject)}"></label>
@@ -278,6 +279,13 @@ const Ord = {
     const read = card => { for (const el of $$('[data-sdf]', card)) { if (el.dataset.sdf === 'body' && el.value !== st.body) st.bodyEdited = true; st[el.dataset.sdf] = el.value; } };
     const refresh = async card => { try { R = await load(); } catch (e) { return toast(esc(e.message)); } paint(card); };
     const payload = () => ({ shoot_id: this.sid, crops_dir: this.crops, to: st.to.trim(), subject: st.subject, body: st.body });
+    st.zipDir = (await DB.get('kv', 'school|zipdir|' + this.sid).catch(() => null)) || '';
+    const zipDir = async (ask) => {
+      if (st.zipDir && !ask) return st.zipDir;
+      const p = await pickPath('folder', { initial: st.zipDir || dirName(this.crops) || S.root || '' });
+      if (p) { st.zipDir = p; DB.put('kv', 'school|zipdir|' + this.sid, p).catch(() => {}); }
+      return p;
+    };
     openModal('<div></div>', card => {
       card.classList.add('sd-card'); paint(card);
       card.addEventListener('change', e => { if (e.target.matches('[data-sdf=to]')) api('/api/orders/school-set', { shoot_id: this.sid, email: e.target.value.trim() }).catch(() => {}); });
@@ -290,6 +298,7 @@ const Ord = {
         if (sk) { const n = sk.dataset.sdskip, skip = new Set(R.school.skip); skip.has(n) ? skip.delete(n) : skip.add(n); await api('/api/orders/school-set', { shoot_id: this.sid, skip: [...skip] }); return refresh(card); }
         if (t.closest('[data-sdcrops]')) { const p = await pickPath('folder', { initial: this.crops || Crop.outDir || S.root || '' }); if (p) { this.crops = p; DB.put('kv', 'orders|crops|' + this.sid, p).catch(() => {}); return refresh(card); } return; }
         if (t.closest('[data-sdsetup]')) { st.setup = true; return paint(card); }
+        if (t.closest('[data-sdzipdir]')) { await zipDir(true); return paint(card); }
         if (t.closest('[data-sdmclose]')) { st.setup = false; return paint(card); }
         if (t.closest('[data-sdmforget]')) { R.mail = await api('/api/mail-settings', { set: true, forget: true }); return paint(card); }
         if (t.closest('[data-sdmsave]')) {
@@ -299,14 +308,15 @@ const Ord = {
           return paint(card);
         }
         if (t.closest('[data-sdzip]')) {
-          const p = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!p) return;
+          const p = await zipDir(false); if (!p) return;
+          paint(card);
           try { const z = await api('/api/orders/school-zip', { ...payload(), folder: p }); toast(`Saved ${plural(z.teams, 'team')} (${mb(z.bytes)}) <button class="toast-link" onclick="reveal(${esc(JSON.stringify(z.path))})">Show</button>`, 6000); }
           catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 5000); }
           return;
         }
         if (t.closest('[data-sdgmail]')) {
           if (!/@/.test(st.to)) return toast("Type the school's email first", 3000);
-          const p = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!p) return;
+          const p = await zipDir(false); if (!p) return;
           try { const z = await api('/api/orders/school-gmail', { ...payload(), folder: p }); reveal(z.path); st.gmailOpened = true; paint(card);
             toast(`Gmail is open with the message filled in - drag “${esc(z.path.split(/[\\/]/).pop())}” from the folder into it, send, then press <b>I sent it</b>.`, 9000); }
           catch (err) { toast(esc(String(err.message).replace(/^\w+Error:\s*/, '')), 5000); }
