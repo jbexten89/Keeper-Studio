@@ -88,6 +88,9 @@ class MeridianTests(unittest.TestCase):
             self.assertEqual(list(got[0].keys()), M.COLUMNS)
             for r in got:
                 self.assertTrue(Path(d, "out", r["file_name"]).is_file(), r["file_name"])
+            # files named in envelope order (team place, envelope #) unless that's switched off
+            self.assertTrue(any("_E001_IMG_5371" in r["file_name"] for r in got), [r["file_name"] for r in got])
+            self.assertTrue(any("_TEAM_IMG_9000" in r["file_name"] for r in got), [r["file_name"] for r in got])
             self.assertEqual(Path(res["csv"]).name, "Winter Sports-meridian-order.csv")
             # a printable PDF beside the CSV, and a report whose totals match the rows
             self.assertEqual(Path(res["pdf"]).read_bytes()[:5], b"%PDF-")

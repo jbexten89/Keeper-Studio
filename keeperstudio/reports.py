@@ -445,3 +445,148 @@ def pdf_sections(sections: list[dict], path: Path, title: str, subtitle: str) ->
                             bottomMargin=0.6 * inch, title=f"{title} - {subtitle}", author="Keeper Studio")
     doc.build(story, onFirstPage=furniture, onLaterPages=furniture)
     return path
+
+
+# ---------------------------------------------------------- matching sheets --
+def envelope_contents(order: dict, catalog) -> str:
+    """What goes in one envelope, as prints: '1× 8x10 · 2× 5x7 · 2 wallet sheets · 1× team 5x7 · Keychain'."""
+    from .orders import MEMORY_MATE, PRINT_SIZES, expand
+    e = expand(order, catalog)
+    bits = []
+    for key in sorted(e["prints"], key=lambda k: (":team" in k, -PRINT_SIZES.get(k.split(":")[0], {}).get("w", 0) * PRINT_SIZES.get(k.split(":")[0], {}).get("h", 0))):
+        n = e["prints"][key]
+        size, _, team = key.partition(":")
+        if not n or size == MEMORY_MATE:
+            continue
+        sz = PRINT_SIZES.get(size, {"label": size})
+        if sz.get("sheet"):
+            bits.append(f"{n} {sz['label'].lower()} sheet{'s' if n != 1 else ''}" + (" (team)" if team else ""))
+        else:
+            bits.append(f"{n}× {'team ' if team else ''}{sz['label']}")
+    if e["mates"]:
+        bits.append(f"{e['mates']} memory mate{'s' if e['mates'] != 1 else ''} to assemble")
+    for pid, packs in e["misc"].items():
+        p = catalog.get(pid)
+        bits.append(f"{packs}× {p.label}" if packs > 1 else p.label)
+    return " · ".join(bits)
+
+
+def matching_pdf(shoot: dict, orders: list[dict], catalog, extras: list[dict], team_photos: dict,
+                 find_photo, path: Path, business: str = "Jamie Bexten Photography") -> Path:
+    """One page per team: each envelope's photo, number and contents, in stuffing order,
+    so prints that come back from the lab without numbers can be matched by eye.
+
+    find_photo(stem) gives the photo's path on this computer, or None.
+    """
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from xml.sax.saxutils import escape
+
+    from .library import thumbnail
+    from .orders import _env_num, expand, order_summary, paid_label
+
+    path = Path(path)
+    if path.suffix.lower() != ".pdf":
+        path = path.with_suffix(".pdf")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    P = lambda t, **k: Paragraph(t if k.get("raw") else escape(str(t)), ParagraphStyle(
+        "x", fontName=k.get("f", "Helvetica"), fontSize=k.get("s", 10), leading=k.get("s", 10) * 1.25,
+        alignment=k.get("a", 0), textColor=colors.HexColor(k.get("c", "#111111"))))
+
+    def pic(stem, w, h):
+        p = find_photo(stem) if stem else None
+        if not p:
+            return P("—", c="#999999", a=1)
+        try:
+            img = Image(io.BytesIO(thumbnail(str(p), 300)))
+            iw, ih = img.imageWidth, img.imageHeight
+            r = min(w / iw, h / ih)
+            img.drawWidth, img.drawHeight = iw * r, ih * r
+            return img
+        except Exception:  # noqa: BLE001 - a missing thumbnail never stops the sheet
+            return P("—", c="#999999", a=1)
+
+    day = shoot.get("date") or ""
+    try:
+        day = dt.date.fromisoformat(day).strftime("%b %d, %Y").replace(" 0", " ")
+    except ValueError:
+        pass
+    teams: dict[str, list] = {}
+    for o in sorted((o for o in orders if o.get("lines")), key=lambda o: (int(o.get("team_rank", 10_000)), str(o.get("team") or "").lower(), _env_num(o.get("envelope")))):
+        teams.setdefault(o.get("team") or "No team", []).append(o)
+    story = []
+    W = 7.5 * inch
+    for team, rows in teams.items():
+        sums = [order_summary(o, catalog) for o in rows]
+        team_envs = [str(o.get("envelope") or "?") for o in rows if any(":" in k for k in expand(o, catalog)["prints"])]
+        owe = [(o, s) for o, s in zip(rows, sums) if s.get("due_cents", 0) > 0]
+        envs = [str(o.get("envelope") or "") for o in rows]
+        coach = next((o.get("coach") for o in rows if o.get("coach")), "")
+        head_left = [P(team, f="Helvetica-Bold", s=20),
+                     P(" · ".join(x for x in [shoot.get("name") or "", f"Picture day {day}" if day else "", f"Coach {coach}" if coach else ""] if x), c="#555555", s=10),
+                     Spacer(1, 6),
+                     P(f"<b>{len(rows)} envelope{'s' if len(rows) != 1 else ''}</b> · #{escape(', #'.join(e for e in envs if e))}", raw=True, s=11),
+                     P(("Team photo prints in envelopes " + ", ".join(team_envs)) if team_envs else "No team photo prints", s=9.5, c="#333333"),
+                     *([P(f"{len(owe)} still owe{'s' if len(owe) == 1 else ''} {_money(sum(s['due_cents'] for _, s in owe))}", s=9.5, c="#B06A00")] if owe else [])]
+        timg = pic(team_photos.get(team, ""), 2.3 * inch, 1.5 * inch)
+        story.append(Table([[head_left, [timg, P(f"Team photo · {team_photos.get(team) or 'not picked'}", s=8, c="#666666", a=2)]]],
+                           colWidths=[W - 2.4 * inch, 2.4 * inch],
+                           style=TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+                                             ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.black), ("BOTTOMPADDING", (0, 0), (-1, 0), 10)])))
+        story.append(Spacer(1, 6))
+        data = [[P(h, f="Helvetica-Bold", s=8, c="#666666") for h in ["", "PHOTO", "ENV #", "WHAT GOES IN IT", "PHOTO #", "PAID"]]]
+        for o, s in zip(rows, sums):
+            stem = o.get("edited") or o.get("image") or ""
+            pk = " + ".join(x for x in [s.get("packages") or "", s.get("extras") or ""] if x)
+            due = s.get("due_cents", 0)
+            if due > 0:
+                paid = P(f"<b>Owes {_money(due)}</b>" + (f"<br/>{escape(o.get('athlete') or '')}" if o.get("athlete") else ""), raw=True, s=9.5, c="#B06A00")
+            elif s.get("change_cents"):
+                paid = P(f"Give {_money(s['change_cents'])} change", s=9.5, c="#B06A00")
+            elif s.get("short_cents"):
+                paid = P(f"Paid · {_money(s['short_cents'])} short", s=9.5, c="#666666")
+            else:
+                paid = P(paid_label(o, s), s=9.5, c="#666666")
+            box = Table([[""]], colWidths=[0.2 * inch], rowHeights=[0.2 * inch],
+                        style=TableStyle([("BOX", (0, 0), (-1, -1), 1.4, colors.HexColor("#333333"))]))
+            data.append([box, pic(stem, 0.5 * inch, 0.62 * inch), P(str(o.get("envelope") or "?"), f="Helvetica-Bold", s=20),
+                         [P(pk or "—", f="Helvetica-Bold", s=10.5), P(envelope_contents(o, catalog), s=9, c="#444444")],
+                         P(re.sub(r"^(IMG|DSC|_MG)_?", "", stem, flags=re.I) or "—", f="Courier", s=10),
+                         paid])
+        story.append(Table(data, colWidths=[0.35 * inch, 0.65 * inch, 0.75 * inch, 3.65 * inch, 0.8 * inch, 1.3 * inch], repeatRows=1,
+                           style=TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                             ("LINEBELOW", (0, 0), (-1, 0), 0.8, colors.HexColor("#999999")),
+                                             ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.HexColor("#DDDDDD")),
+                                             ("TOPPADDING", (0, 1), (-1, -1), 3), ("BOTTOMPADDING", (0, 1), (-1, -1), 3)])))
+        story.append(PageBreak())
+    if extras:
+        story.append(P("School &amp; other orders", raw=True, f="Helvetica-Bold", s=20))
+        story.append(P(shoot.get("name") or "", c="#555555"))
+        story.append(Spacer(1, 10))
+        data = [[P(h, f="Helvetica-Bold", s=8, c="#666666") for h in ["", "FOR", "WHAT GOES IN IT"]]]
+        for x in extras:
+            box = Table([[""]], colWidths=[0.2 * inch], rowHeights=[0.2 * inch],
+                        style=TableStyle([("BOX", (0, 0), (-1, -1), 1.4, colors.HexColor("#333333"))]))
+            data.append([box, P(x.get("customer") or x.get("kind") or "", f="Helvetica-Bold", s=11),
+                         [P(_extra_item_text(it), s=9.5) for it in x.get("items") or []] or P("—")])
+        story.append(Table(data, colWidths=[0.35 * inch, 2.2 * inch, 4.95 * inch], repeatRows=1,
+                           style=TableStyle([("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                             ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.HexColor("#DDDDDD"))])))
+    elif story and isinstance(story[-1], PageBreak):
+        story.pop()
+
+    def foot(c, d):
+        c.saveState()
+        c.setFont("Helvetica", 8)
+        c.setFillColor(colors.HexColor("#666666"))
+        c.drawString(0.5 * inch, 0.45 * inch, "Match each print to its photo · tick the box when the envelope is stuffed")
+        c.drawRightString(8.0 * inch, 0.45 * inch, f"{business} · page {d.page}")
+        c.restoreState()
+
+    doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.5 * inch, rightMargin=0.5 * inch,
+                            topMargin=0.5 * inch, bottomMargin=0.7 * inch, title=f"{shoot.get('name') or 'Shoot'} — matching sheets")
+    doc.build(story or [P("No envelopes yet.")], onFirstPage=foot, onLaterPages=foot)
+    return path

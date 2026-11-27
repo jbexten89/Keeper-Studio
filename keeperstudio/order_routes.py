@@ -516,6 +516,24 @@ def meridian_settings() -> dict:
     return {**M.DEFAULT_SETTINGS, **{k: v for k, v in got.items() if k in M.DEFAULT_SETTINGS}}
 
 
+def r_matching_pdf(b):
+    """Matching sheets: one page per team, each envelope's photo, number and contents, in stuffing order."""
+    sid = int(b["shoot_id"])
+    sh = book.shoot(sid) or {}
+    folder = str(b.get("folder") or sh.get("folder") or "")
+    index: dict[str, Path] = {}
+    if folder and Path(folder).is_dir():
+        for root, dirs, files in os.walk(folder):
+            dirs[:] = [d for d in dirs if not d.startswith(".") and not d.endswith("_out") and d != "_retouched"]
+            for f in files:
+                stem, ext = os.path.splitext(f)
+                if ext.lower() in (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".hif"):
+                    index.setdefault(stem.lower(), Path(root) / f)
+    find = lambda stem: index.get(O.frame_stem(stem).lower()) if stem else None
+    path = R.matching_pdf(sh, book.orders(sid), catalog(), book.extras(sid), _team_photos(sid), find, Path(b["path"]))
+    return {"path": str(path), "photos_found": bool(index)}
+
+
 def r_meridian_settings(b):
     import json
     s = meridian_settings()
@@ -591,6 +609,7 @@ ROUTES = {
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
     "/api/orders/report": r_report, "/api/orders/analysis": r_analysis,
     "/api/orders/extras": r_extras, "/api/orders/extra/save": r_extra_save, "/api/orders/extra/delete": r_extra_delete,
+    "/api/orders/matching-pdf": r_matching_pdf,
     "/api/orders/backups": r_backups, "/api/orders/backup-now": r_backup_now, "/api/orders/backup-second": r_backup_second,
     "/api/orders/backup-restore": r_backup_restore, "/api/orders/folder-link": r_folder_link,
     "/api/orders/folder-status": r_folder_status, "/api/orders/folder-import": r_folder_import,

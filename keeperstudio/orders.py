@@ -530,20 +530,24 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
     team_photos = team_photos or {}
     items: dict[tuple, dict] = {}
 
-    def add(group, crop, file, qty, who, label, why="", item=""):
+    def add(group, crop, file, qty, who, label, why="", item="", team="", rank=10_000, env=""):
         if qty <= 0:
             return
         key = (group, file or f"?{who}")
         it = items.setdefault(key, {"group": group, "crop": crop, "label": label, "file": file, "qty": 0, "for": [],
-                                    "item": item,
+                                    "item": item, "team": team, "rank": rank, "env": env,
                                     "why": why or ("" if file else "no photo picked")})
         it["qty"] += qty
         if who not in it["for"]:
             it["for"].append(who)
+        # where the print goes: the earliest team / envelope it's for (siblings share a photo)
+        if (rank, _env_num(env)) < (it["rank"], _env_num(it["env"])):
+            it.update(team=team, rank=rank, env=env)
 
     for o in orders:
         frame = frame_stem(o.get("edited") or o.get("image"))
         who = o.get("athlete") or f"Envelope {o.get('envelope') or '?'}"
+        where = {"team": o.get("team") or "", "rank": int(o.get("team_rank", 10_000)), "env": str(o.get("envelope") or "")}
         e = expand(o, catalog)
         for key, qty in e["prints"].items():
             size, _, team = key.partition(":")
@@ -553,17 +557,17 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
                 crop = catalog.crop_team.get(size, size)
                 add(f"{PRINT_SIZES[size]['label']} Team", crop, f"{tframe}_{crop}" if tframe else "", qty,
                     f"{tname} team" if tframe else f"{tname} team (no group photo picked)", f"{PRINT_SIZES[size]['label']} Team",
-                    item=f"{size}-team")
+                    item=f"{size}-team", team=tname, rank=where["rank"])
             else:
                 crop = catalog.crop_individual.get(size, size)
                 label = f"{PRINT_SIZES[size]['label']} sheet" if PRINT_SIZES[size].get("sheet") else PRINT_SIZES[size]["label"]
-                add(PRINT_SIZES[size]["label"], crop, f"{frame}_{crop}" if frame else "", qty, who, label, item=size)
+                add(PRINT_SIZES[size]["label"], crop, f"{frame}_{crop}" if frame else "", qty, who, label, item=size, **where)
         # Keepsakes go to the lab as the units bought: one "8 Mini Wallets" is one item to print.
         for l in normalize(o.get("lines"), catalog):
             p = catalog.get(l["product_id"])
             if p.type == "misc":
                 why = "" if p.crop or not frame else "no crop size set for it (Prices…)"
-                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why, item=p.id)
+                add(p.label, p.crop, f"{frame}_{p.crop}" if (frame and p.crop) else "", l["qty"], who, p.label, why, item=p.id, **where)
     if extras:  # school & other orders (not on any envelope)
         from . import extras as X
         X.add_to_plan(add, extras, team_photos)
@@ -577,6 +581,27 @@ def lab_plan(orders: list[dict], catalog: Catalog, team_photos: dict | None = No
         out.append({"group": g, "items": rows, "files": sum(1 for r in rows if r["file"]),
                     "qty": sum(r["qty"] for r in rows)})
     return {"groups": out}
+
+
+def _env_num(env) -> tuple:
+    e = str(env or "").strip()
+    return (0, int(e), "") if e.isdigit() else (1 if e else 2, 0, e)
+
+
+def envelope_order_key(it: dict) -> tuple:
+    """Team order, then envelope number: the order envelopes are stuffed in."""
+    return (int(it.get("rank", 10_000)), str(it.get("team") or "").lower(), _env_num(it.get("env")), str(it.get("file") or "").lower())
+
+
+def envelope_order_name(it: dict, filename: str) -> str:
+    """A lab file name that sorts in stuffing order: 03-7th Boys_E047_IMG_5031_5x7.jpg
+    (team prints: 03-7th Boys_TEAM_..., school & other orders: 99-Other_...)."""
+    rank = int(it.get("rank", 10_000))
+    team = re.sub(r"[^A-Za-z0-9]+", "", str(it.get("team") or "")) or "Other"
+    pos = "99" if rank >= 10_000 else f"{rank + 1:02d}"
+    env = str(it.get("env") or "").strip()
+    mid = f"E{int(env):03d}" if env.isdigit() else f"E{re.sub(r'[^A-Za-z0-9]+', '', env)}" if env else "TEAM" if str(it.get("item") or "").endswith("-team") else ""
+    return f"{pos}-{team}_{mid + '_' if mid else ''}{filename}"
 
 
 def find_crops(crops_dir: Path, stems: set[str]) -> dict[str, Path]:

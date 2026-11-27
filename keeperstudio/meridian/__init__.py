@@ -35,7 +35,9 @@ CHECKER = HERE / "validate_order.py"
 COLUMNS = ["order_name", "account_email", "color_correction", "delivery", "item_id", "product_code", "design_name",
            "quantity", "file_name", "image_order", "text_fields", "finish", "mounting", "texture", "other_options",
            "crop", "crop_focus", "caption", "notes"]
-DEFAULT_SETTINGS = {"account_email": "", "delivery": "ship", "color_correction": "no", "finish": "Matte"}
+DEFAULT_SETTINGS = {"account_email": "", "delivery": "ship", "color_correction": "no", "finish": "Matte",
+                    # file names start with team order + envelope number, so the prints come back in stuffing order
+                    "envelope_order": "yes"}
 
 _products: dict | None = None
 
@@ -198,6 +200,10 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
     found = O.find_crops(Path(crops_dir), stems)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+    in_order = str((settings or {}).get("envelope_order", "yes")).lower() != "no"
+    if in_order:  # items (and so item numbers) in stuffing order too
+        plan = {**plan, "groups": [{**g, "items": sorted(g["items"], key=lambda it: (not it["file"], O.envelope_order_key(it)))}
+                                   for g in plan["groups"]]}
 
     def file_for(it):
         src = found.get(it["file"].lower())
@@ -205,8 +211,9 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
             return ""
         sub = O.safe_name(_group_of(plan, it))
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
-        shutil.copy2(src, out_dir / sub / src.name)
-        return f"{sub}/{src.name}"
+        name = O.envelope_order_name(it, src.name) if in_order else src.name
+        shutil.copy2(src, out_dir / sub / name)
+        return f"{sub}/{name}"
 
     rows, left_out = plan_rows(plan, catalog, settings, order_name, file_for)
     name = O.safe_name(order_name) + "-meridian-order.csv"

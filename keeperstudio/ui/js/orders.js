@@ -65,6 +65,17 @@ const Ord = {
     await this.pickShoot(r.shoot_id);
     toast(r.state === 'newer' ? 'Newer orders brought in · this computer’s were backed up first' : 'Orders brought in', 4000);
   },
+  async matchingPdf() {
+    const s = this.shoot(); if (!s) return;
+    const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+    const p = await pickPath('save', { initial: dir, filename: `${sanitize(s.name || 'Shoot')} - matching sheets.pdf`, types: ['PDF (*.pdf)'] }); if (!p) return;
+    toast('Making matching sheets…', 2000);
+    try {
+      const r = await api('/api/orders/matching-pdf', { shoot_id: this.sid, path: p, folder: S.root || '' });
+      DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
+      toast(`Saved ${esc(baseName(r.path))}${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
+    } catch (e) { toast(esc(e.message), 5000); }
+  },
   async backups() {
     let L; try { L = await api('/api/orders/backups', {}); } catch (e) { return toast(esc(e.message)); }
     const s = this.shoot();
@@ -653,6 +664,7 @@ const Ord = {
       <div class="mer-row"><label class="fld">Meridian account email<input type="email" data-mer="account_email" value="${esc(m.account_email || '')}" placeholder="you@example.com" spellcheck="false"></label>
         <div class="fld"><span>Delivery</span>${segHTML('merDelivery', m.delivery || 'ship', [['ship', 'Ship'], ['pickup', 'Pickup']])}</div>
         <div class="tb-spacer"></div>
+        ${switchHTML('merEnvOrder', m.envelope_order !== 'no', 'Files in envelope order', 'File names start with the team’s place and the envelope number (03-7thBoys_E047_IMG_5031_5x7.jpg), so the lab prints and packs them in the order you stuff envelopes. Turn off to send the plain names.')}
         <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
       ${res}</div>`;
   },
@@ -1237,6 +1249,7 @@ const Ord = {
         ${HIDDEN.has('import') ? '' : `<hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button>`}</div></div>
       <div class="dd"><button class="btn sm" data-dd ${dis}>Export ▾</button><div class="dd-menu right">
         <button data-ord="summary">Shoot summary<em>totals, teams, payments, what sold, who owes</em></button>
+        <button data-ord="matching">Matching sheets (PDF)<em>each envelope’s photo, number and contents, by team</em></button>
         <button data-oexp="pull">Pull sheet<em>one row per athlete, to stuff envelopes from</em></button>
         <button data-oexp="crop">Crop list<em>only the sizes families bought</em></button>
         <hr><button data-oexp="items">Orders CSV<em>one row per item, for the books</em></button>
@@ -1354,6 +1367,7 @@ function bindModuleEvents() {
       if (S.module === 'crop') { const v = !sw.classList.contains('on'); Crop.saveSettings({ [k]: v }); }
       else if (S.module === 'composite') { Comp.f[k] = !sw.classList.contains('on'); Comp.save(); Comp.render(); }
       else if (S.module === 'orders' && k === 'glasses' && Ord.draft) { Ord.draft.glasses = !Ord.draft.glasses; Ord.changed(true); }
+      else if (S.module === 'orders' && k === 'merEnvOrder') { const on = !(Ord.lab && Ord.lab.meridian && Ord.lab.meridian.envelope_order === 'no'); Ord.merSet('envelope_order', on ? 'no' : 'yes'); }
       else if (S.module === 'orders' && k === 'oneper') { Ord.onePer = !Ord.onePer; DB.put('kv', 'orders|oneper', Ord.onePer).catch(() => {}); renderView(); }
       else if (S.module === 'retouch' && k === 'rtMatch') { Ret.match = !Ret.match; Ret.right(); }
       return;
@@ -1438,7 +1452,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off — <button class="toast-link" onclick="prefs.ordThumbs=true;savePrefs();Ord.render()">Turn back on</button>', 4000); } else if (a === 'backups') Ord.backups(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off — <button class="toast-link" onclick="prefs.ordThumbs=true;savePrefs();Ord.render()">Turn back on</button>', 4000); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();
