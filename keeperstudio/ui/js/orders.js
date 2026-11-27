@@ -1394,7 +1394,7 @@ const Ord = {
     if (this.view === 'an') return this.anCenter(v);
     const s = this.shoot() || {};
     v.innerHTML = `<div class="ord-head"><span class="ttl">${esc(s.name)}${this.team !== 'all' ? ' · ' + esc(this.team) : ''}</span><span class="muted small" id="ordCount"></span><div class="tb-spacer"></div>
-      <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm" data-ord="select-all" title="Select every envelope shown, to set their team or coach at once (Ctrl+A). Ctrl-click or Shift-click rows to pick some.">Select all</button><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
+      <label class="osearch" title="Search names, photo numbers, teams and packages (press / to jump here)"><input type="search" data-oq placeholder="Search envelopes" value="${esc(this.q)}" spellcheck="false"><kbd>/</kbd></label><button class="btn sm" data-ord="select-all" title="Select every envelope shown, to set their team or coach at once (Ctrl+A). Ctrl-click or Shift-click rows to pick some.">Select all</button><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
       <div class="ord-scroll" id="ordRows"></div><div class="ord-totbar" id="ordTotBar"></div>`;
     this.paintRows();
   },

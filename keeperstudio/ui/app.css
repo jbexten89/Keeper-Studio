@@ -542,7 +542,9 @@ kbd{font-size:10px}
 /* ---------- Orders ---------- */
 #modView[data-mod=orders]{display:flex;flex-direction:column;overflow:hidden}
 .ord-head{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--panel-2)}
-.ord-head input[type=search]{width:240px}
+.ord-head .osearch{position:relative;display:inline-flex;align-items:center}
+.ord-head .osearch input[type=search]{width:240px;padding-right:30px}
+.ord-head .osearch kbd{position:absolute;right:8px;pointer-events:none;opacity:.7}
 .ord-head .ttl{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ord-scroll{flex:1;overflow:auto;min-height:0}
 .otbl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
