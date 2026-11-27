@@ -99,13 +99,35 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   copies just those files into one folder per size plus `lab-order.csv`.
   With *One file per print* on, two 4x6s become two files, so a whole size
   folder uploads to the Meridian website with every quantity at 1.
-* **Analysis:** sales, average order, lab cost, shipping and profit for the
-  shoot, or for the team picked on the left (compared with the whole shoot),
-  or for every shoot together. Shows the package mix, payments, and what each
-  a la carte print and keepsake sold and kept after lab cost. **What if**
-  tries new prices on any item at once, with a setting for families who stop
-  buying an item when its price goes up, and says how many buyers a raise
-  could lose and still make the same profit. Hide it when you don't need it.
+* **Analysis:** four numbers up top (Sales, You keep, Average order, Still
+  owed), compared with the same league's last shoot when there is one
+  ("Fall Sports 2025" for "Fall Sports 2026"), then **What stands out**: a few
+  plain sentences about the package mix, keepsakes, the best and lowest
+  team, and order sizes. Packages, a la carte and keepsakes list what sold;
+  the rest fold into "+N didn't sell · show". For the shoot, a team picked on
+  the left, or every shoot together. **What if** sits in the right pane: try
+  new prices on any item, with a setting for families who stop buying when a
+  price goes up, and it says how many buyers a raise could lose and still
+  make the same profit.
+* **Names:** only needed for envelopes that owe. Marking one Unpaid or
+  accepting a short payment puts the cursor in the name box ("Who owes
+  this?"), and Totals lists any that owe with no name.
+* **Thumbnails:** each envelope row shows its photo beside the photo number
+  (click it for the Preview window); a team photo's number turns amber.
+  The ▣ in the header turns them off.
+* **Matching sheets:** Export ▾ → Matching sheets (PDF): one page per team,
+  each envelope's photo, number and what goes in it, in stuffing order, so
+  prints that come back without numbers on the back can be matched by eye.
+  The Meridian order names its files in the same order
+  (`03-7thBoys_E047_IMG_5031_5x7.jpg`) so the lab packs them that way; turn
+  off *Files in envelope order* in the Meridian panel to send plain names.
+* **Keeping orders safe:** each shoot's orders are also saved in its photo
+  folder as `Keeper Studio orders.json`, once the app sees the folder holds
+  that shoot's photos. Copy the folder to the other PC and opening it offers
+  to bring the orders in (or the newer ones, after backing up). The order
+  book is also backed up each time the app closes; Shoot ▾ → Backups lists
+  every backup with Restore, and can keep a second copy (OneDrive, a USB
+  stick).
 * **Folder work file:** marks (flags, stars, labels, team photos, collections,
   hand framing, rotations) are also saved in `Keeper Studio work.json` inside
   the shoot folder, a few seconds after each change (Ctrl+S saves at once). If
@@ -155,7 +177,8 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   `%LOCALAPPDATA%\KeeperStudio\catalog.sqlite3`, along with the thumbnail cache.
   They survive app updates.
 * Orders: `%LOCALAPPDATA%\KeeperStudio\orders.sqlite3`, with a dated copy in
-  `backups\` each day the app opens (the last 30 are kept), and your
+  `backups\` each day the app opens (the last 30 are kept) and each time it
+  closes (the last 14), and your
   `prices.yaml` beside it. Updating the app never touches them; the
   repository's `prices.yaml` is only the starting copy.
 * Hand-placed crops are also written into the output folder's `manual\` folder

@@ -843,3 +843,24 @@ textarea:focus{border-color:var(--accent)}
 .bk-grid .ok{color:#5BC46E}.bk-grid .due{color:var(--amber)}
 .bk-list{margin-top:12px;max-height:320px;overflow:auto;border-top:1px solid var(--border)}
 .bk-row{display:grid;grid-template-columns:150px 130px 1fr auto;white-space:nowrap;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12.5px}
+
+/* Analysis, cleaner: four tiles, a few plain notes, What if in the right pane */
+.an-kpis.four{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+.an-kpis.four .an-k b{font-size:26px;font-weight:400}
+.an-kpis.four .an-k s{white-space:normal}
+.an-notes{background:#0f1420;border:1px solid rgba(46,155,255,.35);border-radius:8px;padding:10px 14px}
+.an-notes h4{margin:0 0 6px;font-size:11.5px;letter-spacing:.08em;color:var(--accent);font-weight:700;text-transform:uppercase}
+.an-notes ul{margin:0;padding-left:18px}.an-notes li{margin:3px 0;color:var(--text)}.an-notes b{font-weight:600}
+.an-more{color:var(--dim);font-size:12px;margin:2px 0 6px}
+.an-card h4 .h-note{text-transform:none;letter-spacing:0;color:var(--dim);margin-left:8px}
+.an-wi-pane .wi{padding:12px}
+.an-wi-pane .wh{margin:0 0 6px;font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.an-wi-pane .wh .tag{display:inline-block;border:1px solid var(--border-2);border-radius:4px;padding:1px 6px;font-size:11px;margin-left:6px;text-transform:none;letter-spacing:0;font-weight:400}
+.an-wi-pane .wl{display:block}.an-wi-pane .wl .an-t{margin-bottom:12px;font-size:12.5px}
+.an-wi-pane .an-t td,.an-wi-pane .an-t th{padding:3px 4px}
+.an-wi-pane .wl input{width:50px;padding:0 4px}.an-wi-pane .wl{overflow-x:hidden}
+.an-wi-pane .drop{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:9px 11px;margin:4px 0 12px;font-size:12px;color:var(--muted)}
+.an-wi-pane .dr{display:flex;align-items:center;gap:10px;margin:6px 0 0}.an-wi-pane .dr input{flex:1;accent-color:var(--accent)}.an-wi-pane .dr b{font-weight:500;width:40px;text-align:right;color:var(--text)}
+.an-wi-pane .be div{margin:6px 0;font-size:12px;color:var(--muted)}.an-wi-pane .be b{font-weight:500;color:var(--accent)}
+.an-wi-pane .wbtn{margin-top:10px}
+.an-wi-pane .an-t th{white-space:nowrap;font-size:11.5px}.an-wi-pane .an-t td:first-child{max-width:84px}
