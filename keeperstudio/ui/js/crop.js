@@ -132,6 +132,7 @@ const Crop = {
   /* ---------- center ---------- */
   center() {
     const v = $('#modView');
+    { const ap = this.active(); if (this.live != null && this.livePath && (!ap || ap.path !== this.livePath)) { this.live = null; this.livePath = null; const g = $('#cropGrid'); if (g) g.hidden = true; toast('Straightening not applied - press Apply (or Enter) before moving on', 3500); } }
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
@@ -224,23 +225,40 @@ const Crop = {
       <div class="cj-sub">${esc(starting ? (s.message || 'Loading face detector…') : (s.current || ''))}</div>`;
   },
   /* ---------- straighten ---------- */
+  // Straightening is previewed (with the grid) until you press Apply or Enter; only then is the
+  // angle saved and the framing re-checked, so the tool never disappears mid-adjustment.
   livePreview(deg) {
     const p = this.active(); if (!p) return;
-    this.live = deg;
+    if (this.livePath && this.livePath !== p.path) this.live = null;
+    this.live = deg; this.livePath = p.path;
+    this.paintStraight();
     const d = deg - (this.rotations.get(p.path) || 0), a = Math.abs(d) * Math.PI / 180;
     const k = Math.cos(a) + Math.sin(a) * Math.max(this.W / this.H, this.H / this.W);
     $('#cropImg').style.transform = `rotate(${d}deg) scale(${k})`;
     $('#cropCanvas').classList.add('rotating'); $('#cropGrid').hidden = false;
     const v = $('#rotVal'); if (v) v.textContent = `${deg > 0 ? '+' : ''}${(+deg).toFixed(1)}°`;
   },
+  paintStraight() {
+    const p = this.active(), box = $('#straightAct'); if (!box || !p) return;
+    const saved = this.rotations.get(p.path) || 0, pend = this.live != null && this.livePath === p.path && Math.abs(this.live - saved) > 0.001;
+    box.hidden = !pend;
+    if (pend) box.querySelector('.sa-txt').textContent = `${saved > 0 ? '+' : ''}${saved.toFixed(1)}° → ${this.live > 0 ? '+' : ''}${(+this.live).toFixed(1)}°`;
+  },
+  cancelStraight() {
+    const p = this.active(); this.live = null; this.livePath = null; clearTimeout(this._rt);
+    $('#cropImg').style.transform = ''; $('#cropCanvas').classList.remove('rotating'); $('#cropGrid').hidden = true;
+    this.render();
+  },
+  applyStraight() { const p = this.active(); if (p && this.live != null && this.livePath === p.path) this.setRotation(this.live); },
   async setRotation(deg) {
     const p = this.active(); if (!p) return;
+    this.livePath = null;
     deg = Math.round(clamp(+deg, -10, 10) * 10) / 10;
     try { await api('/api/crop/rotate', { path: p.path, angle: deg }); Work.schedule(); } catch (e) { return toast(esc(e.message)); }
     if (deg) this.rotations.set(p.path, deg); else this.rotations.delete(p.path);
     if (this.manual.has(p.path)) {  // a hand placement was drawn on the old angle
       this.manual.delete(p.path); DB.del('manual', p.path).catch(() => {});
-      toast('Straightened — the hand-placed framing was reset, so place it again if needed', 3500);
+      toast('Straightened - the hand-placed framing was reset, so place it again if needed', 3500);
     }
     this.live = null; $('#cropGrid').hidden = true;
     this.plans.delete(p.path); this.status.delete(p.path);
@@ -251,7 +269,7 @@ const Crop = {
     const base = this.live ?? this.rotations.get(p.path) ?? 0;
     const v = Math.round(clamp(base + step, -10, 10) * 10) / 10;
     this.livePreview(v); const r = $('[data-straight]'); if (r) r.value = v;
-    clearTimeout(this._rt); this._rt = setTimeout(() => this.setRotation(v), 450);
+    const rv = $('#rotVal'); if (rv) rv.textContent = `${v > 0 ? '+' : ''}${v.toFixed(1)}°`;
   },
   /* ---------- adjust (hand placement) ---------- */
   tightSize() { return this.sizes.find(z => z.own_framing && z.kind === 'portrait' && !(this.settings.disabled_sizes || []).includes(z.name)); },
@@ -461,7 +479,8 @@ const Crop = {
     const nOn = this.sizes.filter(z => !off.has(z.name)).length, allOn = nOn === this.sizes.length;
     const master = `<div class="size-row master"><button class="chk ${allOn ? 'on' : nOn ? 'some' : ''}" data-sizeall="${allOn ? 'off' : 'on'}" title="${allOn ? 'Turn every size off' : 'Turn every size on'}"></button><span class="sz-name">All sizes</span><span class="sz-dim">${nOn} of ${this.sizes.length} on</span></div>`;
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
-    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>` : '<div class="hint">Select a photo to straighten it.</div>';
+    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
+      <div class="straight-act" id="straightAct" hidden><span class="sa-txt"></span><button class="btn sm primary" data-crop="rot-apply" title="Save this angle and re-check the framing (Enter)">Apply</button><button class="btn sm" data-crop="rot-cancel" title="Put it back (Esc)">Cancel</button></div>` : '<div class="hint">Select a photo to straighten it.</div>';
     if (p) {
       const own = this.styleOf(p.path), nSel = S.selected.size > 1 && S.selected.has(p.id) ? S.selected.size : 1;
       status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Batch uses the Framing style set on the left."><span>Style</span>
@@ -473,6 +492,7 @@ const Crop = {
       + sectionHTML('c-sizes', 'Print sizes', `<div class="sizes">${master}${portrait.map(sizeRow).join('')}${land.length && (!plan || plan.landscape) ? `<div class="sz-group">Group shots (landscape)</div>${land.map(sizeRow).join('')}` : ''}</div>`, ' <span class="sec-note" title="Hover a size to see just that crop. Pixel sizes are for this photo.">ⓘ</span>')
       ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
+    this.paintStraight();
   },
   modbar() {
     const p = this.active(); const m = p && this.manual.has(p.path);
@@ -598,6 +618,10 @@ const Crop = {
     }
     if (k === 'a') { this.startAdjust(); return true; }
     if (k === 's') { this.startSquare(); return true; }
+    if (this.live != null && this.livePath && this.active() && this.livePath === this.active().path) {
+      if (e.key === 'Enter') { this.applyStraight(); return true; }
+      if (e.key === 'Escape') { this.cancelStraight(); return true; }
+    }
     if (e.key === '[' || e.key === '{') { this.nudge(e.shiftKey ? -1 : -0.1); return true; }
     if (e.key === ']' || e.key === '}') { this.nudge(e.shiftKey ? 1 : 0.1); return true; }
     if (k === 'c' && !e.ctrlKey && !e.metaKey) { this.toggleCompare(); return true; }

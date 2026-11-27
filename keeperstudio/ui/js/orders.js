@@ -1586,7 +1586,7 @@ function bindModuleEvents() {
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
       else if (a === 'overlay') { Crop.overlay = !Crop.overlay; Crop.render(); Crop.modbar(); }
       else if (a === 'tunables') Crop.tunables();
-      else if (a === 'rot-') Crop.nudge(-0.1); else if (a === 'rot+') Crop.nudge(0.1); else if (a === 'rot0') Crop.setRotation(0); else if (a === 'sheets') Crop.showSheets();
+      else if (a === 'rot-') Crop.nudge(-0.1); else if (a === 'rot+') Crop.nudge(0.1); else if (a === 'rot0') Crop.setRotation(0); else if (a === 'rot-apply') Crop.applyStraight(); else if (a === 'rot-cancel') Crop.cancelStraight(); else if (a === 'sheets') Crop.showSheets();
       else if (a === 'open-out') reveal(Crop.result ? Crop.result.out_dir : Crop.outDir);
       else if (a === 'out-change') { const p = await pickPath('folder', { initial: Crop.outDir || S.root || '' }); if (p) Crop.setOut(p, true); }
       else if (a === 'out-default') Crop.setOut(S.root ? `${S.root}_out` : '', false);
@@ -1649,7 +1649,7 @@ function bindModuleEvents() {
     const op = e.target.closest('[data-rt-op]'); if (op) { Ret.opacity = +op.value; $('#rtOpVal').textContent = op.value + '%'; Ret.draw(); }
     const aj = e.target.closest('[data-rt-adj]'); if (aj && aj.value !== '') Ret.setAdj(aj.dataset.rtAdj, +aj.value); });
   $('#right').addEventListener('change', e => { const r = e.target.closest('[data-photostyle]'); if (r) { r.blur(); Crop.setStyle(r.value || null); } });
-  $('#right').addEventListener('change', e => { const r = e.target.closest('[data-straight]'); if (r) { r.blur(); Crop.setRotation(+r.value); } });
+  $('#right').addEventListener('change', e => { const r = e.target.closest('[data-straight]'); if (r) { r.blur(); Crop.livePreview(+r.value); const rv = $('#rotVal'); if (rv) rv.textContent = `${+r.value > 0 ? '+' : ''}${(+r.value).toFixed(1)}°`; } });
   $('#right').addEventListener('mouseover', e => {
     if (S.module !== 'crop') return;
     const row = e.target.closest('[data-size]'); const n = row ? row.dataset.size : null;
