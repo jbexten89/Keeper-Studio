@@ -466,7 +466,7 @@ kbd{font-size:10px}
 .crop-canvas.rotating{overflow:hidden}
 #cropImg{transition:transform .06s linear;transform-origin:50% 50%}
 .crop-canvas.rotating svg,.crop-canvas.rotating #cropLabels{opacity:0}
-#cropGrid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.32) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.32) 1px,transparent 1px);background-size:12.5% 12.5%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
+#cropGrid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.36) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.36) 1px,transparent 1px),linear-gradient(rgba(255,255,255,.14) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.14) 1px,transparent 1px);background-size:12.5% 12.5%,12.5% 12.5%,3.125% 3.125%,3.125% 3.125%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.4)}
 .straight{display:flex;align-items:center;gap:10px;padding:10px 12px 2px}
 .straight input{flex:1}
 .straight b{font-weight:600;min-width:52px;text-align:right;font-variant-numeric:tabular-nums}
