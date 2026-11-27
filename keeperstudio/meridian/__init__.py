@@ -196,10 +196,17 @@ def check(order_csv: Path, folder: Path | None = None) -> dict:
             "total": next((l.split("$")[-1].strip() for l in lines if "Estimated total" in l), "")}
 
 
-def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settings: dict, order_name: str) -> dict:
-    """Copy each cropped file once into out_dir/<size>/, write the order CSV beside them and check it."""
+def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settings: dict, order_name: str,
+          progress=None) -> dict:
+    """Copy each cropped file once into out_dir/<size>/, write the order CSV beside them and check it.
+
+    progress(done, total, message) is called as files are copied and the order is checked."""
+    say = progress or (lambda *a: None)
     stems = {it["file"] for g in plan["groups"] for it in g["items"] if it["file"]}
+    say(0, 0, "Finding the cropped files…")
     found = O.find_crops(Path(crops_dir), stems)
+    total = sum(1 for g in plan["groups"] for it in g["items"] if it["file"] and it["file"].lower() in found) + 2
+    copied = [0]
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     in_order = str((settings or {}).get("envelope_order", "yes")).lower() != "no"
@@ -215,6 +222,8 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
         (out_dir / sub).mkdir(parents=True, exist_ok=True)
         name = O.envelope_order_name(it, src.name) if in_order else src.name
         shutil.copy2(src, out_dir / sub / name)
+        copied[0] += 1
+        say(copied[0], total, f"Copying {name}")
         return f"{sub}/{name}"
 
     rows, left_out = plan_rows(plan, catalog, settings, order_name, file_for)
@@ -223,6 +232,7 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
     pdf_path = ""
     if rows:
         write_csv(rows, path)
+        say(total - 1, total, "Meridian's checker is looking the order over…")
         result = check(path, out_dir)
         try:  # a printable copy beside the CSV; the order itself is the CSV
             from .. import reports
@@ -234,6 +244,7 @@ def build(plan: dict, catalog: O.Catalog, crops_dir: Path, out_dir: Path, settin
         result = {"ok": False, "report": "Nothing to order.", "errors": ["Nothing in this shoot can go in the CSV."],
                   "warnings": [], "total": ""}
     files = len({r["file_name"] for r in rows})
+    say(total, total, "Done")
     return {"out_dir": str(out_dir), "csv": str(path) if rows else "", "pdf": pdf_path, "items": len(rows), "files": files,
             "left_out": left_out, **result}
 

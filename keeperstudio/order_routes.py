@@ -14,6 +14,7 @@ from . import meridian as M
 from . import reports as R
 from . import orders as O
 from . import school as SC
+from . import jobs
 from . import paths
 from . import shootfile as SF
 from .orderbook import OrderBook
@@ -736,7 +737,14 @@ def r_meridian_build(b):
         raise ValueError(" ".join(bad))
     shoot = next((x for x in book.shoots() if x["id"] == sid), {})
     name = str(b.get("order_name") or shoot.get("name") or "Picture day")
-    return M.build(plan, catalog(), Path(b["crops_dir"]), Path(b["out_dir"]), s, name)
+    cat, crops, out = catalog(), Path(b["crops_dir"]), Path(b["out_dir"])
+    if not b.get("job"):
+        return M.build(plan, cat, crops, out, s, name)
+
+    def run(job):  # in the background, so the window can show a progress bar
+        return M.build(plan, cat, crops, out, s, name,
+                       lambda done, total, msg: job.update(done=done, total=total, message=msg, current=msg))
+    return {"job": jobs.start("meridian", run).id}
 
 
 def r_lab_build(b):

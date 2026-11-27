@@ -875,10 +875,24 @@ const Ord = {
     if (em && em.value.trim() !== (this.lab.meridian.account_email || '')) await this.merSet('account_email', em.value.trim());
     const parent = await pickPath('folder', { initial: dirName(this.crops) || S.root || '' }); if (!parent) return;
     const dest = parent + (parent.includes('\\') ? '\\' : '/') + sanitize(`Meridian order - ${s.name}`);
-    this.merBusy = true; this.mer = null; renderView();
-    try { this.mer = await api('/api/orders/meridian-build', { shoot_id: this.sid, crops_dir: this.crops, out_dir: dest }); }
-    catch (e) { toast(esc(e.message), 6000); }
-    this.merBusy = false; renderView();
+    this.merBusy = true; this.mer = null; this.merProg = { done: 0, total: 0, message: 'Starting…' }; renderView();
+    try {
+      const { job } = await api('/api/orders/meridian-build', { shoot_id: this.sid, crops_dir: this.crops, out_dir: dest, job: true });
+      const fin = await pollJob(job, st => { this.merProg = st; this.paintMerProg(); });
+      if (fin.error) throw new Error(fin.error.replace(/^\w+Error:\s*/, ''));
+      this.mer = fin.result;
+    } catch (e) { toast(esc(e.message), 6000); }
+    this.merBusy = false; this.merProg = null; renderView();
+  },
+  // the progress bar under the Meridian row, updated in place while the order builds
+  merProgHTML() {
+    const p = this.merProg; if (!p) return '';
+    const pct = p.total ? Math.round(100 * p.done / p.total) : 0;
+    return `<div class="mer-prog" id="merProg"><div class="bar"><i style="width:${pct}%"></i></div><span class="mp-msg">${esc(p.message || p.current || 'Working…')}</span><span class="pct">${p.total ? `${p.done} of ${p.total} · ${pct}%` : ''}</span></div>`;
+  },
+  paintMerProg() {
+    const el = $('#merProg'); if (!el) return renderView();
+    el.outerHTML = this.merProgHTML();
   },
   merHTML(L, found) {
     const m = L.meridian || {}, R = this.mer;
@@ -899,7 +913,7 @@ const Ord = {
         <div class="tb-spacer"></div>
         ${switchHTML('merEnvOrder', m.envelope_order !== 'no', 'Files in envelope order', 'File names start with the team’s place and the envelope number (03-7thBoys_E047_IMG_5031_5x7.jpg), so the lab prints and packs them in the order you stuff envelopes. Turn off to send the plain names.')}
         <button class="btn primary" data-ord="mer-build" ${this.merBusy || !L.crops_exists || !found ? 'disabled' : ''} title="${noEmail ? 'Fill in your Meridian account email first' : ''}">${this.merBusy ? 'Building…' : 'Build Meridian order…'}</button></div>
-      ${res}</div>`;
+      ${this.merBusy ? this.merProgHTML() : ''}${res}</div>`;
   },
   // ---------- school & other orders ----------
   // Prints for the school, the park, teachers or a sponsor: not on any envelope.
