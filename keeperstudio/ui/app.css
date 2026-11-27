@@ -1005,3 +1005,6 @@ textarea:focus{border-color:var(--accent)}
 .center-lines .cl-line.mid{left:50%;border-left:1px dashed rgba(255,255,255,.7);box-shadow:none}
 .center-lines .cl-num{position:absolute;top:4px;font:700 10px 'Nunito Sans',sans-serif;color:var(--c);text-shadow:0 0 2px #000,0 0 3px #000}
 .lines-btn.peek,.lines-btn.on{border-color:var(--accent)}.lines-btn.on{background:rgba(46,155,255,.16)}
+
+.sd-count{font-size:12.5px;color:var(--muted);margin:0 0 6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.sd-count b{color:var(--text);font-weight:600}.sd-count b.okc{color:#3CC7A0}.sd-count .warn{color:#E3A04F}.sd-count .sd-link{margin-left:auto}

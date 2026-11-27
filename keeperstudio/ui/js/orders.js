@@ -254,9 +254,13 @@ const Ord = {
     const mb = n => (n / 1048576).toFixed(n < 10485760 ? 1 : 0) + ' MB';
     const bodyFor = n => `Hi,\n\nAttached are the 5x7 team photos for ${R.shoot} (${plural(n, 'team')}).\n\nThank you,\nJamie Bexten Photography`;
     const paint = card => {
-      const ok = R.rows.filter(r => r.status === 'ok').length, todo = R.rows.filter(r => r.status === 'todo').length;
+      const ok = R.rows.filter(r => r.status === 'ok').length, todo = R.rows.filter(r => r.status === 'todo').length, skipped = R.rows.filter(r => r.status === 'skip').length;
+      // the same group photo on two teams is almost always a typo'd photo number
+      const byImg = {}; for (const r of R.rows) if (r.image && r.status !== 'skip') (byImg[r.image.toLowerCase()] = byImg[r.image.toLowerCase()] || []).push(r.name);
+      const dupes = Object.entries(byImg).filter(([, v]) => v.length > 1), dupNames = new Set(dupes.flatMap(([, v]) => v));
       if (!st.bodyEdited) st.body = bodyFor(ok);
-      const row = r => `<div class="sd-row ${r.status}"><span class="nm">${esc(r.name)}</span>${r.status === 'ok' ? `<span class="ok" title="${esc(r.file)}">✓</span>${R.changed.includes(r.name) ? '<span class="chg">changed since sent</span>' : ''}`
+      const row = r => `<div class="sd-row ${r.status}"><span class="nm">${esc(r.name)}</span>${r.status === 'ok' ? `<span class="ok" title="${esc(r.file)}">✓</span>${R.changed.includes(r.name) ? '<span class="chg">changed since sent</span>' : ''}${dupNames.has(r.name) ? `<span class="chg" title="Another team has the same group photo">same photo as ${esc(dupes.find(([, v]) => v.includes(r.name))[1].filter(n => n !== r.name).join(', '))}</span>` : ''}`
+
         : r.status === 'skip' ? `<span class="muted small">skipped this year</span><button class="btn sm" data-sdskip="${esc(r.name)}">Include</button>`
         : `<span class="warn">${esc(r.why)}</span>${r.why === 'No group photo picked' ? `<button class="btn sm" data-sdskip="${esc(r.name)}">Skip this year</button>` : ''}`}</div>`;
       const sent = R.school.sent;
@@ -264,7 +268,9 @@ const Ord = {
         <p class="muted small tl-sub">One 5×7 (300 dpi) of every team on the team list, named by team, zipped and emailed.${sent ? ` Last sent ${esc(fmtDay(new Date(sent.at * 1000).toISOString().slice(0, 10)))} to ${esc(sent.to)} · ${plural((sent.teams || []).length, 'team')}.` : ''}</p>
         <div class="pathrow sd-crops"><span class="path ${this.crops ? '' : 'bad'}" title="${esc(this.crops)}">${esc(this.crops || 'Choose the folder Crop exported the prints to')}</span><button class="btn sm" data-sdcrops>Crops folder…</button></div>
         <div class="pathrow sd-crops"><span class="path" title="Where Save zip and Open in Gmail put the zip">${st.zipDir ? 'Zip goes in ' + esc(st.zipDir) : 'Zip folder: asked the first time you save'}</span><button class="btn sm" data-sdzipdir>Zip folder…</button></div>
+        <div class="sd-count"><b>${plural(R.rows.length, 'team')}</b> on the team list · <b class="${ok === R.rows.length - skipped && !todo ? 'okc' : ''}">${ok} in the email</b>${skipped ? ` · ${skipped} skipped` : ''}${todo ? ` · <span class="warn">${todo} not ready</span>` : ''} <button class="sd-link" data-ord="team-list" title="Every team on the shoot's list">Team list…</button></div>
         <div class="sd-list">${R.rows.map(row).join('') || '<div class="hint" style="padding:10px">No teams yet.</div>'}</div>
+        ${dupes.length ? `<div class="sd-warn">${dupes.map(([img, v]) => `${esc(v.length > 2 ? v.slice(0, -1).join(', ') + ' and ' + v[v.length - 1] : v.join(' and '))} have the same group photo (${esc(img.toUpperCase())})`).join('; ')} - check the photo number on the team (▣ in the Teams list).</div>` : ''}
         ${todo ? `<div class="sd-warn">${plural(todo, 'team')} ${todo === 1 ? "isn't" : "aren't"} ready - pick the group photo or crop the 5×7, or skip a team that wasn't photographed.</div>` : ''}
         <div class="sd-mail"><label>To<input data-sdf="to" value="${esc(st.to)}" placeholder="the school's email" spellcheck="false"></label><label>Subject<input data-sdf="subject" value="${esc(st.subject)}"></label>
           <label class="wide">Message<textarea data-sdf="body" rows="6">${esc(st.body)}</textarea></label></div>
