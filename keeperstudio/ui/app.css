@@ -813,3 +813,10 @@ textarea:focus{border-color:var(--accent)}
 /* Envelope editor: the name box asks "Who owes this?" when an envelope owes or paid short */
 .fld input.ask{border-color:var(--amber);box-shadow:0 0 0 2px rgba(227,160,79,.22)}
 .fld input.ask::placeholder{color:var(--amber);opacity:.85}
+
+/* Envelope list: small photo thumbnail right of the photo # */
+.otbl td.o-thc{height:37px}
+.otbl td.o-thc,.otbl th.o-thc{width:34px;padding-top:2px!important;padding-bottom:2px!important;padding-left:2px!important}
+.otbl .o-th{width:26px;height:32px;object-fit:cover;border-radius:3px;display:block;border:1px solid var(--border-2);background:#1a1d22;cursor:zoom-in}
+.otbl .o-th.none{cursor:default}
+.otbl .o-thtog{font-size:12px;color:var(--dim)}
