@@ -934,3 +934,8 @@ textarea:focus{border-color:var(--accent)}
 /* Print sizes: what a size on/off just did */
 .size-note{display:flex;align-items:center;gap:8px;margin:4px 12px 6px;padding:6px 8px;border-radius:6px;background:rgba(46,155,255,.1);border:1px solid rgba(46,155,255,.35);font-size:12px;color:var(--text)}
 .size-note span{flex:1}
+
+/* placing the square: the 3" circle, outside it dimmed */
+.adj-circle{position:absolute;inset:0;pointer-events:none;--d:85.7%;
+  background:radial-gradient(circle closest-side, transparent calc(var(--d) - 1px), rgba(5,6,8,.45) var(--d))}
+.adj-circle::after{content:'';position:absolute;left:50%;top:50%;width:var(--d);height:var(--d);transform:translate(-50%,-50%);border-radius:50%;border:1.5px dashed #fff}

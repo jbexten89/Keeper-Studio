@@ -147,7 +147,7 @@ const Crop = {
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
-        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
+        <div class="crop-canvas" id="cropCanvas"><img id="cropImg" alt="" draggable="false"><svg id="cropSvg" preserveAspectRatio="none"></svg><div id="cropLabels"></div><div id="cropGrid" hidden></div><div id="cropAdj" hidden><div class="adj-box" id="adjBox"><i data-h="nw"></i><i data-h="ne"></i><i data-h="sw"></i><i data-h="se"></i><div class="adj-third v1"></div><div class="adj-third v2"></div><div class="adj-third h1"></div><div class="adj-third h2"></div><div class="adj-circle" id="adjCircle" hidden></div><div class="adj-tag" id="adjTag">8 × 10 framing</div></div></div><span class="cmp-tag" id="cmpTagL" hidden>Original</span></div>
         <div class="crop-canvas cmp" id="cropCmp" hidden><img id="cropCmpImg" alt="" draggable="false"><svg id="cropCmpSvg" preserveAspectRatio="none"></svg><span class="cmp-tag" id="cmpTagR"></span></div>
         <div class="crop-hud" id="cropHud"></div><div class="crop-spin" id="cropSpin" hidden><span></span>Finding the face…</div><div class="crop-job" id="cropJob" hidden></div></div>`;
       this.bindAdjust();
@@ -358,6 +358,10 @@ const Crop = {
     const w = a.height * (this.A || 0.8), l = a.center_x - w / 2;
     const tag = $('#adjTag'); if (tag) tag.textContent = this.target === 'square' ? `${prettySize(this.targetName)} framing` : this.group ? 'Group framing — keep the whole team inside' : '8 × 10 framing';
     Object.assign($('#adjBox').style, { left: l / this.W * 100 + '%', top: a.top / this.H * 100 + '%', width: w / this.W * 100 + '%', height: a.height / this.H * 100 + '%' });
+    // placing the square: always show the 3" circle that a round print keeps
+    const ci = $('#adjCircle'), inch = this.target === 'square' ? this.squareInches(this.targetName) : null;
+    if (ci) { ci.hidden = !(inch && inch > this.CIRCLE_IN); if (!ci.hidden) ci.style.setProperty('--d', (this.CIRCLE_IN / inch * 100) + '%'); }
+    if (tag) tag.textContent += inch && inch > this.CIRCLE_IN ? ` · ${this.CIRCLE_IN}″ circle` : '';
   },
   bindAdjust() {
     const box = $('#adjBox'); let drag = null;
