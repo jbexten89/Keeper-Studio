@@ -101,6 +101,14 @@ def r_folder_link(b):
     sid, folder = int(b["shoot_id"]), str(b.get("folder") or "")
     if folder and not Path(folder).is_dir():
         raise FileNotFoundError(f"Folder not found: {folder}")
+    if folder:  # never write over another shoot's orders file that this computer still has
+        have = SF.read_folder_file(folder)
+        mine = (book.shoot(sid) or {}).get("uid")
+        other_uid = ((have or {}).get("shoot") or {}).get("uid")
+        if other_uid and other_uid != mine:
+            other = book.shoot_by_uid(other_uid)
+            if other and other["id"] != sid:
+                raise ValueError(f"That folder already keeps the orders for {other['name']}.")
     book.set_folder(sid, folder)
     path = SF.write_folder_file(book, sid) if folder else None
     return {"ok": True, "file": str(path) if path else ""}
