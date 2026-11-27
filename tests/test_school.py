@@ -75,6 +75,7 @@ class SchoolTest(unittest.TestCase):
         book.school(a); book.set_school(a, {"email": "ad@school.org", "skip": ["Cheer"]})
         b = book.save_shoot({"name": "Winter Sports 2026", "date": "2026-12-05"})["id"]
         self.assertEqual(book.school(b), {"email": "ad@school.org", "skip": [], "sent": None})
+        book.close()
 
 
 if __name__ == "__main__":

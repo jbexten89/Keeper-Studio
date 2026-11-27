@@ -18,6 +18,7 @@ class TeamListTest(unittest.TestCase):
         self.sid = self.book.save_shoot({"name": "Winter Sports 2026", "date": "2026-12-05"})["id"]
 
     def tearDown(self):
+        self.book.close()  # Windows can't delete an open database
         self.tmp.cleanup()
 
     def test_new_shoot_starts_with_last_years_teams_and_coaches(self):
