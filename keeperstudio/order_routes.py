@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -128,7 +129,7 @@ def r_folder_import(b):
 _MUTATING = {"/api/orders/shoot/save", "/api/orders/save", "/api/orders/delete", "/api/orders/bulk", "/api/orders/bulk-pay",
              "/api/orders/restore", "/api/orders/team-photo", "/api/orders/rename-team", "/api/orders/team-order",
              "/api/orders/extra/save", "/api/orders/extra/delete", "/api/orders/extras-copy", "/api/orders/shipping",
-             "/api/orders/import-web"}
+             "/api/orders/import-web", "/api/orders/shoot-hours"}
 
 
 def _after_change(fn):
@@ -358,9 +359,29 @@ def r_analysis(b):
         ex = {k: sum(e[k] for e in ex) for k in ex[0]} if ex else X.totals([], {})
     else:
         ex = X.totals(book.extras(sid), _team_photos(sid))
-    out = A.analyze(orders, cat, A.unit_lab_cents(cat, M.order_cost_cents), ship, team, ex)
+    unit = A.unit_lab_cents(cat, M.order_cost_cents)
+    out = A.analyze(orders, cat, unit, ship, team, ex)
     out["shoots"] = len(shoots) if b.get("shoot_id") == "all" else 1
+    if b.get("shoot_id") == "all":  # each shoot's own numbers, for ranking by profit per hour
+        rows = []
+        for s in shoots:
+            one = A.analyze([_decorate(o, cat) for o in book.orders(s["id"])], cat, unit, int(s.get("shipping_cents") or 0), None,
+                            X.totals(book.extras(s["id"]), _team_photos(s["id"])))["selection"]
+            rows.append({"id": s["id"], "name": s["name"], "date": s.get("date") or "", "archived": s.get("archived"),
+                         "hours": _hours_total(s), "envelopes": one["n"], "profit": one["profit"], "sales": one["sales"]})
+        out["per_shoot"] = rows
     return out
+
+
+def _hours_total(s: dict) -> float:
+    try:
+        return round(sum(float(v) for v in json.loads(s.get("hours") or "{}").values()), 2)
+    except (ValueError, TypeError, AttributeError):
+        return 0.0
+
+
+def r_shoot_hours(b):
+    return {"hours": book.set_hours(int(b["shoot_id"]), b.get("hours") or {}), "shoot_id": int(b["shoot_id"])}
 
 
 # ------------------------------------------------- school & other orders --
@@ -609,7 +630,7 @@ ROUTES = {
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
     "/api/orders/report": r_report, "/api/orders/analysis": r_analysis,
     "/api/orders/extras": r_extras, "/api/orders/extra/save": r_extra_save, "/api/orders/extra/delete": r_extra_delete,
-    "/api/orders/matching-pdf": r_matching_pdf,
+    "/api/orders/matching-pdf": r_matching_pdf, "/api/orders/shoot-hours": r_shoot_hours,
     "/api/orders/backups": r_backups, "/api/orders/backup-now": r_backup_now, "/api/orders/backup-second": r_backup_second,
     "/api/orders/backup-restore": r_backup_restore, "/api/orders/folder-link": r_folder_link,
     "/api/orders/folder-status": r_folder_status, "/api/orders/folder-import": r_folder_import,

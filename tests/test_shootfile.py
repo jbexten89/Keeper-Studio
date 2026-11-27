@@ -110,3 +110,20 @@ class ShootFileTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HoursTest(unittest.TestCase):
+    def test_hours_saved_and_travel_with_the_shoot(self):
+        with tempfile.TemporaryDirectory() as d:
+            book = OrderBook(Path(d) / "o.sqlite3")
+            sid = book.save_shoot({"name": "Fall Sports 2026"})["id"]
+            self.assertEqual(book.set_hours(sid, {"shoot": "3.5", "edit": 6, "lab": "", "delivery": "1.5"}),
+                             {"shoot": 3.5, "edit": 6.0, "delivery": 1.5})
+            with self.assertRaises(ValueError):
+                book.set_hours(sid, {"shoot": "lots"})
+            data = book.export_shoot(sid)
+            self.assertEqual(json.loads(data["shoot"]["hours"])["edit"], 6.0)
+            other = OrderBook(Path(d) / "p.sqlite3")
+            sid2 = other.import_shoot(data)
+            self.assertEqual(json.loads(other.shoot(sid2)["hours"])["shoot"], 3.5)
+            book.close(); other.close()

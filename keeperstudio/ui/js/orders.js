@@ -932,6 +932,7 @@ const Ord = {
     box.innerHTML = `<div class="an-body">${unp}
       <div class="an-kpis four">${kp.map(k => `<div class="an-k ${k[3] || ''}" title="${esc(k[4] || '')}"><i>${k[0]}</i><b>${k[1]}</b><s>${k[2]}</s></div>`).join('')}</div>
       ${notes.length ? `<div class="an-notes"><h4>What stands out</h4><ul>${notes.map(n => `<li>${n}</li>`).join('')}</ul></div>` : ''}
+      ${all ? this.anRankHTML(A) : !one ? this.anTimeHTML(s, prev) : ''}
       <div class="an-card c-pk"><h4>Packages <span class="h-note">${plural(pkN, 'package')} sold</span></h4><table class="an-t pk-t"><tr><th>Package</th><th>Price</th><th class="pk-bar">Sold</th><th></th><th>Lab cost</th><th>Profit each</th><th>Profit total</th><th>Share of profit</th></tr>${pkRows}</table>${pkMore}</div>
       <div class="an-row r2b"><div class="an-card">${cmp}</div><div class="an-card"><h4>Money in</h4>${pay}</div></div>
       <div class="an-row r2"><div class="an-card c-ac"><h4>A la carte</h4>${items(ac, s.ac_env, s.ac_sales, 'added a la carte prints')}</div><div class="an-card c-ks"><h4>Keepsakes</h4>${items(ks, s.ks_env, s.ks_sales, 'added a keepsake')}</div></div>
@@ -954,6 +955,48 @@ const Ord = {
     this.anPrev = { id: pv.id, data: null };
     api('/api/orders/analysis', { shoot_id: pv.id, team: null }).then(r => { if (this.anPrev && this.anPrev.id === pv.id && r.selection && r.selection.n) { this.anPrev.data = r; if (S.module === 'orders' && this.view === 'an') this.anPaint(); } }).catch(() => {});
     return null;
+  },
+  // ---------- your time: profit per hour ----------
+  HOUR_PARTS: [['shoot', 'Shooting'], ['edit', 'Culling & editing'], ['lab', 'Envelopes & lab'], ['delivery', 'Delivery']],
+  hoursOf(sh) { try { return JSON.parse((sh && sh.hours) || '{}') || {}; } catch { return {}; } },
+  hoursTotal(sh) { return Object.values(this.hoursOf(sh)).reduce((t, v) => t + (+v || 0), 0); },
+  anTimeHTML(s, prev) {
+    const sh = this.shoot(); if (!sh) return '';
+    const H = this.hoursOf(sh), tot = this.hoursTotal(sh);
+    const fmtH = h => (Math.round(h * 100) / 100).toString();
+    const inputs = this.HOUR_PARTS.map(([k, l]) => `<label>${l}<input type="number" min="0" step="0.25" inputmode="decimal" data-hrs="${k}" value="${H[k] != null ? H[k] : ''}" placeholder="0" onchange="Ord.setHours()"></label>`).join('');
+    const pv = this.anPrevShoot(), pvH = pv ? this.hoursTotal(pv) : 0, ps = prev && prev.selection;
+    const cmp = (now, before, label) => before == null ? '' : `<div class="sub">${(d => `<span class="${d >= 0 ? 'an-up' : 'an-dn'}">${d >= 0 ? '▲' : '▼'} ${fmt$(Math.abs(d))}</span>`)(Math.round(now - before))} vs ${esc(prev.name)} (${fmt$(Math.round(before))})</div>`;
+    const perHr = tot ? s.profit / tot : null, perEnv = s.n ? s.profit / s.n : null;
+    const prevHr = ps && pvH ? ps.profit / pvH : null, prevEnv = ps && ps.n ? ps.profit / ps.n : null;
+    return `<div class="an-time">
+      <div class="an-card"><h4>Your time on this shoot</h4><div class="hrs">${inputs}</div>
+        <div class="tot">${tot ? `= <b>${fmtH(tot)} hour${tot === 1 ? '' : 's'}</b> · saved with the shoot` : 'Type your hours to see what this shoot paid per hour.'}</div></div>
+      <div class="an-card"><h4>Profit per hour</h4>${perHr == null ? '<div class="big dim">—</div><div class="sub">needs your hours</div>' : `<div class="big ${perHr < 0 ? 'an-neg' : 'g'}">${fmt$(Math.round(perHr))}</div>${cmp(perHr, prevHr)}<div class="sub">${fmt$(s.profit)} kept ÷ ${fmtH(tot)} hours</div>`}</div>
+      <div class="an-card"><h4>Profit per envelope</h4>${perEnv == null ? '<div class="big dim">—</div>' : `<div class="big">${fmt$(Math.round(perEnv))}</div>${cmp(perEnv, prevEnv)}<div class="sub">${fmt$(s.profit)} kept ÷ ${plural(s.n, 'envelope')}</div>`}</div>
+    </div>`;
+  },
+  async setHours() {
+    const sh = this.shoot(); if (!sh) return;
+    const hours = {}; document.querySelectorAll('[data-hrs]').forEach(i => { hours[i.dataset.hrs] = i.value; });
+    try { const r = await api('/api/orders/shoot-hours', { shoot_id: sh.id, hours }); sh.hours = Object.keys(r.hours).length ? JSON.stringify(r.hours) : ''; }
+    catch (e) { return toast(esc(e.message)); }
+    const f = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.hrs;
+    this.anPaint();
+    if (f) { const i = document.querySelector(`[data-hrs="${f}"]`); if (i) i.focus(); }
+  },
+  anRankHTML(A) {
+    const rows = (A.per_shoot || []).filter(r => r.envelopes);
+    if (!rows.length) return '';
+    const withH = rows.filter(r => r.hours > 0).map(r => ({ ...r, ph: r.profit / r.hours })).sort((a, b) => b.ph - a.ph);
+    const noH = rows.filter(r => !(r.hours > 0)).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+    const max = Math.max(1, ...withH.map(r => r.ph));
+    const tr = r => `<tr class="click" data-anshoot="${r.id}"><td>${esc(r.name)}</td><td class="n">${r.hours > 0 ? (Math.round(r.hours * 100) / 100) : '—'}</td><td class="n">${r.envelopes}</td><td class="n">${fmt$(r.profit)}</td>
+      <td class="l">${r.ph != null ? `<span class="rk-bar"><i style="width:${Math.max(2, 100 * r.ph / max).toFixed(1)}%"></i></span>${fmt$(Math.round(r.ph))}` : '<span class="dim">add hours to rank it</span>'}</td><td class="n">${fmt$(Math.round(r.profit / r.envelopes))}</td></tr>`;
+    return `<div class="an-card"><h4>Profit per hour, every shoot <span class="h-note">${withH.length ? 'best first' : 'open a shoot and type its hours to rank it'}</span></h4>
+      <table class="an-t rk"><tr><th>Shoot</th><th class="n">Hours</th><th class="n">Envelopes</th><th class="n">You keep</th><th class="l">Profit per hour</th><th class="n">Per envelope</th></tr>
+      ${withH.map(tr).join('')}${noH.map(r => tr({ ...r, ph: null })).join('').replace(/<tr class="click"/g, '<tr class="click dim-row"')}</table>
+      <div class="dim small">Profit is after lab cost and shipping. Click a shoot to open it.</div></div>`;
   },
   // A few plain sentences from the numbers; each one only when there's enough to say it.
   anNotes(A, one, all, prev) {
@@ -1544,6 +1587,7 @@ function bindModuleEvents() {
       }
       const sh = t.closest('[data-oshoot]'); if (sh) { if (+sh.dataset.oshoot !== Ord.sid) Ord.pickShoot(+sh.dataset.oshoot); return; }
       const tm = !S.suppressTeamClick && t.closest('[data-oteam]'); if (tm) { Ord.pickTeam(tm.dataset.oteam); return; }
+      const ash = t.closest('[data-anshoot]'); if (ash) { Ord.anScope = 'shoot'; Ord.pickShoot(+ash.dataset.anshoot); return; }
     }
     const cu = t.closest('[data-cut]');
     if (cu) {

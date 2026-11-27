@@ -105,6 +105,8 @@ class OrderBook:
             self._db.execute("ALTER TABLE shoots ADD COLUMN uid TEXT NOT NULL DEFAULT ''")
         if "folder" not in cols:  # the shoot's photo folder, where its orders file is kept
             self._db.execute("ALTER TABLE shoots ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
+        if "hours" not in cols:  # time spent on the shoot, by part: {"shoot": 3.5, "edit": 6, ...} (JSON)
+            self._db.execute("ALTER TABLE shoots ADD COLUMN hours TEXT NOT NULL DEFAULT ''")
         if "changed" not in cols:  # last time anything in the shoot changed
             self._db.execute("ALTER TABLE shoots ADD COLUMN changed REAL NOT NULL DEFAULT 0")
         for r in self._db.execute("SELECT id FROM shoots WHERE uid=''").fetchall():
@@ -150,7 +152,26 @@ class OrderBook:
             self._db.execute("UPDATE shoots SET folder=? WHERE id=?", (str(folder or ""), int(sid)))
             self._db.commit()
 
-    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed")
+    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed", "hours")
+
+    HOUR_PARTS = ("shoot", "edit", "lab", "delivery")
+
+    def set_hours(self, sid: int, hours: dict) -> dict:
+        """Hours spent on a shoot, by part (shooting, culling & editing, envelopes & lab, delivery)."""
+        clean = {}
+        for k in self.HOUR_PARTS:
+            try:
+                v = float(str((hours or {}).get(k, "")).strip() or 0)
+            except ValueError:
+                raise ValueError("Hours must be numbers, like 3.5.")
+            if v < 0 or v > 500:
+                raise ValueError("That many hours doesn't look right.")
+            if v:
+                clean[k] = round(v, 2)
+        with self._lock:
+            self._db.execute("UPDATE shoots SET hours=? WHERE id=?", (json.dumps(clean) if clean else "", int(sid)))
+            self._db.commit()
+        return clean
 
     def export_shoot(self, sid: int) -> dict:
         """Everything about one shoot except the photos: envelopes, payments, team photos, school & other orders."""
