@@ -891,3 +891,13 @@ textarea:focus{border-color:var(--accent)}
 .oth-pop{position:fixed;z-index:60;width:200px;padding:6px;background:var(--panel-2);border:1px solid var(--border-2);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.6);pointer-events:none}
 .oth-pop img{display:block;width:188px;height:235px;object-fit:cover;border-radius:5px;background:#1a1d22}
 .oth-pop span{display:block;text-align:center;font-size:12px;color:var(--muted);margin-top:5px}
+
+/* Totals, slimmer: a few numbers, then only what needs fixing */
+.tot-grid b.ok{color:#5BC46E}.tot-mini b.ok{color:#5BC46E}
+.tot-todo{margin:8px 10px 0;padding-top:8px;border-top:1px solid var(--border)}
+.tot-todo .tt{font-size:11px;letter-spacing:.08em;color:var(--amber);font-weight:700;text-transform:uppercase;padding:0 2px 4px}
+.tot-todo .tot-grid{padding-left:0;padding-right:0}
+.tot-ok{margin:8px 12px 0;padding:5px 8px;border-radius:6px;background:rgba(70,167,88,.12);color:#5BC46E;font-size:12px}
+.tot-an{display:block;margin:8px 12px 2px;font-size:12px;background:none!important;border:0!important;padding:0!important;color:var(--accent)!important;cursor:pointer}.tot-an:hover{text-decoration:underline}
+.ship-lab{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}.ship-lab .ship-in{width:80px}
+.sec.mini .tot-todo,.sec.mini .tot-ok,.sec.mini .tot-an{display:none}
