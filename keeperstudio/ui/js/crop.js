@@ -464,6 +464,11 @@ const Crop = {
     else if (p && this._lastCard && this._lastCard.path === p.path) {
       // re-checking the same photo (a size or setting changed): keep its card in place, dimmed
       status = `<div class="rechecking">${this._lastCard.html}<span class="recheck-badge"><span class="spin-dot"></span>Checking…</span></div>`;
+    } else if (p && this.status.has(p.path) && STATUS_INFO[this.status.get(p.path).status]) {
+      // checked before, but under different settings (a new build, Fine-tune, style): show what it was while it's re-checked
+      const o = this.status.get(p.path), st = STATUS_INFO[o.status];
+      status = `<div class="status-card ${st.cls} rechecking-old"><div class="sc-head"><span class="st-dot ${st.cls}"></span><b>${o.status === 'review' ? 'Needs review' : st.label}</b></div>
+        <div class="sc-label"><span class="spin-dot"></span> Re-checking - framing settings changed since the last check</div></div>`;
     } else if (p) status = '<div class="status-card none checking"><div class="sc-head"><span class="spin-dot"></span><b>Checking framing…</b></div></div>';
     if (p && plan) this._lastCard = { path: p.path, html: status };
     const sizeRow = z => {

@@ -911,3 +911,7 @@ textarea:focus{border-color:var(--accent)}
 /* Straighten: the new angle waits for Apply */
 .straight-act{display:flex;align-items:center;gap:6px;margin:4px 12px 8px;padding:6px 8px;border-radius:6px;background:rgba(46,155,255,.1);border:1px solid rgba(46,155,255,.4)}
 .straight-act .sa-txt{font-size:12px;color:var(--text);margin-right:auto;font-variant-numeric:tabular-nums}
+
+/* checked before under other settings: last result shown while it re-checks */
+.status-card.rechecking-old .sc-label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
+.status-card.rechecking-old .sc-label .spin-dot{width:10px;height:10px}

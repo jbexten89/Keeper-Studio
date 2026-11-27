@@ -773,6 +773,27 @@ _latest_focus = 0
 _cfg_sig: dict = {}
 
 
+def _settings_hash(raw: bytes) -> str:
+    """The settings' values only: comments, layout and where the model and colour files
+    live (the copy in your user folder points at the app folder by full path) don't
+    count, so a new build or a moved app folder never makes saved checks look out of date."""
+    import hashlib
+    try:
+        import yaml
+        def norm(v, key=""):
+            if isinstance(v, dict):
+                return {k: norm(x, str(k)) for k, x in v.items()}
+            if isinstance(v, list):
+                return [norm(x) for x in v]
+            if key.endswith("_path") and isinstance(v, str):
+                return Path(v.replace("\\", "/")).name
+            return v
+        text = json.dumps(norm(yaml.safe_load(raw.decode("utf-8")) or {}), sort_keys=True, default=str)
+        return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+    except Exception:
+        return hashlib.sha1(raw).hexdigest()[:16]
+
+
 def _config_sig() -> str | None:
     """What's in config.yaml, not when it was written: unzipping a new version
     of the app gives the file a new date, and that alone must not make every
@@ -787,7 +808,7 @@ def _config_sig() -> str | None:
     if not cur or cur[0] != m:
         # one tuple, swapped in whole, so a request running at the same time
         # never sees the new date without its hash
-        cur = (m, hashlib.sha1(p.read_bytes()).hexdigest()[:16])
+        cur = (m, _settings_hash(p.read_bytes()))
         _cfg_sig["sig"] = cur
     return cur[1]
 
