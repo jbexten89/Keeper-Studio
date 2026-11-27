@@ -603,8 +603,8 @@ _SIZE_WORDS = {"memory-mate": "MEMORY MATE", "wallet": "WALLETS"}
 
 def _logo_path() -> Path | None:
     from . import paths
-    for base in (paths.bundle_dir(), Path(__file__).resolve().parent.parent):
-        p = base / "assets" / "logo.jpg"
+    for base in (paths.bundle_dir(), Path(__file__).resolve().parent):
+        p = base / "ui" / "logo.jpg"
         if p.is_file():
             return p
     return None
@@ -659,33 +659,34 @@ def envelopes_pdf(shoot: dict, orders: list[dict], catalog, find_photo, path: Pa
             iw, ih = logo_r.getSize(); lh = 74; lw = iw * lh / ih
             c.drawImage(logo_r, (W - lw) / 2, y - lh, lw, lh, mask="auto")
         y -= 84
-        # the strip: envelope, photo, total, payment
+        # the strip: the photo first (it's what prints are matched by), then envelope, total, payment
+        SH = 60
         c.setFillColor(colors.HexColor("#E8F2FF")); c.setStrokeColor(colors.HexColor("#2F9BFF")); c.setLineWidth(1.2)
-        c.rect(0, y - 46, W, 46, fill=1, stroke=0); c.line(0, y, W, y); c.line(0, y - 46, W, y - 46)
+        c.rect(0, y - SH, W, SH, fill=1, stroke=0); c.line(0, y, W, y); c.line(0, y - SH, W, y - SH)
         stem = o.get("edited") or o.get("image") or ""
         px = M
         ph = find_photo(stem) if stem else None
         if ph:
             try:
-                im = ImageReader(io.BytesIO(thumbnail(str(ph), 200))); iw, ih = im.getSize(); th = 38; tw = iw * th / ih
-                c.drawImage(im, px, y - 42, tw, th); px += tw + 10
+                im = ImageReader(io.BytesIO(thumbnail(str(ph), 240))); iw, ih = im.getSize(); th = SH - 8; tw = iw * th / ih
+                c.drawImage(im, px, y - SH + 4, tw, th); px += tw + 10
             except Exception:  # noqa: BLE001 - a missing thumbnail never stops the page
                 pass
-        c.setFillColor(INK); c.setFont("Helvetica-Bold", 12); c.drawString(px, y - 18, f"Envelope {o.get('envelope') or '-'}")
+        c.setFillColor(INK); c.setFont("Helvetica-Bold", 15); c.drawString(px, y - 24, stem or "No photo picked")
         c.setFont("Helvetica", 9.5)
-        c.drawString(px + c.stringWidth(f"Envelope {o.get('envelope') or '-'}", "Helvetica-Bold", 12) + 6, y - 18, f"· Photo {stem or '-'}")
-        c.drawString(px, y - 33, " · ".join(x for x in [o.get("team") or "", shoot.get("name") or ""] if x))
-        c.setFont("Helvetica", 9.5); c.drawRightString(W - M, y - 18, f"Total {_money(s['total_cents'])}")
+        c.drawString(px, y - 41, " · ".join(x for x in [f"Envelope {o.get('envelope') or '-'}", o.get("team") or "", shoot.get("name") or ""] if x))
+        c.setFont("Helvetica", 9.5); c.drawRightString(W - M, y - 24, f"Total {_money(s['total_cents'])}")
         how = paid_label(o, s)
         pay = f"Paid {how.lower()} {_money(s.get('handed_cents', s['paid_cents']))}" if s.get("handed_cents") or s["paid_cents"] else how
         tag = f"Change due {_money(s['change_cents'])}" if s.get("change_cents") else f"Owes {_money(s['due_cents'])}" if s["due_cents"] else ""
         if tag:
             tw = c.stringWidth(tag, "Helvetica-Bold", 9.5) + 12
-            c.setFillColor(AMBER); c.roundRect(W - M - tw, y - 38, tw, 14, 3, fill=1, stroke=0)
-            c.setFillColor(colors.HexColor("#1A1208")); c.setFont("Helvetica-Bold", 9.5); c.drawRightString(W - M - 6, y - 34, tag)
-            c.setFillColor(INK); c.setFont("Helvetica", 9.5); c.drawRightString(W - M - tw - 6, y - 34, pay)
+            c.setFillColor(AMBER); c.roundRect(W - M - tw, y - 45, tw, 14, 3, fill=1, stroke=0)
+            c.setFillColor(colors.HexColor("#1A1208")); c.setFont("Helvetica-Bold", 9.5); c.drawRightString(W - M - 6, y - 41, tag)
+            c.setFillColor(INK); c.setFont("Helvetica", 9.5); c.drawRightString(W - M - tw - 6, y - 41, pay)
         else:
-            c.drawRightString(W - M, y - 34, pay)
+            c.drawRightString(W - M, y - 41, pay)
+        y -= 14
         y -= 64
         c.setFont("Helvetica", 9); c.setFillColor(INK)
         c.drawCentredString(W / 2, y, "PAYMENT DUE DAY OF SHOOT.  CASH/CHECKS ACCEPTABLE.  PLEASE PLACE AN X OR QTY BY CHOICE.")

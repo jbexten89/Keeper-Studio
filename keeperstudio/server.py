@@ -96,7 +96,7 @@ class Handler(BaseHTTPRequestHandler):
         if u.path.startswith("/ui/"):  # the page's own stylesheet and scripts
             ui = (paths.bundle_dir() / "ui").resolve()
             f = (ui / u.path[4:]).resolve()
-            types = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8"}
+            types = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".jpg": "image/jpeg"}
             if f.suffix in types and ui in f.parents and f.is_file():
                 return self._send(200, f.read_bytes(), types[f.suffix])
             return self._send(404, b"not found", "text/plain")

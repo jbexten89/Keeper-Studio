@@ -76,6 +76,67 @@ const Ord = {
       toast(`Saved ${esc(baseName(r.path))}${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
     } catch (e) { toast(esc(e.message), 5000); }
   },
+  // ---------- Form view: an envelope drawn like the paper order form, in the app ----------
+  formHTML(o) {
+    const s = o.summary || {}, sh = this.shoot() || {}, $$m = c => fmt$(c || 0);
+    const q = {}; for (const l of o.lines || []) q[l.product_id] = (q[l.product_id] || 0) + (+l.qty || 0);
+    const pk = this.products('package'), al = this.products('alacarte'), mi = this.products('misc');
+    const hasPkg = pk.some(p => q[p.id]);
+    const word = k => ({ 'memory-mate': 'MEMORY MATE', wallet: 'WALLETS' })[k] || k;
+    const blank = n => `<u>${n || ''}</u>`;
+    const pkHTML = p => `<div class="ef-p ${q[p.id] ? 'on' : ''}"><div class="t">${blank(q[p.id])}${esc(p.label.toUpperCase())} - ${$$m(p.price)}</div><div class="it">${Object.entries(p.contents || {}).map(([k, v]) => `${v} - ${esc(word(k))}`).join('<br>')}</div></div>`;
+    const lab = p => { let w = p.label.toUpperCase(); if (/^\d/.test(p.label)) w = w.replace(/X/g, 'x'); return `${p.unit} - ${esc(w)}`; };
+    const col = (title, items, withp) => `<div><h5 class="${withp == null ? 'm' : ''}">${title}</h5>${items.map(p => { const n = withp == null || withp === hasPkg ? q[p.id] : 0;
+      return `<div class="r ${n ? 'on' : ''}">${blank(n)}<span>${lab(p)}</span>${$$m(withp ? p.with_package : p.price)}</div>`; }).join('')}</div>`;
+    const stem = o.edited || o.image || '', ph = stem ? this.photoFor(stem) : null;
+    const how = s.paid_auto ? 'Picture day' : (!o.paid_method || o.paid_method === 'none') ? 'Not paid' : o.paid_method[0].toUpperCase() + o.paid_method.slice(1);
+    const handed = s.handed_cents ?? s.paid_cents ?? 0;
+    const pay = handed ? `Paid ${how.toLowerCase()} ${$$m(handed)}` : how;
+    const tag = s.change_cents ? `Change due ${$$m(s.change_cents)}` : s.due_cents ? `Owes ${$$m(s.due_cents)}` : '';
+    const half = Math.floor(pk.length / 2);
+    const line = (l, v) => `<div><b>${l}</b><i>${esc(v || '')}</i></div>`;
+    let day = sh.date || ''; try { if (day) day = fmtDay(day); } catch {}
+    return `<div class="ef-page"><div class="ef-logo"><img src="/ui/logo.jpg" alt="Jamie Bexten Photography"></div>
+      <div class="ef-strip">${ph ? `<img class="ef-ph" src="${thumbUrl(ph.path, 400)}" data-efphoto="${ph.id}" title="Click to see it bigger">` : '<span class="ef-ph none"></span>'}
+        <div class="ef-who"><b>${esc(stem || 'No photo picked')}</b><span>Envelope ${esc(o.envelope || '-')} · ${esc(o.team || 'No team')} · ${esc(sh.name || '')}</span></div><span class="tb-spacer"></span>
+        <div class="ef-tot">Total <b>${$$m(s.total_cents)}</b><br>${esc(pay)}${tag ? ` · <span class="ef-tag">${tag}</span>` : ''}</div></div>
+      <div class="ef-head">PAYMENT DUE DAY OF SHOOT. CASH/CHECKS ACCEPTABLE. PLEASE PLACE AN <b>X</b> OR <b>QTY</b> BY CHOICE.<br>CHECKS PAYABLE TO: <b>Jamie Bexten Photography</b></div>
+      <div class="ef-pk"><div>${pk.slice(0, half).map(pkHTML).join('')}</div><div>${pk.slice(half).map(pkHTML).join('')}</div></div>
+      <div class="ef-mm">Memory Mate: (Team 5x7 &amp; Individual 5x7)</div>
+      <div class="ef-save">Save on a la carte items with the purchase of a PACKAGE</div>
+      <div class="ef-box">${col('Without PACKAGE Purchase', al, false)}${col('With PACKAGE Purchase', al, true)}${col('Miscellaneous', mi, null)}</div>
+      <div class="ef-f">${line('NAME', o.athlete)}${line('PARENTS NAME', o.parent)}${line('ADDRESS / PHONE', [o.address, o.phone].filter(Boolean).join(' · '))}${line('TEAM NAME', o.team)}${line("COACH'S NAME", o.coach)}</div>
+      ${o.notes || o.glasses ? `<div class="ef-notes">${o.glasses ? 'Glasses. ' : ''}${esc(o.notes || '')}</div>` : ''}
+      <div class="ef-side">PICTURE DAY: ${esc(day)}</div></div>`;
+  },
+  openForm(id) {
+    if (!this.d) return;
+    const list = () => { const r = this.rows(); return r.length ? r : this.d.orders; };
+    let cur = id;
+    const paint = card => {
+      const L = list(), i = L.findIndex(o => o.id === cur), o = L[i] || this.d.orders.find(x => x.id === cur); if (!o) return closeModal();
+      card.innerHTML = `<div class="ef-bar"><button class="btn sm" data-efstep="-1" ${i > 0 ? '' : 'disabled'} title="Previous envelope (←)">←</button><span class="muted small">${i + 1} of ${L.length}</span><button class="btn sm" data-efstep="1" ${i < L.length - 1 ? '' : 'disabled'} title="Next envelope (→)">→</button>
+        <span class="tb-spacer"></span><button class="btn sm" data-efedit>Edit</button><button class="btn sm" data-efpdf>PDF</button><button class="btn sm" data-close>Close</button></div><div class="ef-scroll">${this.formHTML(o)}</div>`;
+    };
+    const step = (card, d) => { const L = list(), i = L.findIndex(o => o.id === cur); if (L[i + d]) { cur = L[i + d].id; paint(card); } };
+    let onKey = null;
+    openModal('<div></div>', card => {
+      card.classList.add('ef-card'); paint(card);
+      card.addEventListener('click', e => {
+        const t = e.target;
+        if (t.closest('[data-close]')) return closeModal();
+        const sb = t.closest('[data-efstep]'); if (sb) return step(card, +sb.dataset.efstep);
+        if (t.closest('[data-efedit]')) { closeModal(); return this.select(cur); }
+        if (t.closest('[data-efpdf]')) return this.envelopesPdf([cur]);
+        const ph = t.closest('[data-efphoto]'); if (ph) { const pid = +ph.dataset.efphoto; S.active = pid; S.selected = new Set([pid]); S.anchor = pid; refreshSelection(); if (!S.fs) toggleFs(); }
+      });
+      onKey = e => {
+        if (!card.isConnected || $('#modal').classList.contains('hidden')) { document.removeEventListener('keydown', onKey, true); return; }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); step(card, e.key === 'ArrowRight' ? 1 : -1); }
+      };
+      document.addEventListener('keydown', onKey, true);
+    });
+  },
   // Digital envelopes: each envelope drawn like the paper order form (ids: just those envelopes)
   async envelopesPdf(ids) {
     const s = this.shoot(); if (!s) return;
@@ -1397,7 +1458,7 @@ const Ord = {
     const s = o.summary, pic = o.edited || o.image, ord = [s.packages, s.extras].filter(Boolean).join(' + ');
     const due = s.due_cents > 0 ? `<td class="amt due">${fmt$(s.due_cents)}</td>` : s.change_cents > 0 ? `<td class="amt due" title="Paid ${fmt$(s.handed_cents)}: give back ${fmt$(s.change_cents)} change">Change ${fmt$(s.change_cents)}</td>` : s.short_cents > 0 ? `<td class="amt ok" title="Came up ${fmt$(s.short_cents)} short and you accepted it">Paid <span class="dim">−${fmt$(s.short_cents)}</span></td>` : `<td class="amt ${s.total_cents ? 'ok' : 'dim'}">${s.total_cents ? 'Paid' : '—'}</td>`;
     const on = this.multi.size > 1 ? this.multi.has(o.id) : o.id === this.sel;
-    return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}</td><td>${o.athlete ? esc(o.athlete) : o.summary && (o.summary.due_cents > 0 || o.summary.short_cents > 0) ? '<span class="due" title="Owes or paid short — type who it is">(no name)</span>' : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
+    return `<tr data-oid="${o.id}" class="${on ? 'sel' : ''}"><td class="env">${esc(o.envelope)}<button class="ef-rowbtn" data-ord="row-form" data-id="${o.id}" title="See this envelope as the order form">▤</button></td><td>${o.athlete ? esc(o.athlete) : o.summary && (o.summary.due_cents > 0 || o.summary.short_cents > 0) ? '<span class="due" title="Owes or paid short — type who it is">(no name)</span>' : '<span class="dim">(no name)</span>'}</td><td>${esc(o.team)}</td>
       <td title="${esc(ord)}">${ord ? esc(ord) : '<span class="dim">—</span>'}</td>${this.photoCells(o, pic)}<td>${o.glasses ? 'Yes' : ''}</td><td class="amt">${fmt$(s.total_cents)}</td><td class="amt dim" title="Meridian's estimated cost${s.lab_unpriced && s.lab_unpriced.length ? ' (some items not priced)' : ''}">${s.lab_cents ? fmt$(s.lab_cents) : '—'}</td>${this.profitCells(s)}${due}</tr>`;
   },
   // Thumbnails in the envelope list (right of the photo #): on unless switched off in the header.
@@ -1439,7 +1500,7 @@ const Ord = {
     const st = !pr.total ? '' : auto ? '<span class="ok">Paid on picture day</span>' : due > 0 ? `<span class="due">${fmt$(due)} due</span>` : due < 0 ? `<span class="chg">Give ${fmt$(-due)} change</span>` : short ? `<span class="short">Paid ${fmt$(pr.total - short)} · accepted ${fmt$(short)} short</span>` : '<span class="ok">Paid in full</span>';
     return `<div class="tot-sum">${this.sumHTML(pr, d, st)}</div>
       <div class="tot-pay">${segHTML('ordPay', d.paid_method || '', this.payChoices(d.paid_method))}<label class="paid-amt" title="What they actually paid. Type a smaller amount when they're short; the rest shows as due."><span>Paid $</span><input data-of="paid" value="${d.paid_cents ? (d.paid_cents / 100).toFixed(2) : ''}" placeholder="${auto ? 'in full' : '0.00'}" inputmode="decimal" spellcheck="false"></label>${due < 0 ? `<button class="btn sm" data-ord="change-given" title="You handed back the change: record the payment as the total">Change given</button>` : ''}${due > 0 && d.paid_cents ? `<button class="btn sm" data-ord="short-accept" title="Let the ${fmt$(due)} go: the envelope counts as paid, and its total becomes what they paid">Accept ${fmt$(due)} short</button>` : ''}${short && due <= 0 ? `<button class="btn sm" data-ord="short-undo" title="They still owe the ${fmt$(short)}">Undo</button>` : ''}</div>
-      <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}${d.id ? '<button class="btn sm" data-ord="envelope-pdf" title="This envelope drawn like the order form (PDF), for your records">PDF</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
+      <div class="tot-acts">${d.id ? '<button class="btn sm" data-ord="delete" title="Delete this envelope (Del). You can undo it.">Delete</button>' : ''}${d.id ? '<button class="btn sm" data-ord="envelope-form" title="This envelope drawn like the order form (← → step through)">Form</button>' : ''}<div class="tb-spacer"></div><button class="btn sm primary" data-ord="new">Next envelope (N)</button></div>`;
   },
   sumHTML(pr, d, st) { return `<span class="big">${fmt$(pr.total)}</span><span class="st">${st}</span><span class="sub">${pr.savings ? `Package savings ${fmt$(pr.savings)} · ` : ''}${this.labHTML(pr, d)}</span>`; },
   // Meridian's estimated cost, from the server (it expands packages the same way the lab order does).
@@ -1781,6 +1842,7 @@ function bindModuleEvents() {
       const qb = t.closest('[data-oqty]'); if (qb) { Ord.setQty(qb.dataset.oqty, Ord.qty(qb.dataset.oqty) + +qb.dataset.d); return; }
       const so = t.closest('[data-osort]'); if (so) { const k = so.dataset.osort; Ord.sort = Ord.sort.k === k ? { k, dir: -Ord.sort.dir } : { k, dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.paintRows(); return; }
       const tb = t.closest('[data-othumb]'); if (tb) { Ord.thumbHover(null);  Ord.select(+tb.dataset.othumb).then(() => { if (!(prefs.ordPv && prefs.ordPv.open)) Ord.pvToggle(); else Ord.pvPaint(); }); return; }
+      const rf = t.closest('[data-ord=row-form]'); if (rf) { Ord.openForm(+rf.dataset.id); return; }
       const tr = t.closest('tr[data-oid]'); if (tr) { Ord.clickRow(+tr.dataset.oid, e); return; }
       const ex = t.closest('[data-oexp]'); if (ex) { Ord.preview(ex.dataset.oexp); return; }
       const bp = t.closest('[data-bulkpay]'); if (bp) { e.stopPropagation(); return Ord.bulkPay(bp.dataset.bulkpay); }
@@ -1792,7 +1854,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'envelopes-pdf') Ord.envelopesPdf(); else if (a === 'envelope-pdf') { if (Ord.draft && Ord.draft.id) Ord.envelopesPdf([Ord.draft.id]); } else if (a === 'school') Ord.openSchool(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'team-drop') Ord.dropPlanned(oa.dataset.team); else if (a === 'team-list') Ord.openTeamList(); else if (a === 'envelopes-pdf') Ord.envelopesPdf(); else if (a === 'envelope-pdf') { if (Ord.draft && Ord.draft.id) Ord.envelopesPdf([Ord.draft.id]); } else if (a === 'row-form') Ord.openForm(+oa.dataset.id); else if (a === 'envelope-form') { const id = Ord.draft && Ord.draft.id; if (id) (async () => { await Ord.flush(); await Ord.refresh(); Ord.openForm(id); })(); } else if (a === 'school') Ord.openSchool(); else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off · click ▢ beside Photo to turn them back on', 4000); } else if (a === 'an-unsold') { Ord.anUnsold = !Ord.anUnsold; Ord.anPaint(); } else if (a === 'an-teams') { Ord.anAllTeams = !Ord.anAllTeams; Ord.anPaint(); } else if (a === 'to-an') Ord.setView('an'); else if (a === 'tot-glasses') { Ord.team = 'all'; Ord.sort = { k: 'glasses', dir: 1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'tot-nophoto') { Ord.team = 'all'; Ord.sort = { k: 'image', dir: -1 }; prefs.ordSort = Ord.sort; savePrefs(); Ord.setView('orders'); } else if (a === 'backups') Ord.backups(); else if (a === 'matching') Ord.matchingPdf(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

@@ -43,7 +43,7 @@ a = Analysis(
         ("keeperstudio/ui/app.css", "ui"),
         ("keeperstudio/ui/js/*.js", "ui/js"),
         ("assets/keeper-studio.ico", "assets"),
-        ("assets/logo.jpg", "assets"),  # on the digital envelopes
+        ("keeperstudio/ui/logo.jpg", "ui"),  # on the digital envelopes
         *[(str(f), "keeperstudio/meridian") for f in Path("keeperstudio/meridian").iterdir() if f.suffix in (".csv", ".py", ".md")],
         *mediapipe_data, *extra_datas, *metadata,
     ],

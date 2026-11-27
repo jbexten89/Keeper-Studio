@@ -156,8 +156,11 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   draws each envelope like the paper order form, with your logo: the
   packages and a la carte boxes with the choices filled in, the name, parent,
   address/phone, team and coach lines, and a strip with the envelope number,
-  photo, total and what was paid (Owes / Change due in amber). For your
-  records; Address is a field on the envelope under Parent & notes.
+  photo number (big, with the photo), envelope, total and what was paid
+  (Owes / Change due in amber). For your records; Address is a field on the
+  envelope under Parent & notes. **Form** on an envelope (or ▤ on its row)
+  shows the same page in the app, always up to date; ← → step through the
+  list as it's sorted and filtered, Edit goes back to the fields, PDF saves it.
 * **Team list:** a new shoot starts with every team (and its coach) from the
   last shoot of the same name - "Winter Sports 2026" from "Winter Sports
   2025" - in the same order, so the Team box is a pick list and picking a team
