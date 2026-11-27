@@ -771,7 +771,7 @@ function renderEmpty() {
   e.innerHTML = `<div class="empty-card"><div class="logo-big">Keeper<b>.</b> <span class="logo-sub">Studio</span></div>
     <p class="muted">Cull the shoot, crop every print size, build composites and extract subjects from the background — all in one place.</p>
     <button class="btn primary lg" data-act="open">Open Folder…</button>
-    ${recent.length ? `<div class="recent"><h4>Recent</h4>${recent.map(p => `<button data-recent="${esc(p)}"><span>${esc(baseName(p))}</span><small>${esc(p)}</small></button>`).join('')}</div>` : ''}
+    ${recent.length ? `<div class="recent"><h4>Recent<button class="rc-clear" data-recentclear title="Clear the whole list (the folders aren't touched)">Clear all</button></h4>${recent.map(p => `<div class="rc-row"><button data-recent="${esc(p)}"><span>${esc(baseName(p))}</span><small>${esc(p)}</small></button><button class="rc-x" data-recentx="${esc(p)}" title="Remove from Recent (the folder isn't touched)">✕</button></div>`).join('')}</div>` : ''}
     <p class="muted small">or drag a folder onto this window · photos never leave this computer</p></div>`;
 }
 /* ---------- Grid (virtualized) ---------- */
@@ -1557,6 +1557,8 @@ function bindEvents() {
     }
     const tg = e.target.closest('[data-toggle]'); if (tg) return togglePanel(tg.dataset.toggle);
     if (e.target.closest('[data-clear-filter]')) { S.filter = { flag: 'any', rating: 0, label: 'any', text: '', crop: 'any' }; $('#fText').value = ''; return afterFilter(); }
+    const rx = e.target.closest('[data-recentx]'), rca = e.target.closest('[data-recentclear]');
+    if (rx || rca) { api('/api/recent-forget', rca ? { all: true } : { path: rx.dataset.recentx }).then(r => { S.recent = r.recent; renderEmpty(); }).catch(err => toast(esc(err.message))); return; }
     const rc = e.target.closest('[data-recent]'); if (rc) return loadFolder(rc.dataset.recent);
     const dm = e.target.closest('[data-dismiss]'); if (dm) { S.banners = S.banners.filter(b => b.id !== dm.dataset.dismiss); renderBanners(); }
   });

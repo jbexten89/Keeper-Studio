@@ -180,6 +180,17 @@ def r_update_check(b):
             "page": data.get("html_url") or RELEASES_PAGE, "notes": (data.get("body") or "")[:1500]}
 
 
+def r_recent_forget(b):
+    """Take folders off the Recent list (all of them with "all"); the folders themselves aren't touched."""
+    if b.get("all"):
+        recent = []
+    else:
+        gone = {str(p) for p in b.get("paths") or [b.get("path")]}
+        recent = [p for p in (catalog.get("kv", "recent_folders") or []) if p not in gone]
+    catalog.put("kv", "recent_folders", recent)
+    return {"recent": [p for p in recent if Path(p).is_dir()]}
+
+
 def r_open_url(b):
     url = str(b.get("url") or "")
     if not url.startswith("https://github.com/jbexten89/Keeper-Studio"):
@@ -421,7 +432,7 @@ def r_cutout_existing(b):
 
 
 ROUTES = {
-    "/api/hello": r_hello, "/api/update-check": r_update_check, "/api/open-url": r_open_url,
+    "/api/hello": r_hello, "/api/update-check": r_update_check, "/api/open-url": r_open_url, "/api/recent-forget": r_recent_forget,
     "/api/work/status": r_work_status, "/api/work/save": r_work_save, "/api/work/restore": r_work_restore,
     "/api/db/entries": r_db_entries, "/api/db/get": r_db_get, "/api/db/put": r_db_put, "/api/db/del": r_db_del,
     "/api/dialog": r_dialog,
