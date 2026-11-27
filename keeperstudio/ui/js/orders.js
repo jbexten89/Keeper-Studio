@@ -1091,7 +1091,7 @@ const Ord = {
     const s = this.shoot() || {};
     v.innerHTML = `<div class="ord-head"><span class="ttl">${esc(s.name)}${this.team !== 'all' ? ' · ' + esc(this.team) : ''}</span><span class="muted small" id="ordCount"></span><div class="tb-spacer"></div>
       <input type="search" data-oq placeholder="Search names, photos, packages  ( / )" value="${esc(this.q)}" spellcheck="false"><button class="btn sm" data-ord="select-all" title="Select every envelope shown, to set their team or coach at once (Ctrl+A). Ctrl-click or Shift-click rows to pick some.">Select all</button><button class="btn sm primary" data-ord="new">New envelope (N)</button></div>
-      <div class="ord-scroll" id="ordRows"></div>`;
+      <div class="ord-scroll" id="ordRows"></div><div class="ord-totbar" id="ordTotBar"></div>`;
     this.paintRows();
   },
   paintRows() {
@@ -1104,9 +1104,28 @@ const Ord = {
     const newRow = !fresh ? '' : `<tr class="sel new-row" data-onew><td class="env">${esc(d.envelope)}</td><td colspan="11">${d.athlete.trim() ? esc(d.athlete) : '<span class="new-tag">New</span><span class="dim">Type the athlete’s name or press a package letter. It saves as soon as you do.</span>'}</td></tr>`;
     box.innerHTML = rows.length || fresh ? `<table class="otbl"><thead><tr>${th('env', '#', 'env')}${th('athlete', 'Athlete')}${th('team', 'Team')}<th>Order</th>${th('image', 'Photo')}${this.thumbs() ? `<th class="o-thc"><button class="linkish o-thtog" data-ord="thumbs" title="Hide the photo thumbnails">▣</button></th>` : `<th class="o-thc off"><button class="linkish o-thtog" data-ord="thumbs" title="Show the photo thumbnails">▢</button></th>`}${th('glasses', 'Glasses')}${th('total', 'Total', 'amt')}${th('lab', 'Lab', 'amt')}${th('profit', 'Profit', 'amt')}${th('ppct', 'Profit %', 'amt')}${th('due', 'Due', 'amt')}</tr></thead><tbody>${rows.map(o => this.rowHTML(o)).join('')}${newRow}</tbody>${this.totalsRow(rows)}</table>`
       : `<div class="ord-empty">${this.d && this.d.orders.length ? 'No envelopes match.' : '<h3>No envelopes yet</h3><p>Press <kbd>N</kbd> to type in the first one, or import the website’s order CSV.</p>'}</div>`;
+    this.pinTotals(box);
     box.scrollTop = y;
     const nr = fresh && $('tr[data-onew]', box);
     if (nr && this._flashNew) { this._flashNew = false; nr.scrollIntoView({ block: 'nearest' }); nr.classList.add('flash'); }
+  },
+  // The totals row sits in its own bar under the list (not over it), lined up with the columns above.
+  pinTotals(box) {
+    const bar = $('#ordTotBar'); if (!bar) return;
+    // the row stays in the list's table, collapsed, so the columns are still sized to fit it
+    const tf = $('tfoot:not(.ghost)', box);
+    if (tf) { this.totHTML = tf.outerHTML; tf.classList.add('ghost'); } else if (!$('table', box)) this.totHTML = '';
+    if (!this.totHTML) { bar.innerHTML = ''; bar.hidden = true; return; }
+    const tbl = $('table', box); if (!tbl) { bar.innerHTML = ''; bar.hidden = true; return; }
+    const ws = [...tbl.querySelectorAll('thead th')].map(t => t.getBoundingClientRect().width);
+    bar.hidden = false;
+    bar.innerHTML = `<table class="otbl tot-only" style="width:${tbl.getBoundingClientRect().width}px"><colgroup>${ws.map(w => `<col style="width:${w}px">`).join('')}</colgroup>${this.totHTML}</table>`;
+    bar.scrollLeft = box.scrollLeft;
+    if (!box._totWired) {
+      box._totWired = true;
+      box.addEventListener('scroll', () => { const b = $('#ordTotBar'); if (b) b.scrollLeft = box.scrollLeft; }, { passive: true });
+      new ResizeObserver(() => { if ($('#ordTotBar') && $('table', box)) this.pinTotals(box); }).observe(box);
+    }
   },
   // Totals of the envelopes in view (all teams, one team, or a search), pinned under the list.
   totalsRow(rows) {

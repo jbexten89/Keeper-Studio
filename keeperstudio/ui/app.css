@@ -866,3 +866,9 @@ textarea:focus{border-color:var(--accent)}
 .an-wi-pane .an-t th{white-space:nowrap;font-size:11.5px}.an-wi-pane .an-t td:first-child{max-width:84px}
 .otbl td.o-thc.off{height:auto}.otbl .o-thc.off{width:22px}
 .bk-row>span{overflow:hidden;text-overflow:ellipsis}.bk-row .btn{justify-self:end}
+/* Pinned totals row: solid, and covers anything that scrolls beneath it (any screen scaling) */
+.ord-totbar{flex:none;overflow:hidden;border-top:1px solid var(--border-2);background:var(--panel)}
+.otbl.tot-only{table-layout:fixed}
+.otbl.tot-only tfoot td{position:static;border-top:0;overflow:hidden;text-overflow:ellipsis}
+.otbl.tot-only td.o-thc{height:auto}
+.otbl tfoot.ghost{visibility:collapse}.otbl tfoot.ghost td{position:static;padding-top:0;padding-bottom:0;border:0}
