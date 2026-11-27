@@ -809,3 +809,7 @@ textarea:focus{border-color:var(--accent)}
 /* Envelope total box: one color for where the envelope stands, green for what you keep */
 .tot-sum .st .ok{color:#3CC77F}.tot-sum .st .due{color:var(--amber)}.tot-sum .st .chg{color:var(--accent)}.tot-sum .st .short{color:rgba(227,160,79,.75)}
 .tot-sum .labline .keep{color:#3CC77F}.tot-sum .labline .keep.neg{color:#E0605A}
+
+/* Envelope editor: the name box asks "Who owes this?" when an envelope owes or paid short */
+.fld input.ask{border-color:var(--amber);box-shadow:0 0 0 2px rgba(227,160,79,.22)}
+.fld input.ask::placeholder{color:var(--amber);opacity:.85}
