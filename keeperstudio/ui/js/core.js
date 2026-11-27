@@ -208,7 +208,7 @@ function cropShowTest(w) {
   const isT = p => !!getMeta(p.key).team, isP = p => getMeta(p.key).flag === 1;
   return w === 'teams' ? isT : w === 'picks' ? (p => isP(p) && !isT(p)) : (p => isP(p) || isT(p));
 }
-const CROP_SHOW_NAMES = { both: 'Picks + teams', picks: 'Picks', teams: 'Teams' };
+const CROP_SHOW_NAMES = { both: 'Picks + Teams', picks: 'Picks', teams: 'Teams' };
 function recomputeView() {
   const cs = S.module === 'crop' ? cropShowTest(S.cropShow) : null;
   const arr = sourcePhotos().filter(p => matchRules(p, S.filter) && (!cs || cs(p))).sort(sorter());
@@ -1501,7 +1501,7 @@ function buildHelp() {
     ${g('Marking (every selected photo)', [['Pick', 'P'], ['Reject', 'X'], ['Unflag', 'U'], ['Team photo on / off', 'T'], ['Star rating', '0–5'], ['Red / Yellow / Green / Blue label', '6–9'], ['Quick Collection', 'B'], ['Save Quick Collection as…', 'Ctrl Alt B'], ['Mark and move to next', 'Shift +key'], ['Auto-advance always', 'Caps Lock'], ['Undo', 'Ctrl/⌘ Z']])}
     ${g('Selection & panels', [['Next / previous photo', '← →'], ['Row up / down (Grid)', '↑ ↓'], ['Several photos in the filmstrip', 'Ctrl/Shift-click'], ['Extend selection', 'Shift ←→'], ['Select all', 'Ctrl/⌘ A'], ['Deselect all', 'Ctrl/⌘ D'], ['Hide side panels', 'Tab'], ['Hide all panels', 'Shift Tab'], ['Toolbar', 'Shift T'], ['Filter bar', '\\']])}
     ${g('Tabs', [['Library', 'Ctrl 1'], ['Retouch (eye swap)', 'Ctrl 2  Q'], ['Crop', 'Ctrl 3  R'], ['Orders', 'Ctrl 4'], ['Composite', 'Ctrl 5'], ['Extract', 'Ctrl 6']])}
-    ${g('Crop', [['Adjust framing', 'A'], ['Apply / cancel adjust', 'Enter Esc'], ['Crop boxes on/off', 'O'], ['Color side by side', 'C'], ['Next / previous photo', '← →']], 'crop')}
+    ${g('Crop', [['Adjust framing', 'A'], ['Place 3.5 × 3.5', 'S'], ['Apply / cancel placing', 'Enter Esc'], ['Straighten 0.1° (Shift 1°)', '[ ]'], ['Apply / cancel straighten', 'Enter Esc'], ['Show the grid (hold)', 'G'], ['Crop boxes on/off', 'O'], ['Color side by side', 'C'], ['Next / previous photo', '← →']], 'crop')}
     ${g('Orders', [['New envelope', 'N'], ['Add package A–G', 'A … G'], ['Another of that package', 'Shift +letter'], ['Next / previous envelope', '↑ ↓'], ['Next / previous team (Analysis)', '↑ ↓'], ['Floating photo preview', 'V'], ['Close envelope', 'Esc'], ['Delete envelope (with Undo)', 'Del'], ['Search', '/'], ['Select several envelopes', 'Ctrl/Shift-click'], ['Select all shown', 'Ctrl A'], ['Filmstrip photo (opens its envelope)', '← →']], 'orders')}
     ${g('Files', [['Open folder', 'Ctrl/⌘ O'], ['Save folder work now (it also saves itself)', 'Ctrl/⌘ S'], ['New collection', 'Ctrl/⌘ N'], ['Export', 'Ctrl/⌘ Shift E'], ['This help', '?']])}
     </div><p class="muted small" style="margin:16px 0 0">In Compare, ← → change the Candidate. Click a side to make it active; marking keys apply to the active side. Click an image to zoom 1:1 at that spot, scroll to zoom in or out, then drag to pan. In Compare and Survey every photo zooms and pans together.</p></div>`;
