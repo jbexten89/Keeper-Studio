@@ -52,6 +52,12 @@ class ExtrasTests(unittest.TestCase):
         self.assertEqual(by[("16x20", "Varsity team")]["file"], "IMG_5373_20x16")
         self.assertEqual(by[("11x14", "Carter Smith")]["why"], "11x14 isn't set up in Crop")
 
+    def test_portrait_16x20_uses_its_own_crop_or_the_8x10(self):
+        o = {"id": 3, "kind": "School", "items": [{"src": "photo", "image": "IMG_4412.jpg", "label": "Carter", "size": "16x20",
+                                                   "product": "Professional Prints", "qty": 1, "price_cents": 0}]}
+        self.assertEqual(X.lines(o, TP, crop_names={"16x20", "8x10"})[0]["file"], "IMG_4412_16x20")
+        self.assertEqual(X.lines(o, TP, crop_names={"8x10"})[0]["file"], "IMG_4412_8x10")
+
     def test_lab_plan_merges_with_families_and_labels_who(self):
         fam = [order("Avery", "Varsity", cart(("ac-8x10-team", 2)), id=9, image="IMG_1.jpg")]
         plan = O.lab_plan(fam, CAT, TP, [SCHOOL, TEACHERS])

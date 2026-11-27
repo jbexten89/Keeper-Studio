@@ -84,6 +84,9 @@ framing:
 # from the global full-length look; the square does exactly that.
 ratios:
   # ---- Full-length sizes (inherit the global framing) --------------------
+  - name: 16x20         # 4800x6000  ->  4:5
+    width: 4
+    height: 5
   - name: 11x14         # 3300x4200  ->  11:14
     width: 11
     height: 14

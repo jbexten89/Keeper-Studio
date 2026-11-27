@@ -1735,7 +1735,7 @@ const NO_PHOTOS_NEEDED = new Set(['composite', 'orders']);
 // Picture-day tabs in workflow order, then the once-a-year ones (preschool composites, fall banners) after a divider.
 const MODULES = [['library', 'Library'], ['retouch', 'Retouch'], ['crop', 'Crop'], ['orders', 'Orders'], ['composite', 'Composite'], ['cutout', 'Extract']];
 const OCCASIONAL = new Set(['composite', 'cutout']);
-const SIZE_COLOR_BY_NAME = { '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
+const SIZE_COLOR_BY_NAME = { '16x20': '#FFFFFF', '8x10': '#2E9BFF', '5x7': '#3CC7A0', '4x6': '#E8C547', '4x5': '#D07AE6', '2_5x3_5': '#F08A5D', '1_8x2_8': '#7BD389', '1_7x2_2': '#9C8BFF', '3_5x3_5': '#FF6B8B', '10x8': '#5BC0EB', '7x5': '#C9CED6', '11x14': '#A0E7E5', '14x11': '#F2B5D4', '20x16': '#B8E986' };
 const SIZE_COLORS = ['#2E9BFF', '#3CC7A0', '#E8C547', '#D07AE6', '#F08A5D', '#7BD389', '#9C8BFF', '#FF6B8B', '#5BC0EB', '#C9CED6', '#F2B5D4', '#B8E986'];
 const prettySize = n => String(n).replace(/_/g, '.').replace(/x/g, ' × ');
 // Ready to print = framed as planned, shortened to fit, or placed by hand: all three print.

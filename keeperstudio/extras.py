@@ -20,8 +20,10 @@ KINDS = {  # quick-add buttons: what a new order of that kind starts with
 }
 SIZES = ["4x6", "5x7", "8x10", "11x14", "16x20"]
 # The crop file each size is printed from: a portrait crop for one person's
-# photo, a landscape crop for a group photo. 16x20 is the same shape as 8x10.
-PORTRAIT_CROP = {"4x6": "4x6", "5x7": "5x7", "8x10": "8x10", "11x14": "11x14", "16x20": "8x10"}
+# photo, a landscape crop for a group photo. 16x20 has its own crop; it is the
+# same shape as 8x10, so the 8x10 crop stands in when 16x20 is switched off in Crop.
+PORTRAIT_CROP = {"4x6": "4x6", "5x7": "5x7", "8x10": "8x10", "11x14": "11x14", "16x20": "16x20"}
+STAND_IN = {"16x20": "8x10", "20x16": "10x8"}
 GROUP_CROP = {"4x6": "6x4", "5x7": "7x5", "8x10": "10x8", "11x14": "14x11", "16x20": "20x16"}
 PRODUCTS = [  # Meridian categories offered, and the short name shown
     ("Professional Prints", "Print"), ("Giclee Prints", "Giclee print"), ("Standouts", "Standout"),
@@ -104,6 +106,8 @@ def lines(order: dict, team_photos: dict, crop_names: set[str] | None = None) ->
             if part["qty"] <= 0:
                 continue
             crop = (GROUP_CROP if part["landscape"] else PORTRAIT_CROP).get(size, size)
+            if crop_names is not None and crop not in crop_names and STAND_IN.get(crop) in crop_names:
+                crop = STAND_IN[crop]
             code = product_code(size, product, part["landscape"])
             why = ""
             if not part["frame"]:
