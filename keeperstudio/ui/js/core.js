@@ -1213,7 +1213,7 @@ function filterSummary() {
   if (f.rating) parts.push('Rating ≥ ' + f.rating + '★');
   if (f.label !== 'any') parts.push('Label: ' + f.label);
   if (f.crop && f.crop !== 'any') parts.push('Crop: ' + (STATUS_INFO[f.crop] || {}).label);
-  if (f.cstyle && f.cstyle !== 'any') parts.push('Style: ' + (f.cstyle === 'batch' ? 'same as left side' : Crop.STYLE_NAMES[f.cstyle]));
+  if (f.cstyle && f.cstyle !== 'any') parts.push('Style: ' + (f.cstyle === 'batch' ? 'same as shoot' : Crop.STYLE_NAMES[f.cstyle]));
   if (f.text) parts.push('Name contains “' + f.text + '”');
   return parts.length ? 'Filtered by ' + parts.join(' · ') : 'This source is empty';
 }

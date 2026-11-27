@@ -53,7 +53,7 @@ const Crop = {
     for (const p of S.photos) cnt[this.styleOf(p.path) || 'batch']++;
     const cur = S.filter.cstyle || 'any';
     const row = (k, label, tag) => cnt[k] ? `<div class="row ${cur === k ? 'on' : ''}" data-stylefilter="${k}" title="Show only these photos">${tag ? `<span class="style-tag inline">${tag}</span>` : '<span class="style-tag inline none">—</span>'}<span class="lbl">${label}</span><span class="cnt">${cnt[k]}</span></div>` : '';
-    return `<div class="style-rows">${row('batch', 'Same as left side')}${row('full', 'Full length', 'Full')}${row('knee_above', '3/4 · above knees', '¾↑')}${row('knee_below', '3/4 · below knees', '¾↓')}${row('preschool', 'Preschool', 'Pre')}</div>`;
+    return `<div class="style-rows">${row('batch', 'Same as shoot')}${row('full', 'Full length', 'Full')}${row('knee_above', '3/4 · above knees', '¾↑')}${row('knee_below', '3/4 · below knees', '¾↓')}${row('preschool', 'Preschool', 'Pre')}</div>`;
   },
   async clearStyles() {
     // only this folder's photos: other folders keep their own styles
@@ -421,7 +421,7 @@ const Crop = {
       const tq = !s.preschool && ['knee_above', 'knee_below'].includes(s.framing_style);
       if (S.sections['c-out'] === undefined) S.sections['c-out'] = false;  // set once, rarely touched
     const nOwn = S.photos.filter(p => this.styles.has(p.path)).length;  // this folder only
-    html += sectionHTML('c-frame', 'Framing style', `<div class="pad">${nOwn ? `<div class="own-note">${plural(nOwn, 'photo')} use${nOwn === 1 ? 's' : ''} its own style <button class="btn sm" data-crop="clear-styles">Clear</button></div>${this.styleRows()}` : ''}${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full'], ['tq', '3/4'], ['preschool', 'Preschool']])}</div>
+    html += sectionHTML('c-frame', 'Shoot style', `<div class="pad">${nOwn ? `<div class="own-note">${plural(nOwn, 'photo')} use${nOwn === 1 ? 's' : ''} its own style <button class="btn sm" data-crop="clear-styles">Clear</button></div>${this.styleRows()}` : ''}${segHTML('cropMode', s.preschool ? 'preschool' : tq ? 'tq' : 'full', [['full', 'Full'], ['tq', '3/4'], ['preschool', 'Preschool']])}</div>
         ${tq ? `<div class="pad" title="The bottom edge crosses the legs a little above or below the knees — never on the joint. The square keeps its own face framing.">${segHTML('kneeLine', s.framing_style, [['knee_above', 'Just above knees'], ['knee_below', 'Just below knees']])}</div>` : ''}
         ${tq ? '' : switchHTML('balance_feet', s.balance_feet && !s.preschool, 'Balance feet', 'Center shorter and taller kids by finding their feet (standing poses only)')}
         ${s.balance_feet && !s.preschool && !tq ? `<div class="slider-row" title="Space under the feet"><span>Margin</span><input type="range" min="0" max="0.3" step="0.005" value="${s.bottom_margin}" data-range="bottom_margin"><b>${Math.round(s.bottom_margin * 1000) / 10}%</b></div>` : ''}
@@ -435,7 +435,7 @@ const Crop = {
         ${switchHTML('orders', s.orders, `Also copy all sizes to “${esc(this.ordersName)}”`)}
         ${switchHTML('contact_sheets', s.contact_sheets, 'Make contact sheets')}`);
     }
-    if (S.filter.cstyle && S.filter.cstyle !== 'any') html = `<div class="filter-note">Showing only <b>${S.filter.cstyle === 'batch' ? 'same as left side' : esc(this.STYLE_NAMES[S.filter.cstyle])}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-stylefilter="any">Show all</button></div>` + html;
+    if (S.filter.cstyle && S.filter.cstyle !== 'any') html = `<div class="filter-note">Showing only <b>${S.filter.cstyle === 'batch' ? 'same as shoot' : esc(this.STYLE_NAMES[S.filter.cstyle])}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-stylefilter="any">Show all</button></div>` + html;
     if (S.filter.crop && S.filter.crop !== 'any') html = `<div class="filter-note">Showing only <b>${esc(STATUS_INFO[S.filter.crop].label)}</b> · ${S.view.length} photo${S.view.length === 1 ? '' : 's'}<button class="btn sm primary" data-cropfilter="any">Show all</button></div>` + html;
     let foot = '';
     if (this.result && !this.job) {
@@ -493,10 +493,12 @@ const Crop = {
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
     const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><button class="btn sm icon grid-btn" id="gridBtn" data-crop="gridlock" title="Hover (or hold G) to see the grid - click to keep it on"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="12" height="12" rx="1.5"/><path d="M5 1v12M9 1v12M1 5h12M1 9h12"/></svg></button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
       <div class="straight-act" id="straightAct" hidden><span class="sa-txt"></span><button class="btn sm primary" data-crop="rot-apply" title="Save this angle and re-check the framing (Enter)">Apply</button><button class="btn sm" data-crop="rot-cancel" title="Put it back (Esc)">Cancel</button></div>` : '<div class="hint">Select a photo to straighten it.</div>';
-    if (p) {
+    if (p && plan && plan.landscape) {
+      status += `<div class="style-row team" title="Team photos always use the group framing: how much of the photo's height is shown is set in Fine-tune framing › Group shots."><span>Style</span><b>Team photo</b><button class="btn sm" data-crop="tunables" title="Set how much of the photo's height team photos show">Fine-tune…</button></div>`;
+    } else if (p) {
       const own = this.styleOf(p.path), nSel = S.selected.size > 1 && S.selected.has(p.id) ? S.selected.size : 1;
-      status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Batch uses the Framing style set on the left."><span>Style</span>
-        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as left side (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${own ? `<span class="style-tag inline">${STYLE_TAGS[own]}</span>` : ''}${nSel > 1 ? `<em>Changes all ${nSel} selected photos</em>` : ''}</div>`;
+      status += `<div class="style-row" title="A framing style just for ${nSel > 1 ? `the ${nSel} selected photos` : 'this photo'}. Every other photo uses the Shoot style on the left."><span>Style</span>
+        <select data-photostyle class="${own ? 'own' : ''}"><option value="">Same as shoot (${esc(this.STYLE_NAMES[this.batchStyle()])})</option><option disabled>──────────</option>${Object.entries(this.STYLE_NAMES).map(([k, n]) => `<option value="${k}" ${own === k ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>${own ? `<span class="style-tag inline">${STYLE_TAGS[own]}</span>` : ''}${nSel > 1 ? `<em>Changes all ${nSel} selected photos</em>` : ''}</div>`;
     }
     const rs = this.restyled && !this.job ? this.restyled.paths.filter(k => !this.status.has(k)) : [];
     const note = !rs.length ? '' : `<div class="restyle-note"><b>Style changed on ${plural(rs.length, 'photo')}</b>Their framing hasn’t been checked with ${esc(this.restyled.name)} yet. Nothing runs until you click.<div class="btn-row"><button class="btn sm" data-crop="recheck">Re-check the ${rs.length}</button><button class="btn sm ghost" data-crop="recheck-x" title="Leave them for now">Not now</button></div></div>`;
