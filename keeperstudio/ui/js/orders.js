@@ -80,7 +80,7 @@ const Ord = {
     let L; try { L = await api('/api/orders/backups', {}); } catch (e) { return toast(esc(e.message)); }
     const s = this.shoot();
     const when = t => t ? new Date(t * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'never';
-    const kind = { daily: 'when the app opened', close: 'when the app closed', manual: 'made by hand', 'before-restore': 'before a restore' };
+    const kind = { daily: 'app opened', close: 'app closed', manual: 'by hand', 'before-restore': 'before a restore' };
     openModal(`<h3>Backups</h3>
       <div class="bk-grid">
         <span>This shoot’s photo folder</span><b>${s && s.folder ? `<span class="ok">✓</span> ${esc(s.folder)}` : '<span class="muted">not known yet — open the shoot’s photo folder in Library</span>'}</b>

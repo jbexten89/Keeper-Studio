@@ -839,10 +839,10 @@ textarea:focus{border-color:var(--accent)}
 .restyle-note .btn-row{margin-top:8px}
 
 /* Backups window */
-.bk-grid{display:grid;grid-template-columns:180px 1fr;gap:6px 12px;margin:6px 0 10px;font-size:13px}.bk-grid>span{color:var(--muted)}.bk-grid b{font-weight:400;word-break:break-all}
+.bk-grid{display:grid;grid-template-columns:180px 1fr;gap:6px 12px;margin:6px 0 10px;font-size:13px}.bk-grid>span{color:var(--muted)}.bk-grid b{font-weight:400;overflow-wrap:anywhere}
 .bk-grid .ok{color:#5BC46E}.bk-grid .due{color:var(--amber)}
-.bk-list{margin-top:12px;max-height:320px;overflow:auto;border-top:1px solid var(--border)}
-.bk-row{display:grid;grid-template-columns:150px 130px 1fr auto;white-space:nowrap;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12.5px}
+.bk-list{margin-top:12px;max-height:320px;overflow-y:auto;overflow-x:hidden;border-top:1px solid var(--border)}
+.bk-row{display:grid;grid-template-columns:max-content minmax(0,1fr) max-content max-content;white-space:nowrap;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12.5px}
 
 /* Analysis, cleaner: four tiles, a few plain notes, What if in the right pane */
 .an-kpis.four{grid-template-columns:repeat(4,minmax(0,1fr))!important}
@@ -865,3 +865,4 @@ textarea:focus{border-color:var(--accent)}
 .an-wi-pane .wbtn{margin-top:10px}
 .an-wi-pane .an-t th{white-space:nowrap;font-size:11.5px}.an-wi-pane .an-t td:first-child{max-width:84px}
 .otbl td.o-thc.off{height:auto}.otbl .o-thc.off{width:22px}
+.bk-row>span{overflow:hidden;text-overflow:ellipsis}.bk-row .btn{justify-self:end}
