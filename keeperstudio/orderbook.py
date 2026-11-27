@@ -11,6 +11,7 @@ import json
 import sqlite3
 import threading
 import time
+import uuid
 from pathlib import Path
 
 SCHEMA = """
@@ -100,9 +101,113 @@ class OrderBook:
             self._db.execute("ALTER TABLE shoots ADD COLUMN prepaid INTEGER NOT NULL DEFAULT 0")
         if "team_order" not in cols:  # the order teams are listed in, as the user arranged them
             self._db.execute("ALTER TABLE shoots ADD COLUMN team_order TEXT NOT NULL DEFAULT '[]'")
+        if "uid" not in cols:  # stays the same when the shoot is copied to another PC (folder orders file)
+            self._db.execute("ALTER TABLE shoots ADD COLUMN uid TEXT NOT NULL DEFAULT ''")
+        if "folder" not in cols:  # the shoot's photo folder, where its orders file is kept
+            self._db.execute("ALTER TABLE shoots ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
+        if "changed" not in cols:  # last time anything in the shoot changed
+            self._db.execute("ALTER TABLE shoots ADD COLUMN changed REAL NOT NULL DEFAULT 0")
+        for r in self._db.execute("SELECT id FROM shoots WHERE uid=''").fetchall():
+            self._db.execute("UPDATE shoots SET uid=? WHERE id=?", (uuid.uuid4().hex, r["id"]))
         ocols = {r["name"] for r in self._db.execute("PRAGMA table_info(orders)")}
         if "accepted_cents" not in ocols:  # came up short and the shortfall was let go
             self._db.execute("ALTER TABLE orders ADD COLUMN accepted_cents INTEGER NOT NULL DEFAULT 0")
+
+    # ---------------------------------------------------------- backups --
+    def backup_to(self, dst: Path) -> Path:
+        """A consistent copy of the whole order book (safe while it's open)."""
+        dst = Path(dst)
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dst.with_suffix(".part")
+        out = sqlite3.connect(str(tmp))
+        with self._lock:
+            self._db.commit()
+            self._db.backup(out)
+        out.close()
+        tmp.replace(dst)
+        return dst
+
+    # ---------------------------------------- one shoot, as a portable file --
+    def touch(self, sid: int) -> None:
+        with self._lock:
+            self._db.execute("UPDATE shoots SET changed=? WHERE id=?", (time.time(), int(sid)))
+            self._db.commit()
+
+    def shoot(self, sid: int) -> dict | None:
+        with self._lock:
+            r = self._db.execute("SELECT * FROM shoots WHERE id=?", (int(sid),)).fetchone()
+        return dict(r) if r else None
+
+    def shoot_by_uid(self, uid: str) -> dict | None:
+        if not uid:
+            return None
+        with self._lock:
+            r = self._db.execute("SELECT * FROM shoots WHERE uid=?", (str(uid),)).fetchone()
+        return dict(r) if r else None
+
+    def set_folder(self, sid: int, folder: str) -> None:
+        with self._lock:
+            self._db.execute("UPDATE shoots SET folder=? WHERE id=?", (str(folder or ""), int(sid)))
+            self._db.commit()
+
+    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed")
+
+    def export_shoot(self, sid: int) -> dict:
+        """Everything about one shoot except the photos: envelopes, payments, team photos, school & other orders."""
+        sh = self.shoot(sid)
+        if not sh:
+            raise ValueError("That shoot isn't in the order book.")
+        with self._lock:
+            orders = [dict(r) for r in self._db.execute("SELECT * FROM orders WHERE shoot_id=? ORDER BY id", (int(sid),)).fetchall()]
+            teams = [dict(r) for r in self._db.execute("SELECT team, image, coach FROM team_photos WHERE shoot_id=?", (int(sid),)).fetchall()]
+            extras = [dict(r) for r in self._db.execute("SELECT * FROM extra_orders WHERE shoot_id=? ORDER BY id", (int(sid),)).fetchall()]
+        for o in orders + extras:
+            o.pop("id", None); o.pop("shoot_id", None)
+        return {"format": "keeper-studio-orders", "version": 1,
+                "shoot": {k: sh.get(k) for k in self.SHOOT_KEYS}, "orders": orders, "team_photos": teams, "extras": extras}
+
+    def import_shoot(self, data: dict, replace_sid: int | None = None) -> int:
+        """Bring in a shoot from an orders file. With replace_sid, its contents replace that shoot's."""
+        if not isinstance(data, dict) or data.get("format") != "keeper-studio-orders":
+            raise ValueError("That isn't a Keeper Studio orders file.")
+        sh = dict(data.get("shoot") or {})
+        ocols = {r["name"] for r in self._db.execute("PRAGMA table_info(orders)")}
+        ecols = {r["name"] for r in self._db.execute("PRAGMA table_info(extra_orders)")}
+        with self._lock:
+            try:
+                if replace_sid:
+                    sid = int(replace_sid)
+                    for t in ("orders", "team_photos", "extra_orders"):
+                        self._db.execute(f"DELETE FROM {t} WHERE shoot_id=?", (sid,))
+                    keys = [k for k in self.SHOOT_KEYS if k in sh and k not in ("created", "uid")]
+                    if keys:
+                        self._db.execute(f"UPDATE shoots SET {', '.join(f'{k}=?' for k in keys)} WHERE id=?", (*[sh[k] for k in keys], sid))
+                else:
+                    keys = [k for k in self.SHOOT_KEYS if k in sh]
+                    if "name" not in keys:
+                        raise ValueError("The orders file has no shoot name.")
+                    sid = self._db.execute(f"INSERT INTO shoots ({', '.join(keys)}) VALUES ({', '.join('?' * len(keys))})",
+                                           [sh[k] for k in keys]).lastrowid
+                for o in data.get("orders") or []:
+                    o = {k: v for k, v in o.items() if k in ocols and k not in ("id", "shoot_id")}
+                    if isinstance(o.get("lines"), list):
+                        o["lines"] = json.dumps(o["lines"])
+                    o.setdefault("created", time.time()); o.setdefault("updated", time.time())
+                    self._db.execute(f"INSERT INTO orders (shoot_id, {', '.join(o)}) VALUES (?, {', '.join('?' * len(o))})", (sid, *o.values()))
+                for t in data.get("team_photos") or []:
+                    self._db.execute("INSERT OR REPLACE INTO team_photos (shoot_id, team, image, coach) VALUES (?,?,?,?)",
+                                     (sid, str(t.get("team") or ""), str(t.get("image") or ""), str(t.get("coach") or "")))
+                for e in data.get("extras") or []:
+                    e = {k: v for k, v in e.items() if k in ecols and k not in ("id", "shoot_id")}
+                    if isinstance(e.get("items"), list):
+                        e["items"] = json.dumps(e["items"])
+                    e.setdefault("created", time.time()); e.setdefault("updated", time.time())
+                    self._db.execute(f"INSERT INTO extra_orders (shoot_id, {', '.join(e)}) VALUES (?, {', '.join('?' * len(e))})", (sid, *e.values()))
+                self._db.commit()
+            except Exception:
+                self._db.rollback()
+                raise
+        return sid
 
     def _daily_backup(self, folder: Path) -> None:
         try:
@@ -148,8 +253,8 @@ class OrderBook:
                 if "prepaid" in data:
                     self._db.execute("UPDATE shoots SET prepaid=? WHERE id=?", (1 if data["prepaid"] else 0, sid))
             else:  # new shoots: families pay on picture day unless told otherwise
-                sid = self._db.execute("INSERT INTO shoots (name, date, season, notes, archived, created, prepaid) VALUES (?,?,?,?,?,?,?)",
-                                       (*vals, time.time(), 0 if data.get("prepaid") is False else 1)).lastrowid
+                sid = self._db.execute("INSERT INTO shoots (name, date, season, notes, archived, created, prepaid, uid, changed) VALUES (?,?,?,?,?,?,?,?,?)",
+                                       (*vals, time.time(), 0 if data.get("prepaid") is False else 1, uuid.uuid4().hex, time.time())).lastrowid
             self._db.commit()
             return dict(self._db.execute("SELECT * FROM shoots WHERE id=?", (sid,)).fetchone())
 

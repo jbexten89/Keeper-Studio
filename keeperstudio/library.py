@@ -29,6 +29,10 @@ JPEG_EXT = {".jpg", ".jpeg"}
 _decode_slots = threading.BoundedSemaphore(max(2, min(4, (os.cpu_count() or 4) // 2)))
 
 
+# Files Keeper Studio itself keeps in a shoot folder: never counted as "skipped".
+APP_FILES = {"Keeper Studio work.json", "Keeper Studio orders.json"}
+
+
 def scan(folder: Path) -> dict:
     """Every photo under `folder` (recursively), plus what was skipped."""
     folder = folder.resolve()
@@ -36,7 +40,7 @@ def scan(folder: Path) -> dict:
     for root, dirs, files in os.walk(folder):
         dirs[:] = sorted(d for d in dirs if not d.startswith(".") and not d.endswith("_out") and d != "_retouched")
         for name in sorted(files):
-            if name.startswith("."):
+            if name.startswith(".") or name in APP_FILES:
                 continue
             p = Path(root) / name
             ext = p.suffix.lower()

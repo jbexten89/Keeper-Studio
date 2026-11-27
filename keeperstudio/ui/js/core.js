@@ -662,7 +662,7 @@ function starsHTML(r, interactive, cls = '') {
   return `<span class="stars ${r ? '' : 'zero'} ${cls}">${s}</span>`;
 }
 function renderBanners() {
-  $('#banners').innerHTML = S.banners.map(b => `<div class="banner ${b.cls || 'amber'}" data-id="${b.id}"><span>${esc(b.text)}</span>${b.action ? `<button class="btn sm banner-act" data-banner-url="${esc(b.action.url)}">${esc(b.action.label)}</button>` : ''}${b.work ? `<button class="btn sm banner-act primary" data-banner-work style="margin-left:auto">${esc(b.work.label)}</button>` : ''}<button data-dismiss="${b.id}" title="${b.id === 'update' ? 'Later' : 'Dismiss'}">✕</button></div>`).join('');
+  $('#banners').innerHTML = S.banners.map(b => `<div class="banner ${b.cls || 'amber'}" data-id="${b.id}"><span>${esc(b.text)}</span>${b.action ? `<button class="btn sm banner-act" data-banner-url="${esc(b.action.url)}">${esc(b.action.label)}</button>` : ''}${b.work ? `<button class="btn sm banner-act primary" data-banner-work style="margin-left:auto">${esc(b.work.label)}</button>` : ''}${b.go ? `<button class="btn sm banner-act primary" data-banner-go="${b.id}" style="margin-left:auto">${esc(b.go.label)}</button>` : ''}<button data-dismiss="${b.id}" title="${b.id === 'update' ? 'Later' : 'Dismiss'}">✕</button></div>`).join('');
 }
 function renderTop() {
   if ($('#top')._built) return; $('#top')._built = true;

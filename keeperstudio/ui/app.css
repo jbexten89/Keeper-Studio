@@ -837,3 +837,9 @@ textarea:focus{border-color:var(--accent)}
 .restyle-note b{display:block;font-size:13px;margin-bottom:3px}
 .restyle-note .btn{background:#1a1206;color:#f3e3cc;border-color:#1a1206}.restyle-note .btn.ghost{background:transparent;color:#1a1206;border-color:rgba(26,18,6,.4)}
 .restyle-note .btn-row{margin-top:8px}
+
+/* Backups window */
+.bk-grid{display:grid;grid-template-columns:180px 1fr;gap:6px 12px;margin:6px 0 10px;font-size:13px}.bk-grid>span{color:var(--muted)}.bk-grid b{font-weight:400;word-break:break-all}
+.bk-grid .ok{color:#5BC46E}.bk-grid .due{color:var(--amber)}
+.bk-list{margin-top:12px;max-height:320px;overflow:auto;border-top:1px solid var(--border)}
+.bk-row{display:grid;grid-template-columns:150px 130px 1fr auto;white-space:nowrap;gap:10px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--border);font-size:12.5px}

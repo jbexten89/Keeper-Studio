@@ -31,8 +31,72 @@ const Ord = {
     try { this.d = await api('/api/orders/list', { shoot_id: this.sid }); } catch (e) { toast(esc(e.message), 5000); return; }
     const s = this.shoot(); if (s) s.n = this.d.orders.length;
     if (this.team !== 'all' && !this.d.teams.some(t => t.name === this.team)) this.team = 'all';
+    this.linkFolder();
   },
-  libraryLoaded() { this.stems = null; },
+  libraryLoaded() { this.stems = null; this.checkFolder(); this.linkFolder(); },
+  // ---------- keeping orders safe: a copy in the shoot's photo folder, and backups ----------
+  // The open folder holds a shoot's photos when most of the photos picked for its envelopes are in it.
+  async linkFolder() {
+    const s = this.shoot(); if (!s || !S.root || !S.photos.length || s.folder === S.root || !this.d) return;
+    const stems = new Set([...this.d.orders.flatMap(o => [o.image, o.edited]), ...this.d.teams.map(t => t.image)].filter(Boolean).map(n => stemOf(n).toLowerCase()));
+    if (!stems.size) return;
+    let found = 0; for (const st of stems) if (this.photoFor(st)) found++;
+    if (found < Math.min(3, stems.size) || found < stems.size / 2) return;
+    try { await api('/api/orders/folder-link', { shoot_id: s.id, folder: S.root }); } catch { return; }
+    const first = !s.folder; s.folder = S.root;
+    if (first) toast(`Orders for “${esc(s.name)}” are now also saved in its photo folder`, 4000);
+  },
+  // A folder opened with an orders file in it: offer to bring the orders in (another PC, or newer than this one's).
+  async checkFolder() {
+    S.banners = S.banners.filter(b => b.id !== 'ordfile');
+    if (!S.root) return renderBanners();
+    let st; try { st = await api('/api/orders/folder-status', { folder: S.root }); } catch { return; }
+    if (!st.file || st.state === 'same') return renderBanners();
+    const f = st.file, when = f.saved ? new Date(f.saved * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+    S.banners.push(st.state === 'new'
+      ? { id: 'ordfile', cls: 'info', text: `This folder has saved orders for “${f.name}” (${plural(f.envelopes, 'envelope')}${when ? `, saved ${when}` : ''}). Bring them into Orders?`, go: { label: 'Bring them in', fn: () => this.importFolder() } }
+      : { id: 'ordfile', cls: 'info', text: `The orders saved in this folder for “${f.name}” are newer than this computer’s (${f.envelopes} envelopes vs ${st.here_envelopes}${when ? `, saved ${when}` : ''}). Use them? This computer’s orders are backed up first.`, go: { label: 'Use the newer orders', fn: () => this.importFolder() } });
+    renderBanners();
+  },
+  async importFolder() {
+    let r; try { r = await api('/api/orders/folder-import', { folder: S.root }); } catch (e) { renderBanners(); return toast(esc(e.message), 5000); }
+    S.banners = S.banners.filter(b => b.id !== 'ordfile'); renderBanners();
+    try { this.shoots = (await api('/api/orders/shoots', {})).shoots; } catch {}
+    await this.pickShoot(r.shoot_id);
+    toast(r.state === 'newer' ? 'Newer orders brought in · this computer’s were backed up first' : 'Orders brought in', 4000);
+  },
+  async backups() {
+    let L; try { L = await api('/api/orders/backups', {}); } catch (e) { return toast(esc(e.message)); }
+    const s = this.shoot();
+    const when = t => t ? new Date(t * 1000).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'never';
+    const kind = { daily: 'when the app opened', close: 'when the app closed', manual: 'made by hand', 'before-restore': 'before a restore' };
+    openModal(`<h3>Backups</h3>
+      <div class="bk-grid">
+        <span>This shoot’s photo folder</span><b>${s && s.folder ? `<span class="ok">✓</span> ${esc(s.folder)}` : '<span class="muted">not known yet — open the shoot’s photo folder in Library</span>'}</b>
+        <span>Last backup</span><b>${when(L.last)}</b>
+        <span>Second copy</span><b>${L.second ? esc(L.second) : '<span class="muted">off</span>'}${L.last_second_error ? `<br><span class="due">${esc(L.last_second_error)}</span>` : ''}</b>
+      </div>
+      <p class="muted small">Envelopes, payments and team photos are saved in the photo folder as “Keeper Studio orders.json”, so copying the folder brings the orders too. The whole order book is also backed up each day and each time the app closes.</p>
+      <div class="btn-row"><button class="btn sm primary" data-bk="now">Back up now</button><button class="btn sm" data-bk="second">${L.second ? 'Change second copy…' : 'Keep a second copy…'}</button>${L.second ? '<button class="btn sm" data-bk="second-off">Turn second copy off</button>' : ''}</div>
+      <div class="bk-list">${L.items.length ? L.items.slice(0, 40).map(b => `<div class="bk-row"><span>${when(b.time)}</span><span class="muted">${kind[b.kind] || ''}</span><span class="muted">${plural(b.shoots, 'shoot')} · ${plural(b.envelopes, 'envelope')}</span><button class="btn sm" data-bk-restore="${esc(b.name)}">Restore…</button></div>`).join('') : '<div class="muted">No backups yet.</div>'}</div>
+      <div class="m-actions"><button class="btn" data-close>Done</button></div>`, card => {
+      card.addEventListener('click', async e => {
+        const b = e.target.closest('[data-bk]'), rs = e.target.closest('[data-bk-restore]');
+        if (b && b.dataset.bk === 'now') { try { const r = await api('/api/orders/backup-now', {}); toast(r.second_error ? `Backed up · second copy failed: ${esc(r.second_error)}` : 'Backed up', 3500); } catch (er) { return toast(esc(er.message)); } this.backups(); }
+        else if (b && b.dataset.bk === 'second') { const p = await pickPath('folder', { initial: L.second || '' }); if (!p) return; try { await api('/api/orders/backup-second', { folder: p }); toast('Second copy on · backed up there now', 3500); } catch (er) { return toast(esc(er.message)); } this.backups(); }
+        else if (b && b.dataset.bk === 'second-off') { try { await api('/api/orders/backup-second', { folder: '' }); } catch {} this.backups(); }
+        else if (rs) {
+          const item = L.items.find(x => x.name === rs.dataset.bkRestore);
+          confirmDialog(`Restore the backup from ${when(item && item.time)}?`, `Every shoot goes back to how it was then (${plural(item ? item.envelopes : 0, 'envelope')}). The order book as it is now is backed up first, so you can undo this from the same list.`, 'Restore', async () => {
+            try { await api('/api/orders/backup-restore', { name: rs.dataset.bkRestore }); } catch (er) { return toast(esc(er.message), 5000); }
+            try { this.shoots = (await api('/api/orders/shoots', {})).shoots; } catch {}
+            if (this.sid && !this.shoots.some(x => x.id === this.sid)) this.sid = null;
+            await this.refresh(); this.render(); toast('Backup restored', 4000);
+          });
+        }
+      });
+    });
+  },
   photoFor(stem) {
     const key = `${S.gen}:${S.photos.length}`;
     if (!this.stems || this.stemsKey !== key) { this.stems = new Map(S.photos.map(p => [stemOf(p.name).toLowerCase(), p])); this.stemsKey = key; }
@@ -1169,6 +1233,7 @@ const Ord = {
         <button data-ord="edit-shoot" data-id="${this.sid || ''}">Edit shoot…<em>name, date, paid on picture day</em></button>
         <button data-ord="extras">School &amp; other orders…<em>free or paid prints not on an envelope</em></button>
         <button data-ord="prices">Prices…<em>packages, prices, lab codes</em></button>
+        <button data-ord="backups">Backups…<em>restore, second copy, the photo folder’s copy</em></button>
         ${HIDDEN.has('import') ? '' : `<hr><button data-ord="import">Import website CSV…<em>orders from the website's /admin export</em></button>`}</div></div>
       <div class="dd"><button class="btn sm" data-dd ${dis}>Export ▾</button><div class="dd-menu right">
         <button data-ord="summary">Shoot summary<em>totals, teams, payments, what sold, who owes</em></button>
@@ -1277,7 +1342,7 @@ function bindModuleEvents() {
     const pk = S.module === 'orders' && e.target.closest('[data-opkg]'); if (!pk) return;
     e.preventDefault(); const q = Ord.qty(pk.dataset.opkg); if (q) Ord.setQty(pk.dataset.opkg, q - 1);
   });
-  $('#banners').addEventListener('click', e => { const w = e.target.closest('[data-banner-work]'); if (w) { const b = S.banners.find(x => x.id === 'work'); if (b) Work.restore(b.work); return; } const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
+  $('#banners').addEventListener('click', e => { const g = e.target.closest('[data-banner-go]'); if (g) { const b = S.banners.find(x => x.id === g.dataset.bannerGo); if (b && b.go) { g.disabled = true; b.go.fn(); } return; } const w = e.target.closest('[data-banner-work]'); if (w) { const b = S.banners.find(x => x.id === 'work'); if (b) Work.restore(b.work); return; } const u = e.target.closest('[data-banner-url]'); if (u) api('/api/open-url', { url: u.dataset.bannerUrl }).catch(err => toast(esc(err.message))); });
   bindFilmSize();
   $('#top').addEventListener('click', e => { const b = e.target.closest('[data-module]'); if (b) setModule(b.dataset.module); });
   const onClick = async e => {
@@ -1373,7 +1438,7 @@ function bindModuleEvents() {
         else if (a === 'delete') Ord.del(); else if (a === 'team-photo') Ord.teamPhoto(oa.dataset.team); else if (a === 'team-rename') Ord.renameTeam(oa.dataset.team);
         else if (a === 'use-photo') { const p = S.byId.get(S.active); if (p && Ord.draft) { Ord.draft.image = stemOf(p.name); Ord.changed(true); } }
         else if (a === 'import') Ord.importWeb(); else if (a === 'prices') Ord.openPrices(); else if (a === 'select-photos') Ord.selectOrdered();
-        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off — <button class="toast-link" onclick="prefs.ordThumbs=true;savePrefs();Ord.render()">Turn back on</button>', 4000); } else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
+        else if (a === 'lab-crops') Ord.pickCrops(); else if (a === 'lab-build') Ord.buildLab(); else if (a === 'thumbs') { prefs.ordThumbs = !Ord.thumbs(); savePrefs(); Ord.render(); toast(Ord.thumbs() ? 'Photo thumbnails on' : 'Photo thumbnails off — <button class="toast-link" onclick="prefs.ordThumbs=true;savePrefs();Ord.render()">Turn back on</button>', 4000); } else if (a === 'backups') Ord.backups(); else if (a === 'env-missing') Ord.newOrder(+oa.dataset.n); else if (a === 'env-noname') { Ord.team = 'all'; renderLeft(); Ord.select(+oa.dataset.id).then(() => Ord.askName()); } else if (a === 'env-dup') { Ord.sort = { k: 'env', dir: 1 }; Ord.team = 'all'; renderLeft(); const o = Ord.d.orders.find(x => String(x.envelope).trim() === oa.dataset.n); if (o) Ord.select(o.id); } else if (a === 'pv') Ord.pvToggle(); else if (a === 'short-accept' && Ord.draft) { const d = Ord.draft, t = Ord.price(d.lines).total; d.accepted_cents = Math.max(0, t - (d.paid_cents || 0)); Ord.changed(true); Ord.askName(); toast(`Accepted ${fmt$(d.accepted_cents)} short — the envelope counts as paid`, 3000); } else if (a === 'short-undo' && Ord.draft) { Ord.draft.accepted_cents = 0; Ord.changed(true); } else if (a === 'change-given' && Ord.draft) { const d = Ord.draft; d.paid_cents = Ord.price(d.lines).total; Ord.changed(true); toast('Change given — recorded as paid in full', 2500); } else if (a === 'team-up' || a === 'team-down') Ord.moveTeam(oa.dataset.team, a === 'team-up' ? -1 : 1); else if (a === 'tot-full') { Ord.totFull = true; renderLeft(); } else if (a === 'summary') Ord.summary(); else if (a === 'extras') Ord.openExtras(); else if (a === 'wi-toggle') Ord.wiToggle(); else if (a === 'wi-reset') { Ord.wi = {}; Ord.wiPaint(); } else if (a === 'mer-build') Ord.buildMeridian(); else if (a === 'mer-preview') Ord.previewMeridian();
         else if (a === 'picks-only') Ord.setPicksOnly(!Ord.picksOnly());
         else if (a === 'cancel-team-pick') Ord.endTeamPick();
         else if (a === 'select-all') Ord.selectAllRows(); else if (a === 'clear-multi') Ord.clearMulti(); else if (a === 'bulk-apply') Ord.bulkApply();

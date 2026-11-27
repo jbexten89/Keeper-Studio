@@ -12,6 +12,7 @@ from . import meridian as M
 from . import reports as R
 from . import orders as O
 from . import paths
+from . import shootfile as SF
 from .orderbook import OrderBook
 
 book: OrderBook | None = None
@@ -46,6 +47,109 @@ def start() -> None:
     global book
     if book is None:
         book = OrderBook(paths.data_dir() / "orders.sqlite3", paths.data_dir() / "backups")
+
+
+def _open_book():
+    start()
+    return book
+
+
+def _close_book() -> None:
+    global book
+    if book is not None:
+        book.close()
+        book = None
+
+
+def on_app_close() -> None:
+    """The app is closing: save any pending folder files and back up the order book."""
+    try:
+        SF.writer.flush()
+        if book is not None:
+            SF.backup_now(book, "close")
+    except Exception:  # noqa: BLE001 - never block closing
+        pass
+
+
+# ------------------------------------------------ keeping orders safe (idea 5) --
+def r_backups(b):
+    return SF.list_backups()
+
+
+def r_backup_now(b):
+    return SF.backup_now(book, "manual")
+
+
+def r_backup_second(b):
+    folder = str(b.get("folder") or "").strip()
+    if folder and not Path(folder).is_dir():
+        raise FileNotFoundError(f"Folder not found: {folder}")
+    SF.save_settings({"second": folder})
+    return {**SF.list_backups(), **({"made": SF.backup_now(book, "manual")} if folder else {})}
+
+
+def r_backup_restore(b):
+    r = SF.restore(_open_book, _close_book, str(b.get("name") or ""))
+    return r
+
+
+def r_folder_link(b):
+    """Remember which photo folder a shoot's photos are in, and save its orders file there."""
+    sid, folder = int(b["shoot_id"]), str(b.get("folder") or "")
+    if folder and not Path(folder).is_dir():
+        raise FileNotFoundError(f"Folder not found: {folder}")
+    book.set_folder(sid, folder)
+    path = SF.write_folder_file(book, sid) if folder else None
+    return {"ok": True, "file": str(path) if path else ""}
+
+
+def r_folder_status(b):
+    return SF.folder_status(book, str(b.get("folder") or ""))
+
+
+def r_folder_import(b):
+    """Bring in the orders saved in a photo folder: a new shoot, or newer orders for one that's here."""
+    folder = str(b.get("folder") or "")
+    d = SF.read_folder_file(folder)
+    if not d:
+        raise FileNotFoundError("There's no orders file in that folder.")
+    st = SF.folder_status(book, folder)
+    if st.get("state") == "newer":
+        SF.backup_now(book, "manual")  # so the orders being replaced can be got back
+        sid = book.import_shoot(d, replace_sid=st["shoot_id"])
+    elif st.get("state") == "new":
+        sid = book.import_shoot(d)
+    else:
+        sid = st["shoot_id"]
+    book.set_folder(sid, folder)
+    return {"shoot_id": sid, "state": st.get("state")}
+
+
+_MUTATING = {"/api/orders/shoot/save", "/api/orders/save", "/api/orders/delete", "/api/orders/bulk", "/api/orders/bulk-pay",
+             "/api/orders/restore", "/api/orders/team-photo", "/api/orders/rename-team", "/api/orders/team-order",
+             "/api/orders/extra/save", "/api/orders/extra/delete", "/api/orders/extras-copy", "/api/orders/shipping",
+             "/api/orders/import-web"}
+
+
+def _after_change(fn):
+    """Note the change and save the shoot's folder file a few seconds later."""
+    def run(b):
+        out = fn(b)
+        try:
+            sid = (b or {}).get("shoot_id") or (out.get("shoot_id") if isinstance(out, dict) else None)
+            if not sid and isinstance(out, dict) and isinstance(out.get("shoot"), dict):  # shoot/save answers with the shoot
+                sid = out["shoot"].get("id")
+            if sid:
+                book.touch(int(sid))
+                SF.writer.touch(book, int(sid))
+            else:  # shoot not named (e.g. a delete by envelope id): refresh every linked shoot's file
+                for sh in book.shoots():
+                    if sh.get("folder"):
+                        SF.writer.touch(book, sh["id"])
+        except Exception:  # noqa: BLE001 - keeping the copy must never break saving
+            pass
+        return out
+    return run
 
 
 def _decorate(o: dict, cat: O.Catalog) -> dict:
@@ -487,5 +591,12 @@ ROUTES = {
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
     "/api/orders/report": r_report, "/api/orders/analysis": r_analysis,
     "/api/orders/extras": r_extras, "/api/orders/extra/save": r_extra_save, "/api/orders/extra/delete": r_extra_delete,
+    "/api/orders/backups": r_backups, "/api/orders/backup-now": r_backup_now, "/api/orders/backup-second": r_backup_second,
+    "/api/orders/backup-restore": r_backup_restore, "/api/orders/folder-link": r_folder_link,
+    "/api/orders/folder-status": r_folder_status, "/api/orders/folder-import": r_folder_import,
     "/api/orders/extras-copy": r_extras_copy, "/api/orders/invoice-pdf": r_invoice_pdf, "/api/orders/summary": r_summary, "/api/orders/summary-pdf": r_summary_pdf, "/api/orders/shipping": r_shipping, "/api/orders/meridian-settings": r_meridian_settings, "/api/orders/meridian-build": r_meridian_build, "/api/orders/meridian-report": r_meridian_report,
 }
+
+for _k in _MUTATING:
+    if _k in ROUTES:
+        ROUTES[_k] = _after_change(ROUTES[_k])

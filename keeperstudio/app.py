@@ -205,5 +205,10 @@ def main() -> int:
         import traceback
         server.dialogs = None
         return _open_in_browser(url, traceback.format_exc())
+    try:
+        from . import order_routes
+        order_routes.on_app_close()  # back up the order book and finish any folder orders files
+    except Exception:
+        pass
     httpd.shutdown()
     return 0
