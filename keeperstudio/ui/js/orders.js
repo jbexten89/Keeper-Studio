@@ -1233,12 +1233,15 @@ const Ord = {
     }
     const pr = this.price(d.lines);
     const pk = this.products('package').map(p => { const q = this.qty(p.id); return `<button class="pkg ${q ? 'on' : ''}" data-opkg="${p.id}" title="${esc(p.label)}: ${esc(p.summary)}\nClick to add or remove · Shift-click adds another · Right-click takes one off">${q > 1 ? `<span class="q">×${q}</span>` : ''}<b>${esc(p.letter)}</b><small>${p.price % 100 ? fmt$(p.price) : '$' + (p.price / 100)}</small></button>`; }).join('');
-    const notes = d.lines.map(l => this.prod(l.product_id)).filter(p => p && p.type === 'package').map(p => `<b>${esc(p.label)}</b> ${esc(p.summary)}`).join('<br>');
+    // Fixed two-line space: what the picked packages hold, so nothing below moves as packages are added.
+    const picked = this.products('package').filter(p => this.qty(p.id));
+    const noteTxt = picked.map(p => `${p.label}${this.qty(p.id) > 1 ? ` ×${this.qty(p.id)}` : ''}: ${p.summary}`).join('\n');
+    const notes = picked.map(p => `<b>${esc(p.label.replace(/^Package /, ''))}${this.qty(p.id) > 1 ? ` ×${this.qty(p.id)}` : ''}</b> ${esc(p.summary)}`).join(' · ');
     const qrow = p => { const q = this.qty(p.id); return `<div class="qrow ${q ? 'has' : ''}"><span class="nm" title="${esc(p.unit_label)}">${esc(p.short)}</span><span class="pr">${p.type === 'alacarte' && pr.hasPkg ? `<s>${fmt$(p.price)}</s>` : ''}${fmt$(this.unit(p, pr.hasPkg))}</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${q}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`; };
     const fld = (k, l, wide, extra = '') => `<label class="fld ${wide ? 'wide' : ''}"><span>${l}</span><input data-of="${k}" value="${esc(d[k])}" spellcheck="false" ${extra}></label>`;
     $('#right').innerHTML = `<div class="scroll ord-ed">
       ${sectionHTML('o-who', `Envelope<span class="save-state ${this.err ? 'err' : ''}">${esc(this.state)}</span>`, `<div class="of-grid who">${fld('envelope', 'Env #', false, 'title="Envelope number"')}${fld('team', 'Team', false, 'list="ordTeams"')}${(ask => fld('athlete', 'Athlete', false, `placeholder="${ask ? 'Who owes this?' : 'First and last name'}" ${ask ? 'class="ask"' : ''}`))(!String(d.athlete || '').trim() && this.draftOwes(d))}${fld('coach', 'Coach', false, 'list="ordCoaches"')}</div>`)}
-      ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div>${this.products('package').filter(p => this.qty(p.id) > 1).map(p => `<div class="qrow has pkg-qrow"><span class="nm">${esc(p.label)}</span><span class="pr">${fmt$(p.price)} each</span><span class="stepper"><button data-oqty="${p.id}" data-d="-1" title="One fewer">−</button><span>${this.qty(p.id)}</span><button data-oqty="${p.id}" data-d="1" title="One more">+</button></span></div>`).join('')}<div class="pkg-note">${notes || 'No package — a la carte is full price.'}</div>`)}
+      ${sectionHTML('o-pkg', 'Packages', `<div class="pkgs">${pk}</div><div class="pkg-note fixed" title="${esc(noteTxt || 'Click a package to add it · Shift-click adds another · Right-click takes one off')}">${notes || 'No package: a la carte is full price. Shift-click adds another, right-click takes one off.'}</div>`)}
       ${sectionHTML('o-ac', 'A la carte', this.products('alacarte').map(qrow).join(''))}
       ${sectionHTML('o-misc', 'Keepsakes', this.products('misc').map(qrow).join(''))}
       ${sectionHTML('o-photo', 'Photo', this.photoHTML(d))}

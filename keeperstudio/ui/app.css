@@ -872,3 +872,4 @@ textarea:focus{border-color:var(--accent)}
 .otbl.tot-only tfoot td{position:static;border-top:0;overflow:hidden;text-overflow:ellipsis}
 .otbl.tot-only td.o-thc{height:auto}
 .otbl tfoot.ghost{visibility:collapse}.otbl tfoot.ghost td{position:static;padding-top:0;padding-bottom:0;border:0}
+.ord-ed .pkg-note.fixed{height:calc(2 * 1.35em + 8px);line-height:1.35;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;padding:2px 12px 0;margin-bottom:6px}
