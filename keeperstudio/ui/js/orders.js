@@ -1586,7 +1586,7 @@ function bindModuleEvents() {
       else if (a === 'adj-apply') Crop.applyAdjust(); else if (a === 'adj-cancel') Crop.cancelAdjust();
       else if (a === 'overlay') { Crop.overlay = !Crop.overlay; Crop.render(); Crop.modbar(); }
       else if (a === 'tunables') Crop.tunables();
-      else if (a === 'rot-') Crop.nudge(-0.1); else if (a === 'rot+') Crop.nudge(0.1); else if (a === 'rot0') Crop.setRotation(0); else if (a === 'rot-apply') Crop.applyStraight(); else if (a === 'rot-cancel') Crop.cancelStraight(); else if (a === 'sheets') Crop.showSheets();
+      else if (a === 'rot-') Crop.nudge(-0.1); else if (a === 'rot+') Crop.nudge(0.1); else if (a === 'rot0') Crop.setRotation(0); else if (a === 'gridlock') { Crop.gridLock = !Crop.gridLock; Crop.syncGrid(); } else if (a === 'rot-apply') Crop.applyStraight(); else if (a === 'rot-cancel') Crop.cancelStraight(); else if (a === 'sheets') Crop.showSheets();
       else if (a === 'open-out') reveal(Crop.result ? Crop.result.out_dir : Crop.outDir);
       else if (a === 'out-change') { const p = await pickPath('folder', { initial: Crop.outDir || S.root || '' }); if (p) Crop.setOut(p, true); }
       else if (a === 'out-default') Crop.setOut(S.root ? `${S.root}_out` : '', false);

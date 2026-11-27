@@ -132,7 +132,7 @@ const Crop = {
   /* ---------- center ---------- */
   center() {
     const v = $('#modView');
-    { const ap = this.active(); if (this.live != null && this.livePath && (!ap || ap.path !== this.livePath)) { this.live = null; this.livePath = null; const g = $('#cropGrid'); if (g) g.hidden = true; toast('Straightening not applied - press Apply (or Enter) before moving on', 3500); } }
+    { const ap = this.active(); if (this.live != null && this.livePath && (!ap || ap.path !== this.livePath)) { this.live = null; this.livePath = null; this.syncGrid(); toast('Straightening not applied - press Apply (or Enter) before moving on', 3500); } }
     if (v.dataset.mod !== 'crop') {
       v.dataset.mod = 'crop';
       v.innerHTML = `<div class="crop-stage" id="cropStage">
@@ -235,8 +235,15 @@ const Crop = {
     const d = deg - (this.rotations.get(p.path) || 0), a = Math.abs(d) * Math.PI / 180;
     const k = Math.cos(a) + Math.sin(a) * Math.max(this.W / this.H, this.H / this.W);
     $('#cropImg').style.transform = `rotate(${d}deg) scale(${k})`;
-    $('#cropCanvas').classList.add('rotating'); $('#cropGrid').hidden = false;
+    $('#cropCanvas').classList.add('rotating'); this.syncGrid();
     const v = $('#rotVal'); if (v) v.textContent = `${deg > 0 ? '+' : ''}${(+deg).toFixed(1)}°`;
+  },
+  // The grid shows while straightening, while the grid button is hovered or G is held,
+  // and stays on while the grid button is locked (clicked).
+  gridLock: false, gridPeek: false, gridKey: false,
+  syncGrid() {
+    const g = $('#cropGrid'); if (g) g.hidden = !(this.live != null || this.gridLock || this.gridPeek || this.gridKey);
+    const b = $('#gridBtn'); if (b) { b.classList.toggle('on', this.gridLock); b.classList.toggle('peek', !this.gridLock && (this.gridPeek || this.gridKey)); }
   },
   paintStraight() {
     const p = this.active(), box = $('#straightAct'); if (!box || !p) return;
@@ -246,7 +253,7 @@ const Crop = {
   },
   cancelStraight() {
     const p = this.active(); this.live = null; this.livePath = null; clearTimeout(this._rt);
-    $('#cropImg').style.transform = ''; $('#cropCanvas').classList.remove('rotating'); $('#cropGrid').hidden = true;
+    $('#cropImg').style.transform = ''; $('#cropCanvas').classList.remove('rotating'); this.syncGrid();
     this.render();
   },
   applyStraight() { const p = this.active(); if (p && this.live != null && this.livePath === p.path) this.setRotation(this.live); },
@@ -260,7 +267,7 @@ const Crop = {
       this.manual.delete(p.path); DB.del('manual', p.path).catch(() => {});
       toast('Straightened - the hand-placed framing was reset, so place it again if needed', 3500);
     }
-    this.live = null; $('#cropGrid').hidden = true;
+    this.live = null; this.syncGrid();
     this.plans.delete(p.path); this.status.delete(p.path);
     this.render(); this.ensurePlan(p);
   },
@@ -484,7 +491,7 @@ const Crop = {
     const nOn = this.sizes.filter(z => !off.has(z.name)).length, allOn = nOn === this.sizes.length;
     const master = `<div class="size-row master"><button class="chk ${allOn ? 'on' : nOn ? 'some' : ''}" data-sizeall="${allOn ? 'off' : 'on'}" title="${allOn ? 'Turn every size off' : 'Turn every size on'}"></button><span class="sz-name">All sizes</span><span class="sz-dim">${nOn} of ${this.sizes.length} on</span></div>`;
     const rot = p ? (this.live ?? this.rotations.get(p.path) ?? 0) : 0;
-    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
+    const straight = p && plan && !plan.error ? `<div class="straight compact" title="Drag to level the photo — a grid appears to line up walls and the floor. [ ] nudge 0.1°, with Shift 1°."><button class="btn sm icon" data-crop="rot-" title="−0.1°  ( [ )">−</button><input type="range" min="-10" max="10" step="0.1" value="${rot}" data-straight><button class="btn sm icon" data-crop="rot+" title="+0.1°  ( ] )">+</button><button class="btn sm icon grid-btn" id="gridBtn" data-crop="gridlock" title="Hover (or hold G) to see the grid - click to keep it on"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="1" y="1" width="12" height="12" rx="1.5"/><path d="M5 1v12M9 1v12M1 5h12M1 9h12"/></svg></button><b id="rotVal" ${rot ? 'data-crop="rot0" title="Click to reset to 0°" class="resettable"' : ''}>${rot > 0 ? '+' : ''}${(+rot).toFixed(1)}°</b></div>
       <div class="straight-act" id="straightAct" hidden><span class="sa-txt"></span><button class="btn sm primary" data-crop="rot-apply" title="Save this angle and re-check the framing (Enter)">Apply</button><button class="btn sm" data-crop="rot-cancel" title="Put it back (Esc)">Cancel</button></div>` : '<div class="hint">Select a photo to straighten it.</div>';
     if (p) {
       const own = this.styleOf(p.path), nSel = S.selected.size > 1 && S.selected.has(p.id) ? S.selected.size : 1;
@@ -498,6 +505,9 @@ const Crop = {
       ;
     R.innerHTML = `<div class="scroll">${html}</div>`;
     this.paintStraight();
+    const gb = $('#gridBtn');
+    if (gb) { gb.onmouseenter = () => { this.gridPeek = true; this.syncGrid(); }; gb.onmouseleave = () => { this.gridPeek = false; this.syncGrid(); }; }
+    this.syncGrid();
   },
   modbar() {
     const p = this.active(); const m = p && this.manual.has(p.path);
@@ -626,6 +636,14 @@ const Crop = {
     if (this.live != null && this.livePath && this.active() && this.livePath === this.active().path) {
       if (e.key === 'Enter') { this.applyStraight(); return true; }
       if (e.key === 'Escape') { this.cancelStraight(); return true; }
+    }
+    if (k === 'g' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (!this.gridKey) {
+        this.gridKey = true; this.syncGrid();
+        const up = ev => { if ((ev.key || '').toLowerCase() === 'g' || ev.type === 'blur') { this.gridKey = false; this.syncGrid(); window.removeEventListener('keyup', up); window.removeEventListener('blur', up); } };
+        window.addEventListener('keyup', up); window.addEventListener('blur', up);
+      }
+      return true;
     }
     if (e.key === '[' || e.key === '{') { this.nudge(e.shiftKey ? -1 : -0.1); return true; }
     if (e.key === ']' || e.key === '}') { this.nudge(e.shiftKey ? 1 : 0.1); return true; }

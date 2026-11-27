@@ -915,3 +915,8 @@ textarea:focus{border-color:var(--accent)}
 /* checked before under other settings: last result shown while it re-checks */
 .status-card.rechecking-old .sc-label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px}
 .status-card.rechecking-old .sc-label .spin-dot{width:10px;height:10px}
+
+/* grid button in Straighten: hover / hold G peeks, click locks */
+.grid-btn{margin-left:2px}
+.grid-btn.peek{border-color:var(--accent);color:var(--accent)}
+.grid-btn.on{border-color:var(--accent);color:var(--accent);background:rgba(46,155,255,.16)}
