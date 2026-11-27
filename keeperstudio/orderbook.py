@@ -105,6 +105,8 @@ class OrderBook:
             self._db.execute("ALTER TABLE shoots ADD COLUMN uid TEXT NOT NULL DEFAULT ''")
         if "folder" not in cols:  # the shoot's photo folder, where its orders file is kept
             self._db.execute("ALTER TABLE shoots ADD COLUMN folder TEXT NOT NULL DEFAULT ''")
+        if "team_list" not in cols:  # the shoot's teams with their coaches, carried from last year: JSON, '' = not filled in yet
+            self._db.execute("ALTER TABLE shoots ADD COLUMN team_list TEXT NOT NULL DEFAULT ''")
         if "hours" not in cols:  # time spent on the shoot, by part: {"shoot": 3.5, "edit": 6, ...} (JSON)
             self._db.execute("ALTER TABLE shoots ADD COLUMN hours TEXT NOT NULL DEFAULT ''")
         if "changed" not in cols:  # last time anything in the shoot changed
@@ -152,7 +154,7 @@ class OrderBook:
             self._db.execute("UPDATE shoots SET folder=? WHERE id=?", (str(folder or ""), int(sid)))
             self._db.commit()
 
-    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed", "hours")
+    SHOOT_KEYS = ("name", "date", "season", "notes", "archived", "shipping_cents", "prepaid", "team_order", "created", "uid", "changed", "hours", "team_list")
 
     HOUR_PARTS = ("shoot", "edit", "lab", "delivery")
 
@@ -327,6 +329,103 @@ class OrderBook:
                 out.append(t)
         return out
 
+    # ---------------------------------------------------------- team list --
+    # A shoot's teams, with their coaches: "Winter Sports 2026" starts with every
+    # team of the last "Winter Sports" shoot, so the Team box is a pick list. A
+    # team with no envelope or group photo yet can be taken off for the year.
+    @staticmethod
+    def league(name: str) -> str:
+        import re
+        n = re.sub(r"\b(19|20)\d\d\b", "", str(name or "").lower())
+        return re.sub(r"[^a-z]+", " ", n).strip()
+
+    def _raw(self, sid: int, col: str, default):
+        r = self._db.execute(f"SELECT {col} FROM shoots WHERE id=?", (int(sid),)).fetchone()
+        try:
+            return json.loads(r[col]) if r and r[col] else default
+        except ValueError:
+            return default
+
+    def _coaches(self, sid: int) -> dict[str, str]:
+        """The coach most envelopes name, for each team of a shoot."""
+        out, best = {}, {}
+        for x in self._db.execute("SELECT team, coach, COUNT(*) n FROM orders WHERE shoot_id=? AND team<>'' AND coach<>'' "
+                                  "GROUP BY team, coach", (int(sid),)).fetchall():
+            if x["n"] > best.get(x["team"], 0):
+                best[x["team"]], out[x["team"]] = x["n"], x["coach"]
+        return out
+
+    def team_list(self, sid: int) -> list[dict]:
+        """[{name, coach}] in the arranged order: the planned teams and every team in use."""
+        self.seed_teams(sid)
+        with self._lock:
+            planned = self._raw(sid, "team_list", [])
+            saved = self._raw(sid, "team_order", [])
+            coach = self._coaches(sid)
+        live = self.team_order(sid)
+        names = []
+        for n in saved + live + [t["name"] for t in planned]:
+            if n not in names and (n in live or any(t["name"] == n for t in planned)):
+                names.append(n)
+        pc = {t["name"]: t.get("coach", "") for t in planned}
+        return [{"name": n, "coach": coach.get(n) or pc.get(n, ""), "live": n in live} for n in names]
+
+    def seed_teams(self, sid: int) -> None:
+        """Once per shoot: start its team list from the last shoot of the same league."""
+        with self._lock:
+            r = self._db.execute("SELECT id, name, date, created, team_list FROM shoots WHERE id=?", (int(sid),)).fetchone()
+            if not r or r["team_list"]:
+                return
+            key, prev = self.league(r["name"]), None
+            if key:
+                for x in self._db.execute("SELECT id, name, date, created FROM shoots WHERE id<>?", (int(sid),)).fetchall():
+                    if self.league(x["name"]) != key:
+                        continue
+                    earlier = x["date"] < r["date"] if (x["date"] and r["date"]) else x["created"] < r["created"]
+                    if earlier and (prev is None or (x["date"] or "", x["created"]) > (prev["date"] or "", prev["created"])):
+                        prev = x
+        teams = []
+        if prev is not None:
+            with self._lock:
+                pl = self._raw(prev["id"], "team_list", [])
+                pc = self._coaches(prev["id"])
+            names = [t["name"] for t in pl] if pl else self.team_order(prev["id"])
+            byname = {t["name"]: t.get("coach", "") for t in pl}
+            teams = [{"name": n, "coach": pc.get(n) or byname.get(n, "")} for n in names]
+        with self._lock:
+            self._db.execute("UPDATE shoots SET team_list=? WHERE id=?", (json.dumps(teams), int(sid)))
+            if teams and not self._raw(sid, "team_order", []):
+                self._db.execute("UPDATE shoots SET team_order=? WHERE id=?", (json.dumps([t["name"] for t in teams]), int(sid)))
+            self._db.commit()
+
+    def plan_team(self, sid: int, name: str, coach: str = "") -> None:
+        """A team typed on an envelope joins the shoot's list (and next year's)."""
+        name, coach = str(name or "").strip(), str(coach or "").strip()
+        if not name:
+            return
+        self.seed_teams(sid)
+        with self._lock:
+            pl = self._raw(sid, "team_list", [])
+            t = next((x for x in pl if x["name"] == name), None)
+            if t is None:
+                pl.append({"name": name, "coach": coach})
+            elif coach and t.get("coach") != coach:
+                t["coach"] = coach
+            else:
+                return
+            self._db.execute("UPDATE shoots SET team_list=? WHERE id=?", (json.dumps(pl), int(sid)))
+            self._db.commit()
+
+    def drop_team(self, sid: int, name: str) -> None:
+        """Take a team off this shoot's list: only one with no envelope and no group photo."""
+        if name in self.team_order(sid):
+            raise ValueError(f"{name} has envelopes or a group photo, so it stays.")
+        with self._lock:
+            pl = [t for t in self._raw(sid, "team_list", []) if t["name"] != name]
+            so = [n for n in self._raw(sid, "team_order", []) if n != name]
+            self._db.execute("UPDATE shoots SET team_list=?, team_order=? WHERE id=?", (json.dumps(pl), json.dumps(so), int(sid)))
+            self._db.commit()
+
     def set_team_order(self, sid: int, names: list[str]) -> list[str]:
         clean = []
         for n in names or []:
@@ -497,6 +596,14 @@ class OrderBook:
                     tord = [new if t == old else t for t in tord]
                     self._db.execute("UPDATE shoots SET team_order=? WHERE id=?",
                                      (json.dumps(list(dict.fromkeys(tord))), int(sid)))
+            pl = self._raw(sid, "team_list", [])
+            if any(t["name"] == old for t in pl):
+                merged = []
+                for t in pl:
+                    t = {**t, "name": new} if t["name"] == old else t
+                    if not any(m["name"] == t["name"] for m in merged):
+                        merged.append(t)
+                self._db.execute("UPDATE shoots SET team_list=? WHERE id=?", (json.dumps(merged), int(sid)))
             for r in self._db.execute("SELECT id, items FROM extra_orders WHERE shoot_id=?", (int(sid),)).fetchall():
                 items, hit = json.loads(r["items"] or "[]"), False
                 for it in items:

@@ -147,6 +147,12 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   team in the Teams list, or use its ↑ ↓, to rearrange; A–Z sorts them. That
   order is used everywhere: the envelope list, lab and Meridian orders, the
   pull sheet, the shoot summary and Analysis.
+* **Team list:** a new shoot starts with every team (and its coach) from the
+  last shoot of the same name - "Winter Sports 2026" from "Winter Sports
+  2025" - in the same order, so the Team box is a pick list and picking a team
+  fills in its coach. Those teams show dimmed ("From last year · no envelopes
+  yet") until an envelope uses them; ✕ takes one off for the year. A team
+  typed that isn't on the list is added to it, and carries to next year.
 * **School & other orders…** (under Totals) are prints that aren't on any
   envelope: for the school, the park, teachers or a sponsor. Each item is a
   size (4x6 to 16x20) and a Meridian product (print, standout, canvas, metal…)

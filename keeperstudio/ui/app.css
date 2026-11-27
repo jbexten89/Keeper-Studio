@@ -951,3 +951,7 @@ textarea:focus{border-color:var(--accent)}
 .other-send summary span{color:var(--muted);font-size:12px;margin-left:8px}
 .os-body{padding:0 12px 12px}.os-body p{margin:0 0 8px;color:var(--muted);font-size:12px}
 .os-row{display:flex;align-items:center;gap:16px}
+
+/* Teams carried from last year with no envelopes yet */
+.row.planned .lbl{color:var(--muted)}
+.row.planned .cnt{opacity:.45}

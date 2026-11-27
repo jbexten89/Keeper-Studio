@@ -129,7 +129,7 @@ def r_folder_import(b):
 _MUTATING = {"/api/orders/shoot/save", "/api/orders/save", "/api/orders/delete", "/api/orders/bulk", "/api/orders/bulk-pay",
              "/api/orders/restore", "/api/orders/team-photo", "/api/orders/rename-team", "/api/orders/team-order",
              "/api/orders/extra/save", "/api/orders/extra/delete", "/api/orders/extras-copy", "/api/orders/shipping",
-             "/api/orders/import-web", "/api/orders/shoot-hours"}
+             "/api/orders/import-web", "/api/orders/shoot-hours", "/api/orders/team-drop"}
 
 
 def _after_change(fn):
@@ -208,11 +208,12 @@ def r_list(b):
     paid += ex["paid_cents"]
     lab += ex["lab_cents"]
     keep = total - lab - ship
-    teams = book.team_order(sid)
+    teams = book.team_list(sid)
     return {
         "orders": rows, "next_envelope": book.next_envelope(sid),
-        "teams": [{"name": t, "image": (photos.get(t) or {}).get("image", ""),
-                   "count": sum(1 for o in rows if o["team"] == t)} for t in teams],
+        # every team on the shoot's list: in use, or carried from last year and not used yet ("planned")
+        "teams": [{"name": t["name"], "image": (photos.get(t["name"]) or {}).get("image", ""), "coach": t["coach"],
+                   "planned": not t["live"], "count": sum(1 for o in rows if o["team"] == t["name"])} for t in teams],
         "coaches": sorted({o["coach"] for o in rows if o["coach"]}, key=str.lower),
         "totals": {"orders": len(rows), "family_cents": fam_total, "extras": ex, "total_cents": total, "paid_cents": paid, "due_cents": total - paid,
                    "change_cents": sum(o["summary"].get("change_cents", 0) for o in rows),
@@ -226,6 +227,11 @@ def r_list(b):
                    "no_photo": sum(1 for o in rows if not (o["image"] or o["edited"]) and o["lines"]),
                    "glasses": sum(1 for o in rows if o["glasses"])},
     }
+
+
+def r_team_drop(b):
+    book.drop_team(int(b["shoot_id"]), str(b.get("team") or ""))
+    return {"ok": True}
 
 
 def r_team_order(b):
@@ -246,11 +252,16 @@ def r_shipping(b):
 def r_save(b):
     sid = int(b["shoot_id"])
     o = book.save_order(sid, b.get("order") or {})
+    book.plan_team(sid, o.get("team"), o.get("coach"))
     return {"order": _decorate(o, catalog())}
 
 
 def r_bulk(b):
-    return {"changed": book.bulk_update(int(b["shoot_id"]), b.get("ids") or [], b.get("fields") or {})}
+    f = b.get("fields") or {}
+    n = book.bulk_update(int(b["shoot_id"]), b.get("ids") or [], f)
+    if f.get("team"):
+        book.plan_team(int(b["shoot_id"]), f["team"], f.get("coach", ""))
+    return {"changed": n}
 
 
 def r_bulk_pay(b):
@@ -624,7 +635,7 @@ ROUTES = {
     "/api/orders/shoot/save": r_shoot_save, "/api/orders/shoot/delete": r_shoot_delete,
     "/api/orders/list": r_list, "/api/orders/save": r_save, "/api/orders/delete": r_delete, "/api/orders/bulk": r_bulk, "/api/orders/bulk-pay": r_bulk_pay,
     "/api/orders/restore": r_restore, "/api/orders/team-photo": r_team_photo,
-    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/price": r_price,
+    "/api/orders/rename-team": r_rename_team, "/api/orders/team-order": r_team_order, "/api/orders/team-drop": r_team_drop, "/api/orders/price": r_price,
     "/api/orders/export": r_export, "/api/orders/export-name": r_export_name,
     "/api/orders/crop-list": r_crop_list, "/api/orders/lab-plan": r_lab_plan, "/api/orders/lab-build": r_lab_build,
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
