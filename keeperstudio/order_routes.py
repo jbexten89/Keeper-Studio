@@ -443,9 +443,11 @@ def _export_text(b) -> str:
     return EXPORTS[kind][1](rows, catalog(), _team_photos(sid))
 
 
-def _report_titles(b) -> tuple[str, str]:
+def _report_titles(b, what: str = "") -> tuple[str, str]:
+    """(title, subtitle): the shoot's name is the title, since that's what tells reports
+    apart; the subtitle says which report, the date, and the team when it's one team."""
     s = next((x for x in book.shoots() if x["id"] == int(b["shoot_id"])), {})
-    bits = [s.get("name") or "Shoot"]
+    bits = [what or R.TITLES.get(b.get("kind"), "Report")]
     if s.get("date"):
         try:
             import datetime as dt
@@ -454,7 +456,7 @@ def _report_titles(b) -> tuple[str, str]:
             bits.append(s["date"])
     if b.get("team"):
         bits.append(f"{b['team']} only")
-    return R.TITLES[b["kind"]], " · ".join(bits)
+    return s.get("name") or "Shoot", " · ".join(bits)
 
 
 def _summary(b) -> dict:
@@ -462,11 +464,12 @@ def _summary(b) -> dict:
     cat = catalog()
     shoot = next((x for x in book.shoots() if x["id"] == sid), {})
     orders = [_decorate(o, cat) for o in book.orders(sid)]
-    _, sub = _report_titles({"shoot_id": sid, "kind": "pull"})
-    if shoot.get("season"):
-        sub += f" · {shoot['season']}"
+    title, sub = _report_titles({"shoot_id": sid}, "Shoot summary")
+    season = str(shoot.get("season") or "").strip()
+    if season and season not in f"{title} {sub}":  # "2026" is already in the date
+        sub += f" · {season}"
     extras = [{**e, "summary": X.summary(e, _team_photos(sid)), "who": X.who(e)} for e in book.extras(sid)]
-    return {"title": "Shoot summary", "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot, extras)}
+    return {"title": title, "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot, extras)}
 
 
 def r_summary(b):
