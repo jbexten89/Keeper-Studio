@@ -771,9 +771,9 @@ const Ord = {
     const body = R.rows.map(r => r.kind === 'group' ? `<tr class="grp"><td colspan="${R.head.length}">${esc(r.label)}</td></tr>`
       : `<tr class="${r.kind === 'total' ? 'tot' : ''}">${r.cells.map((c, i) => `<td class="${cls(R.align[i])}">${esc(c)}</td>`).join('')}</tr>`).join('');
     const n = R.rows.filter(r => r.kind === 'row').length;
-    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)} · ${plural(n, 'row')}${note ? ' · ' + note : ''}</div></div>
+    openModal(`<div class="rep-head"><div class="muted small">${plural(n, 'row')}${note ? ' · ' + note : ''}</div>
         <div class="m-actions" style="margin:0">${buttons}</div></div>
-      <div class="rep-paper">${n ? `<table class="rep"><thead><tr>${R.head.map((h, i) => `<th class="${cls(R.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>` : '<p class="muted">Nothing to show yet.</p>'}</div>`,
+      <div class="rep-paper"><div class="rep-page wide">${repTitle(R)}${n ? `<table class="rep"><thead><tr>${R.head.map((h, i) => `<th class="${cls(R.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table>` : '<p class="rep-none">Nothing to show yet.</p>'}</div></div>`,
       card => {
         card.classList.add('report');
         card.addEventListener('click', e => { const b = e.target.closest('[data-rep]'); if (b) onAction(b); });
@@ -856,9 +856,9 @@ const Ord = {
     let R; try { R = await api('/api/orders/summary', { shoot_id: this.sid }); } catch (e) { return toast(esc(e.message)); }
     const cls = a => a === 'money' ? 'r' : a === 'num' ? 'c' : '';
     const table = t => `<table class="rep" style="${t.head.length <= 3 ? 'width:auto;min-width:360px' : ''}"><thead><tr>${t.head.map((h, i) => `<th class="${cls(t.align[i])}">${esc(h)}</th>`).join('')}</tr></thead><tbody>${t.rows.map(r => `<tr class="${r.kind === 'total' ? 'tot' : ''}">${r.cells.map((c, i) => `<td class="${cls(t.align[i])}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-    openModal(`<div class="rep-head"><div><h3>${esc(R.title)}</h3><div class="muted small">${esc(R.subtitle)}</div></div>
+    openModal(`<div class="rep-head"><div class="muted small">Same as the PDF</div>
         <div class="m-actions" style="margin:0"><button class="btn" data-close>Close</button><button class="btn primary" data-sum-pdf>Save PDF…</button></div></div>
-      <div class="rep-paper">${R.sections.map(sec => `<h4 class="rep-h">${esc(sec.heading)}</h4>${table(sec)}`).join('')}</div>`, card => {
+      <div class="rep-paper"><div class="rep-page">${repTitle(R)}${R.sections.map(sec => `<h4 class="rep-h">${esc(sec.heading)}</h4>${table(sec)}`).join('')}</div></div>`, card => {
       card.classList.add('report');
       $('[data-sum-pdf]', card).addEventListener('click', async () => {
         const s = this.shoot();
@@ -1758,6 +1758,9 @@ const Ord = {
 window.KS_ordUndo = () => Ord.undoDelete();
 
 /* ---------- module UI events ---------- */
+// The report's heading as the PDF prints it: shoot name big, report and date underneath.
+function repTitle(R) { return `<div class="rep-title"><div class="rep-t">${esc(R.title)}</div><div class="rep-s">${esc(R.subtitle)}</div></div>`; }
+
 // A newer release on GitHub? Shown once per launch as a blue banner; ✕ means "later".
 async function checkForUpdate() {
   try {

@@ -456,7 +456,14 @@ def _report_titles(b, what: str = "") -> tuple[str, str]:
             bits.append(s["date"])
     if b.get("team"):
         bits.append(f"{b['team']} only")
-    return s.get("name") or "Shoot", " · ".join(bits)
+    return _shoot_title(s), " · ".join(bits)
+
+
+def _shoot_title(s: dict) -> str:
+    """"Winter Sports 2026": the name, with the season's year when the name doesn't have it."""
+    name = s.get("name") or "Shoot"
+    season = str(s.get("season") or "").strip()
+    return f"{name} {season}" if season and season not in name else name
 
 
 def _summary(b) -> dict:
@@ -465,9 +472,6 @@ def _summary(b) -> dict:
     shoot = next((x for x in book.shoots() if x["id"] == sid), {})
     orders = [_decorate(o, cat) for o in book.orders(sid)]
     title, sub = _report_titles({"shoot_id": sid}, "Shoot summary")
-    season = str(shoot.get("season") or "").strip()
-    if season and season not in f"{title} {sub}":  # "2026" is already in the date
-        sub += f" · {season}"
     extras = [{**e, "summary": X.summary(e, _team_photos(sid)), "who": X.who(e)} for e in book.extras(sid)]
     return {"title": title, "subtitle": sub, "sections": R.shoot_summary(orders, cat, shoot, extras)}
 

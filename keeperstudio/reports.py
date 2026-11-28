@@ -35,6 +35,11 @@ def table(csv_text: str, kind: str) -> dict:
         align.append("money" if vals and all(MONEY.match(v) for v in vals)
                      else "num" if vals and all(INT.match(v) for v in vals) else "text")
     team_col = head.index("Team") if "Team" in head and kind in GROUP_BY_TEAM else None
+    if team_col is not None:  # one block per team, even when the CSV lists team photos before athletes
+        first = {}
+        for r in data:
+            first.setdefault(r[team_col], len(first))
+        data = sorted(data, key=lambda r: first[r[team_col]])
     out, last = [], object()
     for r in data:
         if team_col is not None and r[team_col] != last:

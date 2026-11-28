@@ -279,14 +279,18 @@ body.lights2 #viewport{background:#000}
 .modal-card h3{margin:0 0 16px;font-weight:700;font-size:16px}
 .modal-card.report{width:min(1500px,96vw);max-height:92vh;display:flex;flex-direction:column}
 .rep-head{display:flex;align-items:flex-start;gap:16px;justify-content:space-between;margin:0 0 12px}.rep-head h3{margin:0 0 2px}
-.rep-paper{background:#fff;color:#1b1e24;border-radius:4px;padding:14px 16px;overflow:auto;flex:1;min-height:120px}
+.rep-paper{background:#2a2d33;border-radius:4px;padding:18px;overflow:auto;flex:1;min-height:120px}
+.rep-page{background:#fff;color:#1b1e24;font-family:Helvetica,Arial,sans-serif;max-width:880px;margin:0 auto;padding:36px 44px 44px;box-shadow:0 4px 18px rgba(0,0,0,.45);min-height:100%}
+.rep-page.wide{max-width:1180px}
+.rep-title{margin:0 0 14px}.rep-t{font-size:22px;font-weight:700;line-height:1.2;color:#000}.rep-s{font-size:13px;color:#555B66;margin-top:2px}
+.rep-none{color:#555B66}
 table.rep{border-collapse:collapse;width:100%;font-size:12px;font-variant-numeric:tabular-nums}
-table.rep th{position:sticky;top:-14px;background:#E6E8EC;border-bottom:1.5px solid #555B66;text-align:left;padding:5px 6px;font-weight:600;white-space:nowrap}
+table.rep th{position:sticky;top:-18px;background:#E6E8EC;border-bottom:1.5px solid #555B66;text-align:left;padding:5px 6px;font-weight:600;white-space:nowrap}
 table.rep td{padding:4px 6px;border-bottom:1px solid #E1E4E9;vertical-align:top}
 table.rep tbody tr:nth-child(even):not(.grp):not(.tot) td{background:#FAFAFB}
 table.rep .r{text-align:right}table.rep .c{text-align:center}
 table.rep tr.grp td{background:#F1F3F6;font-weight:700;border-top:1px solid #9AA0AA;padding-top:7px}
-h4.rep-h{margin:18px 0 6px;font-size:14px;font-weight:600;color:#1b1e24}h4.rep-h:first-child{margin-top:0}
+h4.rep-h{margin:22px 0 6px;font-size:15px;font-weight:700;color:#000}
 table.rep tr.tot td{font-weight:700;border-top:1.5px solid #000;background:#E6E8EC}
 .fld{display:flex;flex-direction:column;gap:7px;margin:0 0 15px}
 .fld>span{font-variant:all-small-caps;letter-spacing:.08em;font-size:14px;color:var(--muted)}
