@@ -460,10 +460,7 @@ def _report_titles(b, what: str = "") -> tuple[str, str]:
 
 
 def _shoot_title(s: dict) -> str:
-    """"Winter Sports 2026": the name, with the season's year when the name doesn't have it."""
-    name = s.get("name") or "Shoot"
-    season = str(s.get("season") or "").strip()
-    return f"{name} {season}" if season and season not in name else name
+    return R.shoot_title(s) or "Shoot"
 
 
 def _summary(b) -> dict:

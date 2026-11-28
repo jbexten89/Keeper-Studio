@@ -20,6 +20,13 @@ INT = re.compile(r"^\d+$")
 GROUP_BY_TEAM = {"pull", "crop", "items"}
 
 
+def shoot_title(s: dict) -> str:
+    """"Winter Sports 2026": the name, with the season's year when the name doesn't have it."""
+    name = (s or {}).get("name") or ""
+    season = str((s or {}).get("season") or "").strip()
+    return f"{name} {season}" if name and season and season not in name else name
+
+
 def table(csv_text: str, kind: str) -> dict:
     """The CSV as a table: head, typed rows (row / group / total) and column alignment."""
     rows = list(csv.reader(io.StringIO(csv_text.lstrip("﻿"))))
@@ -341,7 +348,7 @@ def invoice_pdf(order: dict, summary: dict, shoot: dict, path: Path) -> Path:
         day = dt.date.fromisoformat(day).strftime("%B %d, %Y").replace(" 0", " ")
     except ValueError:
         pass
-    shoot_bits = " · ".join(b for b in [shoot.get("name") or "", day] if b)
+    shoot_bits = " · ".join(b for b in [shoot_title(shoot), day] if b)
     story = [Table([[P("Jamie Bexten Photography", f="Helvetica-Bold", s=15), P("INVOICE", f="Helvetica-Bold", s=18, a=TA_RIGHT)],
                     [P("Bryan, Ohio", c="#555B66"), P(f"No. {shoot.get('id', 0)}-{order['id']}   ·   {today}", a=TA_RIGHT, c="#555B66")]],
                    colWidths=[3.9 * inch, 3.4 * inch]),
@@ -531,7 +538,7 @@ def matching_pdf(shoot: dict, orders: list[dict], catalog, extras: list[dict], t
         envs = [str(o.get("envelope") or "") for o in rows]
         coach = next((o.get("coach") for o in rows if o.get("coach")), "")
         head_left = [P(team, f="Helvetica-Bold", s=20),
-                     P(" · ".join(x for x in [shoot.get("name") or "", f"Picture day {day}" if day else "", f"Coach {coach}" if coach else ""] if x), c="#555555", s=10),
+                     P(" · ".join(x for x in [shoot_title(shoot), f"Picture day {day}" if day else "", f"Coach {coach}" if coach else ""] if x), c="#555555", s=10),
                      Spacer(1, 6),
                      P(f"<b>{len(rows)} envelope{'s' if len(rows) != 1 else ''}</b> · #{escape(', #'.join(e for e in envs if e))}", raw=True, s=11),
                      P(("Team photo prints in envelopes " + ", ".join(team_envs)) if team_envs else "No team photo prints", s=9.5, c="#333333"),
@@ -569,7 +576,7 @@ def matching_pdf(shoot: dict, orders: list[dict], catalog, extras: list[dict], t
         story.append(PageBreak())
     if extras:
         story.append(P("School &amp; other orders", raw=True, f="Helvetica-Bold", s=20))
-        story.append(P(shoot.get("name") or "", c="#555555"))
+        story.append(P(shoot_title(shoot), c="#555555"))
         story.append(Spacer(1, 10))
         data = [[P(h, f="Helvetica-Bold", s=8, c="#666666") for h in ["", "FOR", "WHAT GOES IN IT"]]]
         for x in extras:
@@ -679,7 +686,7 @@ def envelopes_pdf(shoot: dict, orders: list[dict], catalog, find_photo, path: Pa
                 pass
         c.setFillColor(INK); c.setFont("Helvetica-Bold", 15); c.drawString(px, y - 24, stem or "No photo picked")
         c.setFont("Helvetica", 9.5)
-        c.drawString(px, y - 41, " · ".join(x for x in [f"Envelope {o.get('envelope') or '-'}", o.get("team") or "", shoot.get("name") or ""] if x))
+        c.drawString(px, y - 41, " · ".join(x for x in [f"Envelope {o.get('envelope') or '-'}", o.get("team") or "", shoot_title(shoot)] if x))
         c.setFont("Helvetica", 9.5); c.drawRightString(W - M, y - 24, f"Total {_money(s['total_cents'])}")
         how = paid_label(o, s)
         pay = f"Paid {how.lower()} {_money(s.get('handed_cents', s['paid_cents']))}" if s.get("handed_cents") or s["paid_cents"] else how
