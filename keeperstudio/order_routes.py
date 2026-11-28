@@ -698,8 +698,47 @@ def r_envelopes_pdf(b):
     find, found = _photo_finder(str(b.get("folder") or sh.get("folder") or ""))
     ids = {int(i) for i in b.get("ids") or []}
     rows = [o for o in book.orders(sid) if not ids or o["id"] in ids]
-    path = R.envelopes_pdf(sh, rows, catalog(), find, Path(b["path"]))
+    path = R.envelopes_pdf(sh, rows, catalog(), find, _pdf_dest(b))
     return {"path": str(path), "photos_found": found, "pages": len(rows)}
+
+
+def _pdf_pages(path) -> int:
+    import re
+    try:
+        return len(re.findall(rb"/Type\s*/Page[^s]", Path(path).read_bytes()))
+    except OSError:
+        return 0
+
+
+def _pdf_dest(b) -> Path:
+    """Where to write a PDF: the path given, or for a preview a fresh file in the temp folder
+    (older previews are cleared out first)."""
+    if not b.get("preview"):
+        return Path(b["path"])
+    import tempfile, time, uuid
+    d = Path(tempfile.gettempdir()) / "KeeperStudio previews"
+    d.mkdir(parents=True, exist_ok=True)
+    for f in d.glob("*.pdf"):
+        try:
+            if time.time() - f.stat().st_mtime > 3600:
+                f.unlink()
+        except OSError:
+            pass
+    return d / f"{uuid.uuid4().hex}.pdf"
+
+
+def r_pdf_keep(b):
+    """Save a previewed PDF where the user chose: a copy of the temp file."""
+    import shutil, tempfile
+    src, dest = Path(b["src"]), Path(b["path"])
+    if Path(tempfile.gettempdir()) / "KeeperStudio previews" != src.parent or not src.is_file():
+        raise ValueError("That preview is gone. Make it again.")
+    if dest.suffix.lower() != ".pdf":
+        dest = dest.with_suffix(".pdf")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    data = src.read_bytes()
+    SC.write_file(data, dest)
+    return {"path": str(dest)}
 
 
 def r_matching_pdf(b):
@@ -708,8 +747,8 @@ def r_matching_pdf(b):
     sh = book.shoot(sid) or {}
     find, found = _photo_finder(str(b.get("folder") or sh.get("folder") or ""))
     index = found
-    path = R.matching_pdf(sh, book.orders(sid), catalog(), book.extras(sid), _team_photos(sid), find, Path(b["path"]))
-    return {"path": str(path), "photos_found": bool(index)}
+    path = R.matching_pdf(sh, book.orders(sid), catalog(), book.extras(sid), _team_photos(sid), find, _pdf_dest(b))
+    return {"path": str(path), "photos_found": bool(index), "pages": _pdf_pages(path)}
 
 
 def r_meridian_settings(b):
@@ -796,7 +835,7 @@ ROUTES = {
     "/api/orders/import-web": r_import_web, "/api/orders/open-prices": r_open_prices,
     "/api/orders/report": r_report, "/api/orders/analysis": r_analysis,
     "/api/orders/extras": r_extras, "/api/orders/extra/save": r_extra_save, "/api/orders/extra/delete": r_extra_delete,
-    "/api/orders/matching-pdf": r_matching_pdf, "/api/orders/shoot-hours": r_shoot_hours,
+    "/api/orders/matching-pdf": r_matching_pdf, "/api/orders/pdf-keep": r_pdf_keep, "/api/orders/shoot-hours": r_shoot_hours,
     "/api/orders/backups": r_backups, "/api/orders/backup-now": r_backup_now, "/api/orders/backup-second": r_backup_second,
     "/api/orders/backup-restore": r_backup_restore, "/api/orders/folder-link": r_folder_link,
     "/api/orders/folder-status": r_folder_status, "/api/orders/folder-import": r_folder_import,

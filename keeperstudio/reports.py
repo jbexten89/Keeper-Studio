@@ -599,7 +599,7 @@ def matching_pdf(shoot: dict, orders: list[dict], catalog, extras: list[dict], t
         c.restoreState()
 
     doc = SimpleDocTemplate(str(path), pagesize=letter, leftMargin=0.5 * inch, rightMargin=0.5 * inch,
-                            topMargin=0.5 * inch, bottomMargin=0.7 * inch, title=f"{shoot.get('name') or 'Shoot'} — matching sheets")
+                            topMargin=0.5 * inch, bottomMargin=0.7 * inch, title=f"{shoot_title(shoot) or 'Shoot'} — matching sheets")
     doc.build(story or [P("No envelopes yet.")], onFirstPage=foot, onLaterPages=foot)
     return path
 
@@ -651,7 +651,7 @@ def envelopes_pdf(shoot: dict, orders: list[dict], catalog, find_photo, path: Pa
     alc = [p for p in catalog.products if p.type == "alacarte"]
     misc = [p for p in catalog.products if p.type == "misc"]
     c = rl_canvas.Canvas(str(path), pagesize=letter)
-    c.setTitle(f"Envelopes - {shoot.get('name', '')}")
+    c.setTitle(f"Envelopes - {shoot_title(shoot)}")
     rows = sorted(orders, key=lambda o: (int(o.get("team_rank", 10_000)), str(o.get("team") or "").lower(), _env_num(o.get("envelope"))))
 
     def blank(x, y, qty, w=26):

@@ -152,6 +152,11 @@ price, keepsakes are one price, and a Memory Mate is built from an individual
   5–30% in from both sides of the group framing, plus the middle. Line the
   team's outer edges up on the same color; while adjusting, the arrows move
   0.1% (Shift 1%).
+* **PDF previews:** Matching sheets and Envelopes open in a preview window
+  first (the whole page, with page arrows, zoom and print). *Save PDF…* keeps
+  it where you choose; *Open in PDF app* opens it in your own viewer. Shoot
+  summary, Pull sheet and Crop list preview as a page laid out like the PDF.
+  Every report's title is the shoot with its year ("Winter Sports 2026").
 * **Digital envelopes:** Export ▾ → *Envelopes (PDF)*, or *PDF* on one envelope,
   draws each envelope like the paper order form, with your logo: the
   packages and a la carte boxes with the choices filled in, the name, parent,

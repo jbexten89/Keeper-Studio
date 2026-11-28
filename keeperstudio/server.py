@@ -120,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, retouch.image(q["id"][0], q["w"][0]), "image/jpeg")
             if u.path == "/file":  # an output we wrote (composite, cut-out, contact sheet)
                 p = q["p"][0]
-                ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}.get(Path(p).suffix.lower(), "application/octet-stream")
+                ctype = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".pdf": "application/pdf"}.get(Path(p).suffix.lower(), "application/octet-stream")
                 return self._send(200, Path(p).read_bytes(), ctype)
             if u.path.startswith("/api/job/"):
                 job = jobs.get(u.path.rsplit("/", 1)[1])

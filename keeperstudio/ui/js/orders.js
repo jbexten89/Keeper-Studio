@@ -67,14 +67,29 @@ const Ord = {
   },
   async matchingPdf() {
     const s = this.shoot(); if (!s) return;
-    const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
-    const p = await pickPath('save', { initial: dir, filename: `${sanitize(s.name || 'Shoot')} - matching sheets.pdf`, types: ['PDF (*.pdf)'] }); if (!p) return;
     toast('Making matching sheets…', 2000);
-    try {
-      const r = await api('/api/orders/matching-pdf', { shoot_id: this.sid, path: p, folder: S.root || '' });
-      DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
-      toast(`Saved ${esc(baseName(r.path))}${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
-    } catch (e) { toast(esc(e.message), 5000); }
+    let r; try { r = await api('/api/orders/matching-pdf', { shoot_id: this.sid, preview: true, folder: S.root || '' }); } catch (e) { return toast(esc(e.message), 5000); }
+    this.pdfPreview(r, 'Matching sheets', `${sanitize(s.name || 'Shoot')} - matching sheets.pdf`);
+  },
+  // A PDF made into the temp folder, shown in the app before it's saved anywhere.
+  pdfPreview(r, what, filename) {
+    const note = r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it';
+    openModal(`<div class="rep-head"><div><h3 style="margin:0 0 2px">${esc(what)}</h3><div class="muted small">Preview · ${plural(r.pages || 0, 'page')}${note}</div></div>
+        <div class="m-actions" style="margin:0"><button class="btn" data-close>Close</button><button class="btn" data-pv-open title="Open it in your PDF app">Open in PDF app</button><button class="btn primary" data-pv-save>Save PDF…</button></div></div>
+      <div class="pdf-pv"><iframe src="${fileUrl(r.path, Date.now())}#view=Fit&toolbar=1&navpanes=0" title="${esc(what)}"></iframe></div>`, card => {
+      card.classList.add('report', 'pdf');
+      $('[data-pv-open]', card).addEventListener('click', () => api('/api/open-file', { path: r.path }).catch(e => toast(esc(e.message))));
+      $('[data-pv-save]', card).addEventListener('click', async () => {
+        const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
+        const p = await pickPath('save', { initial: dir, filename, types: ['PDF (*.pdf)'] }); if (!p) return;
+        try {
+          const k = await api('/api/orders/pdf-keep', { src: r.path, path: p });
+          DB.put('kv', 'orders|exportdir', dirName(k.path)).catch(() => {});
+          closeModal();
+          toast(`Saved ${esc(baseName(k.path))} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(k.path))})">Show</button>`, 7000);
+        } catch (e) { toast(esc(e.message), 5000); }
+      });
+    });
   },
   // ---------- Form view: an envelope drawn like the paper order form, in the app ----------
   formHTML(o) {
@@ -152,15 +167,10 @@ const Ord = {
   async envelopesPdf(ids) {
     const s = this.shoot(); if (!s) return;
     const one = ids && ids.length === 1 ? this.d.orders.find(o => o.id === ids[0]) : null;
-    const dir = (await DB.get('kv', 'orders|exportdir').catch(() => null)) || S.root || '';
     const name = one ? `${sanitize(s.name || 'Shoot')} - envelope ${sanitize(one.envelope || one.id)}.pdf` : `${sanitize(s.name || 'Shoot')} - envelopes.pdf`;
-    const p = await pickPath('save', { initial: dir, filename: name, types: ['PDF (*.pdf)'] }); if (!p) return;
-    toast('Making envelope PDF…', 2000);
-    try {
-      const r = await api('/api/orders/envelopes-pdf', { shoot_id: this.sid, path: p, folder: S.root || '', ids: ids || [] });
-      DB.put('kv', 'orders|exportdir', dirName(r.path)).catch(() => {});
-      toast(`Saved ${esc(baseName(r.path))} (${plural(r.pages, 'page')})${r.photos_found ? '' : ' · open the shoot’s photo folder to get the photos on it'} <button class="toast-link" onclick="reveal(${esc(JSON.stringify(r.path))})">Show</button>`, 7000);
-    } catch (e) { toast(esc(e.message), 5000); }
+    toast(one ? 'Making the envelope…' : 'Making envelopes…', 2000);
+    let r; try { r = await api('/api/orders/envelopes-pdf', { shoot_id: this.sid, preview: true, folder: S.root || '', ids: ids || [] }); } catch (e) { return toast(esc(e.message), 5000); }
+    this.pdfPreview(r, one ? `Envelope ${one.envelope || ''}`.trim() : 'Envelopes', name);
   },
   async backups() {
     let L; try { L = await api('/api/orders/backups', {}); } catch (e) { return toast(esc(e.message)); }
